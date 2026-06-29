@@ -23,6 +23,7 @@ function parseCanonForm(formData: FormData): CanonUpdate {
     prompt_prefix: String(formData.get("prompt_prefix") ?? "").trim(),
     prompt_suffix: String(formData.get("prompt_suffix") ?? "").trim(),
     negative_prompt: String(formData.get("negative_prompt") ?? "").trim(),
+    reference_imgs: lines("reference_imgs").filter((u) => /^https?:\/\//i.test(u)),
     style_guide: {
       do: lines("do_rules"),
       never: lines("never_rules"),
@@ -59,6 +60,7 @@ export async function saveCanonAction(
         prompt_prefix: patch.prompt_prefix,
         prompt_suffix: patch.prompt_suffix,
         negative_prompt: patch.negative_prompt,
+        reference_imgs: patch.reference_imgs,
         style_guide: patch.style_guide,
       });
     }

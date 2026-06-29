@@ -13,9 +13,10 @@ export function wayfindersCanon(projectId: string): CanonInsert {
     lora_trigger: "wyfndrstyle",
     lora_status: "none",
     prompt_prefix:
-      "wyfndrstyle, cozy stylized faceted low-poly, flat-shaded facets, chunky " +
-      "rounded forms, silhouette-first, vertex-color flat materials, soft bloom, " +
-      "one warm key light, storybook papercraft diorama charm",
+      "wyfndrstyle, low-poly 3D game asset, untextured flat-shaded faceted geometry, " +
+      "hard faceted edges, blender low-poly render, chunky rounded forms, simple flat " +
+      "vertex colors, minimal polygons, silhouette-first, cozy stylized, soft bloom, " +
+      "one warm key light, storybook papercraft diorama",
     prompt_suffix:
       "saturated-but-soft palette, legible, 3/4 view, isolated object, neutral background",
     negative_prompt:

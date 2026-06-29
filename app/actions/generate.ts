@@ -66,9 +66,19 @@ export async function runGenerateAction(
 
   const mode = String(formData.get("mode") ?? "image") === "model" ? "model" : "image";
   const run = mode === "model" ? runGenerationPipeline : runImagePipeline;
+  const assetType = String(formData.get("assetType") ?? "prop");
+  const provider =
+    String(formData.get("provider") ?? "flux") === "nanobanana" ? "nanobanana" : "flux";
 
   try {
-    await run({ projectId: active.id, projectSlug: active.slug, title, prompt });
+    await run({
+      projectId: active.id,
+      projectSlug: active.slug,
+      title,
+      prompt,
+      assetType,
+      provider,
+    });
   } catch (err) {
     return {
       ok: false,

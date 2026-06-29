@@ -40,6 +40,9 @@ export function CanonForm({ canon }: { canon: Canon | null }) {
   const doRules = stringArray(sg, "do").join("\n");
   const neverRules = stringArray(sg, "never").join("\n");
   const palette = paletteHexes(sg).join(", ");
+  const referenceImgs = Array.isArray(canon?.reference_imgs)
+    ? canon.reference_imgs.filter((x): x is string => typeof x === "string").join("\n")
+    : "";
 
   return (
     <form action={action} className="flex flex-col gap-4">
@@ -140,6 +143,23 @@ export function CanonForm({ canon }: { canon: Canon | null }) {
           placeholder="One rule per line"
           className={`${control} resize-y`}
         />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="reference_imgs" className="text-sm font-medium text-zinc-300">
+          Reference image URLs
+        </label>
+        <textarea
+          id="reference_imgs"
+          name="reference_imgs"
+          rows={3}
+          defaultValue={referenceImgs}
+          placeholder="https://… (one per line) — used as a style anchor by Nano Banana"
+          className={`${control} resize-y`}
+        />
+        <p className="text-xs text-zinc-500">
+          One image URL per line. Nano Banana conditions on these to match your game’s look.
+        </p>
       </div>
 
       {(canon?.lora_trigger || canon) && (

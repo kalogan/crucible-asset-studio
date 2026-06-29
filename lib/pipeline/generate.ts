@@ -9,19 +9,32 @@ import {
   removeBackground,
   generateModelFromImage,
   persistToStorage,
+  persistBase64ToStorage,
+  extForContentType,
+  generateImageNanoBanana,
   enrichPrompt,
   FLUX_TEXT2IMG,
   TRELLIS_DEFAULTS,
 } from "@/lib/executor";
 import type { Asset, Canon } from "@/lib/schema";
 import { buildFinalPrompt } from "@/lib/canon/prompt";
+import { framingFor } from "@/lib/canon/framing";
 import { buildStoragePath, catalogKeyFor } from "./paths";
+
+export type ImageProvider = "flux" | "nanobanana";
 
 export interface PipelineInput {
   projectId: string;
   projectSlug: string;
   title: string;
   prompt: string;
+  assetType?: string;
+  provider?: ImageProvider;
+}
+
+function referenceUrls(canon: Canon | null): string[] {
+  if (!canon || !Array.isArray(canon.reference_imgs)) return [];
+  return canon.reference_imgs.filter((x): x is string => typeof x === "string");
 }
 
 /**
@@ -62,8 +75,29 @@ async function generate2D(
   catalogKey: string,
 ) {
   await updateJob(jobId, { phase: "image" });
+  // Canon supplies style; the asset-type framing supplies format (+ format nevers).
+  const framing = framingFor(input.assetType ?? "prop");
   const subject = await expandSubject(canon, input.prompt);
-  const finalPrompt = buildFinalPrompt(canon, subject);
+  const framedSubject = framing.formatCues ? `${subject}, ${framing.formatCues}` : subject;
+  const finalPrompt = buildFinalPrompt(canon, framedSubject, framing.nevers);
+
+  // Nano Banana (Gemini 2.5 Flash Image): text→image + canon reference images as a
+  // style anchor. Returns inline base64; persist it. Fail-soft -> null if no key.
+  if (input.provider === "nanobanana") {
+    const img = await generateImageNanoBanana(finalPrompt, {
+      referenceImageUrls: referenceUrls(canon),
+    });
+    if (!img) {
+      throw new Error("Nano Banana returned no image — is GEMINI_API_KEY set?");
+    }
+    const imageUrl = await persistBase64ToStorage({
+      base64: img.base64,
+      mimeType: img.mimeType,
+      path: buildStoragePath(input.projectSlug, catalogKey, extForContentType(img.mimeType)),
+    });
+    return { imageUrl, finalPrompt, predictionId: "nanobanana" };
+  }
+
   const image = await generateImage(finalPrompt, { width: 1024, height: 1024 });
   const imageUrl = await persistToStorage({
     sourceUrl: image.url,

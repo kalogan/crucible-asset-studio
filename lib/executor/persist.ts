@@ -37,6 +37,26 @@ export async function persistToStorage({
   return data.publicUrl;
 }
 
+/** Persist raw base64 image bytes (e.g. Gemini/nano-banana inline output) to Storage. */
+export async function persistBase64ToStorage({
+  base64,
+  mimeType,
+  path,
+}: {
+  base64: string;
+  mimeType: string;
+  path: string;
+}): Promise<string> {
+  const supabase = createServiceClient();
+  const bytes = Uint8Array.from(Buffer.from(base64, "base64"));
+  const { error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(path, bytes, { upsert: true, contentType: mimeType });
+  if (error) throw new Error(`persistBase64ToStorage: upload failed — ${error.message}`);
+  const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 /** Pick a storage extension from a content type. */
 export function extForContentType(contentType: string): string {
   if (contentType.includes("gltf-binary") || contentType.includes("glb")) return "glb";

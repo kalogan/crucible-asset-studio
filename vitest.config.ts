@@ -17,6 +17,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./", import.meta.url)),
+      // `server-only` throws outside RSC; stub it so pure helpers in server-only
+      // modules are unit-testable. The guard still applies in the real app.
+      "server-only": fileURLToPath(new URL("./test/stubs/server-only.ts", import.meta.url)),
     },
   },
 });

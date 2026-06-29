@@ -45,7 +45,9 @@ export async function listSpecsWithAssetByProject(
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("asset_specs")
-    .select("id,title,prompt,created_at,assets(raw_path,kind,created_at)")
+    // Disambiguate: assets has TWO FKs to asset_specs (assets.spec_id and
+    // asset_specs.source_asset_id) — name the one we want explicitly.
+    .select("id,title,prompt,created_at,assets!assets_spec_id_fkey(raw_path,kind,created_at)")
     .eq("project_id", projectId)
     .order("created_at", { ascending: false })
     .limit(60);

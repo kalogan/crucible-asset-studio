@@ -17,7 +17,11 @@ function paletteHexes(styleGuide: Record<string, unknown>): string[] {
  *   - FLUX-schnell has no negative field, so the canon's "nevers" are baked into the
  *     positive prompt as `no X` (the March trick)
  */
-export function buildFinalPrompt(canon: Canon | null, subject: string): string {
+export function buildFinalPrompt(
+  canon: Canon | null,
+  subject: string,
+  extraNevers: string[] = [],
+): string {
   const clean = (s: string) => s.trim().replace(/^[,\s]+|[,\s]+$/g, "");
   const subj = clean(subject);
   if (!canon) {
@@ -30,11 +34,15 @@ export function buildFinalPrompt(canon: Canon | null, subject: string): string {
   const hexes = paletteHexes(canon.style_guide).slice(0, 8);
   if (hexes.length) parts.push(`palette ${hexes.join(", ")}`);
 
-  const nevers = canon.negative_prompt
-    .split(",")
+  // FLUX-schnell has no negative field — bake the canon's nevers + any
+  // format-specific nevers (from the asset-type framing) into the positive prompt.
+  const nevers = [
+    ...canon.negative_prompt.split(","),
+    ...extraNevers,
+  ]
     .map((s) => s.trim())
     .filter(Boolean)
-    .slice(0, 12);
+    .slice(0, 14);
   if (nevers.length) parts.push(nevers.map((n) => `no ${n}`).join(", "));
 
   return parts.filter((p) => p.length > 0).join(", ");

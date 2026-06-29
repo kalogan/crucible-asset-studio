@@ -7,6 +7,7 @@ import {
   type GenerationStatus,
 } from "@/app/actions/generate";
 import type { ActionResult } from "@/app/actions/projects";
+import { ASSET_TYPE_OPTIONS } from "@/lib/canon/framing";
 
 const control =
   "rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-zinc-100 " +
@@ -165,6 +166,34 @@ export function GenerateForm({
         <p className="text-xs text-zinc-500">
           Describe the subject — the project canon supplies the style.
         </p>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-1 flex-col gap-1.5">
+          <label htmlFor="assetType" className="text-sm font-medium text-zinc-300">
+            Asset type
+          </label>
+          <select id="assetType" name="assetType" defaultValue="prop" className={`${control} min-h-11`}>
+            {ASSET_TYPE_OPTIONS.map((o) => (
+              <option key={o.key} value={o.key}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-zinc-500">Supplies the format (canon supplies the style).</p>
+        </div>
+        <div className="flex flex-1 flex-col gap-1.5">
+          <label htmlFor="provider" className="text-sm font-medium text-zinc-300">
+            Image model
+          </label>
+          <select id="provider" name="provider" defaultValue="flux" className={`${control} min-h-11`}>
+            <option value="flux">FLUX (Replicate)</option>
+            <option value="nanobanana">Nano Banana (Gemini)</option>
+          </select>
+          <p className="text-xs text-zinc-500">
+            Nano Banana uses the canon’s reference images as a style anchor (needs GEMINI_API_KEY).
+          </p>
+        </div>
       </div>
 
       <fieldset className="flex flex-col gap-1.5">
