@@ -1,16 +1,16 @@
 import type { ProjectStatus } from "@/lib/schema";
 
-/** Badge classes per portfolio status (not color-only — the label text carries meaning). */
+/** Badge classes per portfolio status (token-driven; label text also carries meaning). */
 export function statusBadgeClass(status: ProjectStatus): string {
   switch (status) {
     case "shipped":
-      return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
+      return "border-accent/30 bg-accent/10 text-accent";
     case "active":
-      return "border-amber-500/40 bg-amber-500/10 text-amber-300";
+      return "border-primary/30 bg-primary/10 text-primary";
     case "paused":
-      return "border-zinc-600 bg-zinc-800 text-zinc-400";
+      return "border-border bg-muted text-muted-foreground";
     case "prototype":
     default:
-      return "border-sky-500/40 bg-sky-500/10 text-sky-300";
+      return "border-border bg-secondary text-muted-foreground";
   }
 }
