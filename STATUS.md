@@ -5,7 +5,10 @@ _Durable status for the Architect/Builder pipeline (write → persist → notify
 ## Where we are
 
 **Phase 0 — kernel mining:** ✅ done (`KERNEL_LESSONS.md`).
-**Phase 1 — platform spine:** ✅ code-complete, gate-green, pushed. **Live run pending your keys.**
+**Phase 1 — platform spine:** ✅ code-complete, gate-green, pushed. Supabase **live**: keys in
+`.env.local`, migrations applied (`pnpm migrate`), DB functionally verified (insert/constraint/
+storage-bucket), app boots with the project switcher against the real DB. TRELLIS pinned version
+re-verified valid. **Only the first paid Generate remains** (Replicate token is in; ~$0.09/run).
 
 | Slice | What | Commit |
 |---|---|---|
