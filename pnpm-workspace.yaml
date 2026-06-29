@@ -1,0 +1,9 @@
+# Standalone pnpm root. This file's presence shadows the ancestor workspace at
+# C:/Users/kevin so Crucible installs into a LOCAL node_modules with its own
+# lockfile, instead of being absorbed into that workspace. Single-package repo —
+# no member packages.
+packages: []
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
