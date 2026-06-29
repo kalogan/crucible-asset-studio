@@ -78,6 +78,44 @@ Three options, cheapest first:
   a **reusable generation/render kit** (the kit-registry "linked art-kit") so new games plug in instead
   of starting from scratch.
 
+### Roadmap — asset ingestion (added 2026-06-29)
+
+**A. Bulk / multi-type import from a game harness.** Today "Export to Crucible" grabs the Props
+gallery's art-kit ids (the selected pack's props + the mobs it references) for ONE pack. Extend to
+grab any/all asset types — one category at a time or in bulk. The catch: **each category has a
+different id source in the harness**, so design per source (don't dump the flat `ART_KIT` registry —
+it would silently miss the real creature/character sets):
+- **Props** — pack-scoped art-kit ids (`collectArtKitIds(pack)`, prefix `prop.`). Bulk = iterate all
+  packs (`loadAllPacks`), dedup, tag each with the pack(s)/region(s) that use it. *Proven path,
+  lowest risk → the recommended first slice.*
+- **Creatures / beasts** — NOT just `ART_KIT`'s `mob.*` kit; the real set is the **Bestiary** (~77
+  mobs via the creature engine / descriptors, `loadBestiary`). Needs the creature build path, not
+  `generateArtKit` alone. Tag by family/biome.
+- **Characters** — the class-silhouette templates (`makeHumanoidGenerator`, `char.*`). Static posed
+  export; tag by class.
+- **Biomes** — NOT a single mesh; a whole zone/scene. Either export a representative scene capture or
+  fall back to a screenshot (`format: image`). Different mechanism — decide separately.
+- Crucible side already accepts all of this (type + tags + GLB/image); this is **mostly harness
+  work** + a category-select UI. Per-asset `artKitId` keeps re-sync (replace-not-duplicate) working.
+- **Decisions needed (Kevin):** (1) scope per run — current pack vs all packs? (2) creatures: full
+  Bestiary or just the legacy `mob.*` kit? (3) biomes: scene-capture GLB or screenshot? (4) for a
+  prop used by several packs, tag with all regions or just one?
+
+**B. Reverse sync — trigger a grab FROM Crucible.** Today the push is harness→Crucible (the game
+initiates). Add a Crucible-initiated pull so a "grab latest from <game>" can be triggered from the
+studio. Crosses an architecture boundary (Crucible must reach the game's generators). Options,
+cheap→expensive:
+1. **Remote-trigger endpoint on the game** — the deployed game exposes an authed
+   `POST /export-to-crucible` that runs the same export; Crucible calls it. Needs the game
+   running/deployed; loosest coupling.
+2. **Run the generators inside Crucible** — import the game's art-kit module and generate locally
+   (no game runtime); couples the code. This is the deferred "run generators in Crucible" step.
+3. **Shared art-kit package** — extract the generators to a package both consume (the "reusable
+   art-kit kit" end-goal).
+- Ties directly into the existing **"Live procgen renderer, evolutionary"** line (run generators in
+  Crucible → reusable kit). **Decision needed:** which direction — and is the trigger per-game ad-hoc
+  or a registered "linked source" per project?
+
 ### Later phases
 - **Phase 3 — bulk + finish + publish:** resumable, cost-capped **batch worker** (sync gen is
   prod-unsafe at volume); **Kiln** finishing module (retopo + baked PBR); **CDN publish** + per-project
