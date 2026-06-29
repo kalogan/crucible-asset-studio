@@ -12,6 +12,8 @@ import {
   TRELLIS_DEFAULTS,
 } from "@/lib/executor";
 import type { Asset } from "@/lib/schema";
+import { getCanonByProject } from "@/lib/db/canons";
+import { buildFinalPrompt } from "@/lib/canon/prompt";
 import { buildStoragePath, catalogKeyFor } from "./paths";
 
 export interface PipelineInput {
@@ -33,9 +35,11 @@ export interface PipelineInput {
  */
 export async function runGenerationPipeline(input: PipelineInput): Promise<Asset> {
   const catalogKey = catalogKeyFor(input.title);
+  const canon = await getCanonByProject(input.projectId);
 
   const spec = await createAssetSpec({
     project_id: input.projectId,
+    canon_id: canon?.id ?? null,
     catalog_key: catalogKey,
     asset_type: "model_3d",
     title: input.title,
@@ -48,8 +52,10 @@ export async function runGenerationPipeline(input: PipelineInput): Promise<Asset
   });
 
   try {
-    const enriched = await enrichPrompt(input.prompt);
-    const finalPrompt = `${enriched}, isolated object, neutral background`;
+    // Canon supplies the style (prefix/suffix); the user supplies the subject.
+    // enrich is fail-soft (no-op without an Anthropic key).
+    const subject = await enrichPrompt(input.prompt);
+    const finalPrompt = buildFinalPrompt(canon, subject);
 
     // 1. FLUX text -> image, persist the raw 2D output.
     await updateJob(job.id, { phase: "image" });
@@ -90,8 +96,10 @@ export async function runGenerationPipeline(input: PipelineInput): Promise<Asset
       image_prediction: image.predictionId,
       model_prediction: model.predictionId,
       trellis: TRELLIS_DEFAULTS,
-      lora_ref: null,
-      canon_id: null,
+      canon_id: canon?.id ?? null,
+      canon_name: canon?.name ?? null,
+      lora_ref: canon?.lora_ref ?? null,
+      lora_trigger: canon?.lora_trigger ?? null,
     };
 
     await updateJob(job.id, {

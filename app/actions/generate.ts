@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { getActiveProject } from "@/lib/active-project";
 import { runGenerationPipeline } from "@/lib/pipeline/generate";
+import { getCanonByProject } from "@/lib/db/canons";
+import { canonReadiness } from "@/lib/canon/precision";
 import {
   countJobsSince,
   countActiveJobsSince,
@@ -28,6 +30,19 @@ export async function runGenerateAction(
   const prompt = String(formData.get("prompt") ?? "").trim();
   if (title.length < 2) return { ok: false, error: "Title is required." };
   if (prompt.length < 3) return { ok: false, error: "Prompt is required." };
+
+  // ── Canon precision gate: if a canon exists it must be ready (CANON_INTAKE §6).
+  // No canon = canon-free generation is allowed (output won't be on-style).
+  const canon = await getCanonByProject(active.id);
+  if (canon) {
+    const { ready, missing } = canonReadiness(canon);
+    if (!ready) {
+      return {
+        ok: false,
+        error: `Canon "${canon.name}" isn't ready — missing: ${missing.join(", ")}. Finish it in the Canon panel.`,
+      };
+    }
+  }
 
   // ── Cost guardrails (before any spend) ──
   const now = new Date();
