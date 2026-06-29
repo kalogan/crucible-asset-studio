@@ -2,8 +2,10 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { createProject, getProject, getProjectBySlug } from "@/lib/db/projects";
+import { redirect } from "next/navigation";
+import { createProject, getProject, getProjectBySlug, updateProject } from "@/lib/db/projects";
 import { parseCreateProjectForm } from "@/lib/projects/createInput";
+import { ProjectStatus } from "@/lib/schema";
 import { ACTIVE_PROJECT_COOKIE } from "@/lib/active-project";
 
 export interface ActionResult {
@@ -59,4 +61,44 @@ export async function setActiveProjectAction(
       error: err instanceof Error ? err.message : "Failed to switch project.",
     };
   }
+}
+
+/** Portfolio-face edit (Overview). Never touches the generation face. */
+export async function updateProjectAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const id = String(formData.get("projectId") ?? "");
+  const slug = String(formData.get("slug") ?? "");
+  if (!id) return { ok: false, error: "Missing project." };
+  const orNull = (k: string) => {
+    const v = String(formData.get(k) ?? "").trim();
+    return v.length > 0 ? v : null;
+  };
+  const statusParsed = ProjectStatus.safeParse(String(formData.get("status") ?? ""));
+  try {
+    await updateProject(id, {
+      description: orNull("description"),
+      url: orNull("url"),
+      repo_url: orNull("repo_url"),
+      screenshot: orNull("screenshot"),
+      ...(statusParsed.success ? { status: statusParsed.data } : {}),
+    });
+    revalidatePath("/");
+    if (slug) revalidatePath(`/projects/${slug}`);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to save." };
+  }
+}
+
+const WORKSPACE_PATHS = new Set(["/generate", "/review", "/canon", "/prompts"]);
+
+/** Set a game active, then enter its generation workspace. */
+export async function openWorkspaceAction(formData: FormData): Promise<void> {
+  const id = String(formData.get("projectId") ?? "");
+  const target = String(formData.get("target") ?? "/generate");
+  const dest = WORKSPACE_PATHS.has(target) ? target : "/generate";
+  if (id) await setActiveCookie(id);
+  redirect(dest);
 }

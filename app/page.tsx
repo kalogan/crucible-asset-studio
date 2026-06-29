@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/config";
 import { listProjects } from "@/lib/db/projects";
-import { getActiveProject } from "@/lib/active-project";
-import { ProjectSwitcher } from "@/components/projects/ProjectSwitcher";
+import { statusBadgeClass } from "@/lib/projects/status";
+import { NewGameForm } from "@/components/games/NewGameForm";
 
-// Reads cookies + DB per request — never prerender (no keys at build time).
+// Games gallery — the front door. Reads the PORTFOLIO face only.
 export const dynamic = "force-dynamic";
 
 function SetupNotice() {
@@ -15,14 +15,9 @@ function SetupNotice() {
     >
       <h2 className="text-lg font-semibold text-amber-300">Connect Supabase to begin</h2>
       <p className="mt-2 text-sm text-zinc-300">
-        Copy{" "}
-        <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-100">.env.example</code>{" "}
-        to <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-100">.env.local</code>{" "}
-        and fill in your Supabase URL + keys, then run the migrations in{" "}
-        <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-100">
-          supabase/migrations
-        </code>
-        .
+        Copy <code className="rounded bg-zinc-800 px-1.5 py-0.5">.env.example</code> to{" "}
+        <code className="rounded bg-zinc-800 px-1.5 py-0.5">.env.local</code>, fill in your
+        Supabase keys, then run <code className="rounded bg-zinc-800 px-1.5 py-0.5">pnpm migrate</code>.
       </p>
     </section>
   );
@@ -31,17 +26,14 @@ function SetupNotice() {
 export default async function HomePage() {
   const configured = isSupabaseConfigured();
   const projects = configured ? await listProjects() : [];
-  const active = configured ? await getActiveProject() : null;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-8 px-6 py-12">
+    <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-8 px-6 py-12">
       <header className="flex flex-col gap-2">
-        <p className="text-sm font-medium uppercase tracking-widest text-amber-400">
-          Crucible
-        </p>
-        <h1 className="text-3xl font-semibold text-zinc-50 sm:text-4xl">Asset studio</h1>
+        <p className="text-sm font-medium uppercase tracking-widest text-amber-400">Crucible</p>
+        <h1 className="text-3xl font-semibold text-zinc-50 sm:text-4xl">Games</h1>
         <p className="text-sm text-zinc-400">
-          Multi-game from line one — every asset hangs off a project.
+          Every game is a project — see them all here, then generate assets for each.
         </p>
       </header>
 
@@ -49,55 +41,67 @@ export default async function HomePage() {
         <SetupNotice />
       ) : (
         <>
-          <ProjectSwitcher projects={projects} activeId={active?.id ?? null} />
+          <NewGameForm />
 
-          <section
-            aria-label="Active project"
-            className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5"
-          >
-            {active ? (
-              <div className="flex flex-col gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold text-zinc-50">{active.name}</h2>
-                  <p className="text-sm text-zinc-400">
-                    slug: <span className="text-zinc-300">{active.slug}</span>
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
+          {projects.length === 0 ? (
+            <p className="text-sm text-zinc-300">No games yet — create your first above.</p>
+          ) : (
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {projects.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50"
+                >
                   <Link
-                    href="/generate"
-                    className="inline-flex min-h-11 w-fit items-center rounded-md bg-amber-500 px-4 font-medium text-zinc-950 hover:bg-amber-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+                    href={`/projects/${p.slug}`}
+                    className="group flex flex-col focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400"
                   >
-                    Generate an asset →
+                    <div className="aspect-video w-full overflow-hidden bg-zinc-900">
+                      {p.screenshot ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={p.screenshot}
+                          alt={`${p.name} screenshot`}
+                          className="h-full w-full object-cover transition-opacity group-hover:opacity-90"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-sm text-zinc-600">
+                          No screenshot
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2 p-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <h2 className="font-semibold text-zinc-50 group-hover:text-amber-200">
+                          {p.name}
+                        </h2>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusBadgeClass(p.status)}`}
+                        >
+                          {p.status}
+                        </span>
+                      </div>
+                      {p.description && (
+                        <p className="line-clamp-2 text-sm text-zinc-400">{p.description}</p>
+                      )}
+                    </div>
                   </Link>
-                  <Link
-                    href="/review"
-                    className="inline-flex min-h-11 w-fit items-center rounded-md border border-zinc-700 px-4 font-medium text-zinc-100 hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
-                  >
-                    Review queue
-                  </Link>
-                  <Link
-                    href="/canon"
-                    className="inline-flex min-h-11 w-fit items-center rounded-md border border-zinc-700 px-4 font-medium text-zinc-100 hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
-                  >
-                    Canon
-                  </Link>
-                  <Link
-                    href="/prompts"
-                    className="inline-flex min-h-11 w-fit items-center rounded-md border border-zinc-700 px-4 font-medium text-zinc-100 hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
-                  >
-                    Prompt library
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-zinc-400">
-                {projects.length > 0
-                  ? "Pick a project above to make it active."
-                  : "Create your first project to get started."}
-              </p>
-            )}
-          </section>
+                  {p.url && (
+                    <div className="px-4 pb-4">
+                      <a
+                        href={p.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded text-sm text-amber-300 underline underline-offset-2 hover:text-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400"
+                      >
+                        Play ↗
+                      </a>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </>
       )}
     </main>

@@ -1,6 +1,12 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
-import { Project, ProjectInsert, type ProjectInsert as ProjectInsertT } from "@/lib/schema";
+import {
+  Project,
+  ProjectInsert,
+  ProjectUpdate,
+  type ProjectInsert as ProjectInsertT,
+  type ProjectUpdate as ProjectUpdateT,
+} from "@/lib/schema";
 
 export async function createProject(input: ProjectInsertT): Promise<Project> {
   const supabase = createServiceClient();
@@ -33,6 +39,19 @@ export async function getProject(id: string): Promise<Project | null> {
     .maybeSingle();
   if (error) throw new Error(`getProject: ${error.message}`);
   return data ? Project.parse(data) : null;
+}
+
+export async function updateProject(id: string, patch: ProjectUpdateT): Promise<Project> {
+  const supabase = createServiceClient();
+  const payload = ProjectUpdate.parse(patch);
+  const { data, error } = await supabase
+    .from("projects")
+    .update(payload)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw new Error(`updateProject: ${error.message}`);
+  return Project.parse(data);
 }
 
 export async function getProjectBySlug(slug: string): Promise<Project | null> {

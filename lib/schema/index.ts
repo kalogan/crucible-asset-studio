@@ -34,11 +34,22 @@ export const slugSchema = z
   .string()
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be kebab-case (a-z, 0-9, single hyphens)");
 
-// ── projects ─────────────────────────────────────────────────────────────────
+// ── projects (one record, two faces: identity + portfolio + generation) ──────
+export const ProjectStatus = z.enum(["prototype", "active", "shipped", "paused"]);
+export type ProjectStatus = z.infer<typeof ProjectStatus>;
+
 export const Project = z.object({
+  // identity
   id: uuid,
   slug: slugSchema,
   name: z.string().min(1),
+  // portfolio face (presentation only)
+  description: z.string().nullable(),
+  status: ProjectStatus,
+  url: z.string().nullable(),
+  repo_url: z.string().nullable(),
+  screenshot: z.string().nullable(),
+  // generation face
   context_ref: z.string().nullable(),
   cdn_endpoint: z.string().nullable(),
   created_at: ts,
@@ -49,10 +60,25 @@ export type Project = z.infer<typeof Project>;
 export const ProjectInsert = z.object({
   slug: slugSchema,
   name: z.string().min(1),
+  description: z.string().nullable().optional(),
+  status: ProjectStatus.optional(),
+  url: z.string().nullable().optional(),
+  repo_url: z.string().nullable().optional(),
+  screenshot: z.string().nullable().optional(),
   context_ref: z.string().nullable().optional(),
   cdn_endpoint: z.string().nullable().optional(),
 });
 export type ProjectInsert = z.infer<typeof ProjectInsert>;
+
+/** Portfolio-face edits only (the generation face is never edited here). */
+export const ProjectUpdate = z.object({
+  description: z.string().nullable().optional(),
+  status: ProjectStatus.optional(),
+  url: z.string().nullable().optional(),
+  repo_url: z.string().nullable().optional(),
+  screenshot: z.string().nullable().optional(),
+});
+export type ProjectUpdate = z.infer<typeof ProjectUpdate>;
 
 // ── canons ───────────────────────────────────────────────────────────────────
 export const Canon = z.object({
