@@ -1,6 +1,27 @@
 import "server-only";
-import { startPrediction, pollPrediction, firstOutput } from "./replicate";
+import {
+  startPrediction,
+  pollPrediction,
+  cancelPrediction,
+  firstOutput,
+} from "./replicate";
 import { trellisInput, normalizeModelUrl } from "./trellis";
+
+/**
+ * Poll to completion, but CANCEL the prediction if we give up (timeout/abort/error)
+ * so it stops billing on Replicate's side (cost guardrail). Cancel is fire-and-forget.
+ */
+async function pollOrCancel(
+  predictionId: string,
+  opts: { timeoutMs: number; signal?: AbortSignal },
+): Promise<unknown> {
+  try {
+    return await pollPrediction(predictionId, opts);
+  } catch (err) {
+    await cancelPrediction(predictionId);
+    throw err;
+  }
+}
 
 /**
  * High-level generation helpers — the surface S5 (and the future batch worker)
@@ -39,7 +60,7 @@ export async function generateImage(
   if (pred.status === "succeeded" && pred.output != null) {
     return { predictionId: pred.id, url: String(firstOutput(pred.output)) };
   }
-  const output = await pollPrediction(pred.id, { timeoutMs: 120_000, signal: opts.signal });
+  const output = await pollOrCancel(pred.id, { timeoutMs: 120_000, signal: opts.signal });
   return { predictionId: pred.id, url: String(firstOutput(output)) };
 }
 
@@ -51,7 +72,7 @@ export async function removeBackground(
   if (pred.status === "succeeded" && pred.output != null) {
     return String(firstOutput(pred.output));
   }
-  const output = await pollPrediction(pred.id, { timeoutMs: 120_000, signal: opts.signal });
+  const output = await pollOrCancel(pred.id, { timeoutMs: 120_000, signal: opts.signal });
   return String(firstOutput(output));
 }
 
@@ -61,7 +82,7 @@ export async function generateModelFromImage(
   opts: { signal?: AbortSignal } = {},
 ): Promise<GenResult> {
   const pred = await startPrediction("firtoz/trellis", trellisInput(imageUrl));
-  const output = await pollPrediction(pred.id, { timeoutMs: 360_000, signal: opts.signal });
+  const output = await pollOrCancel(pred.id, { timeoutMs: 360_000, signal: opts.signal });
   const url = normalizeModelUrl(output);
   if (!url) throw new Error("No GLB URL returned from TRELLIS");
   return { predictionId: pred.id, url };
