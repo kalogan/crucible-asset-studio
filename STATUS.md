@@ -321,11 +321,13 @@ preserve: the LLM never moves an NPC.** Movement is pure, seeded, deterministic;
 
 **Track A — Memory v2 ("local model": insert / summarize / store / load / recall).** Each phase is a seam
 + a local default + a provider/remote adapter as a future add; all pure logic unit-tested with a fake model.
-- **A1 — Durable store adapter** (the already-deferred item): a reference `NpcMemoryStore` over SQLite/
-  Postgres/IndexedDB + a `withSafeStore` wrapper that degrades to no-memory on throw. Makes store/load real.
-- **A2 — Rolling summarization** (the missing "summary"): a `Summarizer` seam `summarize(turns, prev) →
-  string` invoked when episodic overflows. Local default = extractive/heuristic (zero-cost); provider-backed
-  variant uses the reasoning provider's `complete`. Compacts old turns into the relational summary.
+- **A1 — Durable store adapter** ✓ SHIPPED (game-kit `7a52cf2`): `createKvNpcStore(kv)` over any async
+  `KVStore` the game supplies (localStorage/Redis/DB/file) + `withSafeStore` degrade wrapper + `createInMemoryKv`.
+  Zero-dep (no DB pulled into the kit).
+- **A2 — Rolling summarization** ✓ SHIPPED (game-kit `7a52cf2`): `Summarizer` seam +
+  `createExtractiveSummarizer` (local, deterministic) + `createProviderSummarizer(complete)` +
+  `consolidateMemory`; `createNpcBrain` takes an optional `summarizer`/`consolidateKeepRecent` and folds the
+  episodic overflow into the summary. Opt-in; verbatim-only default unchanged.
 - **A3 — Local embeddings + semantic recall** (the "local model"): an `Embedder` seam `embed(text)→number[]`
   with a LOCAL default via transformers.js (e.g. all-MiniLM-L6-v2, in-process, no API cost). Store vectors
   with episodic turns; `buildMemoryView` upgrades from "last 8" → top-K by cosine + a few most-recent.
