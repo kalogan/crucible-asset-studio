@@ -241,6 +241,43 @@ seeded-PRNG + vite/deploy presets — all 3–5/5 adoption, low complexity. **Wh
 workspace package (mirror project-mmo's `packages/shared` + `sim-core`) with r3f + vanilla entry points,
 catalogued/scaffolded by Crucible. Decide package layout before extracting.
 
+#### game-kit — built vs gaps (audit 2026-06-29)
+**Built** (`github.com/kalogan/game-kit`): prng · settings · scene-state · lighting (+r3f) · postfx (+r3f)
+· audio · hud · anim (procedural). **Gaps**, prioritized for the most leverage:
+- **HIGH — procgen art-kit registry + geometry/material helpers.** The `id → (prng)=>Object3D` seam +
+  jitter / flat-shade / non-indexed helpers. EVERY three.js game here uses it; it's the backbone of the
+  asset-grab AND the Roblox descriptor renderer (shared primitives). **Biggest single gap.**
+- **HIGH — palette + material factory.** Named palette + flat/emissive factories + the bloom-glow recipe
+  (`toneMapped:false`). Pairs with postfx; project-mmo's `PAL` is the reference.
+- **HIGH — input + camera rigs.** keyboard/mouse/touch mapper + orbit/chase/FPS controllers (every game).
+- **MED — render bootstrap (vanilla)** (renderer+scene+resize+RAF+fixed-timestep ticker, for the 3 vanilla
+  games) · **save/load** (versioned+checksummed localStorage + a pluggable storage adapter) · **netcode**
+  (Colyseus room template + client connector) · **fx/particles** (smoke/glow/emitters — feeds asset-system
+  fx) · **skeletal-anim adapter + the procedural→clip baker** (generalize project-mmo's baker into the kit)
+  · **math/util** (vec/easing/tween/spatial-hash/collision).
+- **LOW — build+deploy presets** (vite + Fly/Vercel/Docker → a separate "ops kit") · i18n · a11y filters.
+
+**Recommended next steps to improve the kit:**
+1. Add the **foundational trio** (art-kit registry + geometry/material helpers + palette) — unlocks procgen
+   parity + the Roblox renderer in one move (highest leverage).
+2. **Input + camera rigs** next.
+3. **Publish + version** it (set `exports` for `.`/`./r3f`, add a `tsc→dist` build) so games can install it;
+   then **prove it** by adopting it in ONE game (swap storm-break's bloom/lighting to game-kit) — validates
+   the dual vanilla/r3f API.
+4. **Crucible as the catalog/scaffolder** — a page listing kit pieces (copy/scaffold), → a "new game" generator.
+
+### Roadmap — "puzzle pieces": plug-and-play game kits (added 2026-06-29)
+The end-state Kevin wants: **pick puzzle pieces, get a working game.** Beyond atoms/systems, define KITS =
+opinionated, RUNNABLE bundles that wire systems + glue + a minimal scene:
+- **Starter kits:** `r3f-3d-starter`, `vanilla-three-starter`, `isometric-roguelike`, `multiplayer-arena`
+  (Colyseus), `procgen-world`, `first-person-walker`. Each = a manifest of systems + glue + a runnable scene.
+- **Crucible = catalog + scaffolder:** browse pieces/kits, toggle what you want → it scaffolds a new game
+  repo (or wires the `game-kit` package). The "spin up these systems" UX, made concrete.
+- **Composability the whole way down:** kits supply *systems*; composable asset-systems (campfire) + the
+  scene editor supply *content*; the agnostic descriptor makes it engine-portable (web ↔ Roblox).
+- **Decision:** kit = generator (scaffolds files) vs runtime (`createGame({ systems })` composed at boot)?
+  Likely both — a config-driven bootstrap + a Crucible repo-skeleton generator.
+
 **Animation baking (in progress):** bake procgen games' PROCEDURAL animators (project-mmo —
 `ProceduralCharacterAnimator` / creature animator, segmented groups, no skeleton) into glTF
 `AnimationClip`s on export, so grabbed creatures/characters animate in Crucible's viewer and carry
