@@ -1,0 +1,239 @@
+"use client";
+
+import { useCallback, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  generateScaffold,
+  type ScaffoldFile,
+  type ScaffoldTarget,
+} from "@/lib/scaffold/generate";
+import type { Tier } from "@/lib/kit/catalog";
+
+export type ScaffoldSystem = { id: string; name: string; tier: Tier };
+
+const TIER_LABELS: Record<Tier, string> = {
+  atom: "Atoms",
+  system: "Systems",
+  kit: "Kits",
+};
+
+const TIER_ORDER: readonly Tier[] = ["atom", "system", "kit"];
+
+/** Group the built systems by tier, preserving the incoming (sorted) order. */
+function groupByTier(systems: readonly ScaffoldSystem[]) {
+  return TIER_ORDER.map((tier) => ({
+    tier,
+    items: systems.filter((s) => s.tier === tier),
+  })).filter((g) => g.items.length > 0);
+}
+
+export function Scaffolder({ systems }: { systems: readonly ScaffoldSystem[] }) {
+  const [name, setName] = useState("My Game");
+  const [target, setTarget] = useState<ScaffoldTarget>("r3f");
+  const [selected, setSelected] = useState<ReadonlySet<string>>(
+    () => new Set(systems.map((s) => s.id)),
+  );
+  const [files, setFiles] = useState<ScaffoldFile[] | null>(null);
+  const [copiedPath, setCopiedPath] = useState<string | null>(null);
+
+  const groups = useMemo(() => groupByTier(systems), [systems]);
+
+  const toggle = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const onGenerate = useCallback(() => {
+    setFiles(
+      generateScaffold({
+        name: name.trim() || "My Game",
+        target,
+        systemIds: [...selected],
+      }),
+    );
+  }, [name, target, selected]);
+
+  const onCopy = useCallback(async (file: ScaffoldFile) => {
+    try {
+      await navigator.clipboard.writeText(file.content);
+      setCopiedPath(file.path);
+      window.setTimeout(() => setCopiedPath(null), 1500);
+    } catch {
+      // Clipboard unavailable (insecure context / no permission) — no-op.
+    }
+  }, []);
+
+  const onDownloadZip = useCallback(async () => {
+    if (!files) return;
+    const { default: JSZip } = await import("jszip");
+    const zip = new JSZip();
+    for (const file of files) zip.file(file.path, file.content);
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const slug =
+      name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "game";
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, [files, name]);
+
+  return (
+    <div className="flex flex-col gap-8">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Configure</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Name, starter target, and the kit pieces to wire in.
+          </p>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-6">
+          {/* Name */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="scaffold-name">Project name</Label>
+            <Input
+              id="scaffold-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="My Game"
+              autoComplete="off"
+            />
+          </div>
+
+          {/* Target */}
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-sm font-medium text-foreground">
+              Starter target
+            </legend>
+            <div className="flex flex-wrap gap-4">
+              {(
+                [
+                  { value: "r3f", label: "React Three Fiber" },
+                  { value: "vanilla", label: "Vanilla three.js" },
+                ] as const
+              ).map((opt) => (
+                <label
+                  key={opt.value}
+                  className="flex cursor-pointer items-center gap-2 text-sm text-foreground"
+                >
+                  <input
+                    type="radio"
+                    name="scaffold-target"
+                    value={opt.value}
+                    checked={target === opt.value}
+                    onChange={() => setTarget(opt.value)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          {/* Systems */}
+          <fieldset className="flex flex-col gap-3">
+            <legend className="text-sm font-medium text-foreground">
+              Kit pieces ({selected.size} selected)
+            </legend>
+            <div className="flex flex-col gap-4">
+              {groups.map((group) => (
+                <div key={group.tier} className="flex flex-col gap-2">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {TIER_LABELS[group.tier]}
+                  </span>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {group.items.map((sys) => {
+                      const checked = selected.has(sys.id);
+                      return (
+                        <label
+                          key={sys.id}
+                          className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggle(sys.id)}
+                            className="h-4 w-4 accent-primary"
+                          />
+                          {sys.name}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </fieldset>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" onClick={onGenerate}>
+              Generate scaffold
+            </Button>
+            {files && (
+              <Button type="button" variant="outline" onClick={onDownloadZip}>
+                Download .zip
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {files && (
+        <section
+          className="flex flex-col gap-4"
+          aria-labelledby="scaffold-output"
+        >
+          <div className="flex items-baseline justify-between gap-2">
+            <h2
+              id="scaffold-output"
+              className="font-serif text-lg font-semibold"
+            >
+              Generated files
+            </h2>
+            <Badge variant="outline" className="tabular-nums">
+              {files.length} files
+            </Badge>
+          </div>
+
+          {files.map((file) => (
+            <Card key={file.path}>
+              <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+                <CardTitle className="text-sm font-medium">
+                  <code>{file.path}</code>
+                </CardTitle>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onCopy(file)}
+                  aria-label={`Copy ${file.path}`}
+                >
+                  {copiedPath === file.path ? "Copied" : "Copy"}
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <pre className="overflow-x-auto rounded-md border border-border bg-muted p-3 text-xs leading-relaxed">
+                  <code>{file.content}</code>
+                </pre>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}

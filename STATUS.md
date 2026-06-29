@@ -328,6 +328,17 @@ superset that also covers the three.js games' art-kit ids)? where the builders l
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
 
+### Shipped 2026-06-29 (kit r3f variants + /kit scaffolder)
+- **game-kit r3f variants** (pushed `e35ad84`) — `useOrbitCamera`/`useChaseCamera`/`useFirstPersonCamera`,
+  `<Particles>`, `useClipPlayer`, `useFixedLoop` (via `game-kit/r3f`). The 2 r3f games can now adopt the
+  WHOLE kit, not just lighting/postfx. Gate: tsc 0 · 178 tests.
+- **/kit scaffolder** (`/kit/scaffold`) — the dashboard → scaffolder step: pick a target (r3f/vanilla) +
+  systems → generate a runnable Vite starter that depends on `game-kit` and wires the picked pieces. Every
+  generated import resolves to a REAL game-kit export (render-bootstrap hoisted first to avoid a TDZ; r3f
+  components as `<Canvas>` children, r3f hooks in an inner `Systems()`); copyable file tree + **Download
+  .zip** (jszip). `lib/scaffold` pure + tested. "Pick pieces → working game."
+- Gate (Crucible): typecheck 0 · lint 0 · test 138 · build 0.
+
 ### Shipped 2026-06-29 (game-kit complete — camera/render/presets/fx/net/clip)
 - **game-kit's six remaining systems** (pushed `6fbca78`) — **camera** (orbit/chase/FPS, no-alloc),
   **render** (vanilla bootstrap + tested fixed-timestep `advance`), **presets** (vite/fly.toml/vercel.json/

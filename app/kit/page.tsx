@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { CoverageSummary } from "@/components/kit/CoverageSummary";
 import { AdoptionMatrix } from "@/components/kit/AdoptionMatrix";
 import { OpportunitiesPanel } from "@/components/kit/OpportunitiesPanel";
@@ -19,6 +20,9 @@ export default function KitPage() {
           <code className="rounded bg-muted px-1 py-0.5 text-xs">lib/kit/catalog.ts</code> —
           director-editable estimates, not computed from the codebases.
         </p>
+        <Button asChild className="mt-2 w-fit">
+          <Link href="/kit/scaffold">Scaffold a game →</Link>
+        </Button>
       </header>
 
       <CoverageSummary />
