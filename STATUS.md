@@ -241,21 +241,19 @@ seeded-PRNG + vite/deploy presets — all 3–5/5 adoption, low complexity. **Wh
 workspace package (mirror project-mmo's `packages/shared` + `sim-core`) with r3f + vanilla entry points,
 catalogued/scaffolded by Crucible. Decide package layout before extracting.
 
-#### game-kit — built vs gaps (audit 2026-06-29)
+#### game-kit — built vs gaps (audit 2026-06-29; live view at `/kit`)
 **Built** (`github.com/kalogan/game-kit`): prng · settings · scene-state · lighting (+r3f) · postfx (+r3f)
-· audio · hud · anim (procedural). **Gaps**, prioritized for the most leverage:
-- **HIGH — procgen art-kit registry + geometry/material helpers.** The `id → (prng)=>Object3D` seam +
-  jitter / flat-shade / non-indexed helpers. EVERY three.js game here uses it; it's the backbone of the
-  asset-grab AND the Roblox descriptor renderer (shared primitives). **Biggest single gap.**
-- **HIGH — palette + material factory.** Named palette + flat/emissive factories + the bloom-glow recipe
-  (`toneMapped:false`). Pairs with postfx; project-mmo's `PAL` is the reference.
-- **HIGH — input + camera rigs.** keyboard/mouse/touch mapper + orbit/chase/FPS controllers (every game).
-- **MED — render bootstrap (vanilla)** (renderer+scene+resize+RAF+fixed-timestep ticker, for the 3 vanilla
-  games) · **save/load** (versioned+checksummed localStorage + a pluggable storage adapter) · **netcode**
-  (Colyseus room template + client connector) · **fx/particles** (smoke/glow/emitters — feeds asset-system
-  fx) · **skeletal-anim adapter + the procedural→clip baker** (generalize project-mmo's baker into the kit)
-  · **math/util** (vec/easing/tween/spatial-hash/collision).
-- **LOW — build+deploy presets** (vite + Fly/Vercel/Docker → a separate "ops kit") · i18n · a11y filters.
+· audio · hud · anim (procedural) · **geo · palette · artkit** (the procgen backbone) · **input · save ·
+math**. So the HIGH-leverage trio + the MED input/save/math are DONE. **Remaining gaps:**
+- **camera rigs** (orbit/chase/FPS — the input *mapper* is built; the camera controllers aren't).
+- **render bootstrap (vanilla)** — renderer+scene+resize+RAF+fixed-timestep ticker (for the 3 vanilla games).
+- **netcode** — Colyseus room template + client connector (2–3 games).
+- **fx/particles** — smoke/glow/emitters (feeds the asset-system fx field).
+- **skeletal-anim adapter + the procedural→clip baker** (generalize project-mmo's baker into the kit).
+- **LOW** — build+deploy presets (vite + Fly/Vercel/Docker → an "ops kit") · i18n · a11y filters.
+
+The **`/kit` health-check** page now shows the live adoption matrix (system × game: uses-own / opportunity /
+n-a) + "build next / adopt here / expand to" rankings — the catalog/scaffolder surface, starting as a dashboard.
 
 **Recommended next steps to improve the kit:**
 1. Add the **foundational trio** (art-kit registry + geometry/material helpers + palette) — unlocks procgen
@@ -329,6 +327,16 @@ superset that also covers the three.js games' art-kit ids)? where the builders l
 - **LoRA Stage 1**: training-set assembly — upload/list/remove turntable renders per project at
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
+
+### Shipped 2026-06-29 (game-kit input/save/math + Kit health-check)
+- **game-kit input/save/math** (pushed `b81600d`) — keybind/action mapper (conflict-swap), versioned +
+  checksummed save store, math/easing/vec3 utils. All three-free. Gate: tsc 0 · 117 tests.
+- **Kit health-check dashboard** (`/kit`) — live **adoption matrix** (system × game: uses-own /
+  opportunity / n-a) + coverage stats + per-game bars + **"build next / adopt here / expand to"** rankings,
+  all derived purely from a director-editable catalog (`lib/kit/catalog.ts`, tested in `derive.test.ts`).
+  The catalog/scaffolder surface, starting as a dashboard — shows where systems are used vs not + what's
+  highest-leverage next.
+- Gate (Crucible): typecheck 0 · lint 0 · test 123 · build 0.
 
 ### Shipped 2026-06-29 (foundational kit trio + Roblox Phase 2)
 - **game-kit foundational trio** (pushed `30eb754`) — `geo` (nonIndexedFlat + deterministic jitterVerts),
