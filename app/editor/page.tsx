@@ -3,8 +3,10 @@ import { isSupabaseConfigured } from "@/lib/config";
 import { getActiveProject } from "@/lib/active-project";
 import { listReferenceAssetsByProject } from "@/lib/db/reference-assets";
 import { listAssetsByProject } from "@/lib/db/assets";
+import { listAssetSystemsByProject } from "@/lib/db/asset-systems";
 import { recipeString } from "@/lib/pipeline/paths";
 import { EditorView, type EditorModel } from "@/components/editor/EditorView";
+import type { AssetSystem } from "@/lib/asset-system/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -15,28 +17,42 @@ export default async function EditorPage() {
   // Only MODEL-format assets with a real url are editable. Mirrors the library
   // page's load (procgen refs + non-rejected generated), filtered to 3D models.
   let models: EditorModel[] = [];
+  let systems: AssetSystem[] = [];
+  // Maps a library asset's RAW id (the id a system part references) → its model
+  // url, so the scene composer can resolve each part of an imported system.
+  const assetUrlById: Record<string, string> = {};
   if (configured && active) {
-    const [refs, generated] = await Promise.all([
+    const [refs, generated, sys] = await Promise.all([
       listReferenceAssetsByProject(active.id),
       listAssetsByProject(active.id),
+      listAssetSystemsByProject(active.id),
     ]);
     const refModels: EditorModel[] = refs
       .filter((r) => r.format === "model" && r.image_path)
-      .map((r) => ({
-        id: `procgen-${r.id}`,
-        label: r.label,
-        type: r.asset_type,
-        url: r.image_path as string,
-      }));
+      .map((r) => {
+        const url = r.image_path as string;
+        assetUrlById[r.id] = url;
+        return {
+          id: `procgen-${r.id}`,
+          label: r.label,
+          type: r.asset_type,
+          url,
+        };
+      });
     const genModels: EditorModel[] = generated
       .filter((a) => a.stage !== "rejected" && a.kind === "model" && a.raw_path)
-      .map((a) => ({
-        id: `generated-${a.id}`,
-        label: recipeString(a.recipe_snapshot, "title", "asset"),
-        type: "generated",
-        url: a.raw_path as string,
-      }));
+      .map((a) => {
+        const url = a.raw_path as string;
+        assetUrlById[a.id] = url;
+        return {
+          id: `generated-${a.id}`,
+          label: recipeString(a.recipe_snapshot, "title", "asset"),
+          type: "generated",
+          url,
+        };
+      });
     models = [...refModels, ...genModels];
+    systems = sys;
   }
 
   return (
@@ -69,7 +85,7 @@ export default async function EditorPage() {
           No 3D models yet. Generate or import some models to edit them here.
         </p>
       ) : (
-        <EditorView models={models} />
+        <EditorView models={models} systems={systems} assetUrlById={assetUrlById} />
       )}
     </main>
   );

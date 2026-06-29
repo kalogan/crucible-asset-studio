@@ -12,12 +12,21 @@ import {
   type InstanceTransform,
   type SceneInstance,
 } from "./SceneComposer";
+import type { AssetSystem } from "@/lib/asset-system/schema";
 
 export interface EditorModel {
   id: string;
   label: string;
   type: string;
   url: string;
+}
+
+export interface EditorViewProps {
+  models: EditorModel[];
+  /** Saved asset-systems for the active project (Scene-mode "Add system" picker). */
+  systems?: AssetSystem[];
+  /** Resolves a system part's raw `assetId` → model url. */
+  assetUrlById?: Record<string, string>;
 }
 
 type EditorMode = "object" | "scene";
@@ -70,7 +79,7 @@ function exportGLB(object: Object3D, filename: string, onDone: () => void): void
   );
 }
 
-export function EditorView({ models }: { models: EditorModel[] }) {
+export function EditorView({ models, systems = [], assetUrlById = {} }: EditorViewProps) {
   const reduced = useReducedMotion();
   const [editorMode, setEditorMode] = useState<EditorMode>("object");
 
@@ -98,7 +107,12 @@ export function EditorView({ models }: { models: EditorModel[] }) {
       {editorMode === "object" ? (
         <ObjectEditor models={models} reduced={reduced} />
       ) : (
-        <SceneEditor models={models} reduced={reduced} />
+        <SceneEditor
+          models={models}
+          systems={systems}
+          assetUrlById={assetUrlById}
+          reduced={reduced}
+        />
       )}
     </div>
   );
@@ -265,11 +279,24 @@ function ObjectEditor({ models, reduced }: { models: EditorModel[]; reduced: boo
 /* Scene mode — multi-asset composer                                   */
 /* ------------------------------------------------------------------ */
 
-function SceneEditor({ models, reduced }: { models: EditorModel[]; reduced: boolean }) {
+function SceneEditor({
+  models,
+  systems,
+  assetUrlById,
+  reduced,
+}: {
+  models: EditorModel[];
+  systems: AssetSystem[];
+  assetUrlById: Record<string, string>;
+  reduced: boolean;
+}) {
   const [instances, setInstances] = useState<SceneInstance[]>([]);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [mode, setMode] = useState<TransformMode>("translate");
   const [exporting, setExporting] = useState(false);
+  const [selectedSystemId, setSelectedSystemId] = useState<string>("");
+  // Note surfaced when an imported system resolved no parts to local model urls.
+  const [systemNote, setSystemNote] = useState<string | null>(null);
 
   // Stable instance ids: a monotonic counter (Math.random/Date.now are unavailable).
   const counterRef = useRef(0);
@@ -298,6 +325,53 @@ function SceneEditor({ models, reduced }: { models: EditorModel[]; reduced: bool
     setSelectedInstanceId((cur) => (cur === instanceId ? null : cur));
   }, []);
 
+  // Import a saved system: add one scene instance per part, placed at the part's
+  // relative position/rotation/scale, with url resolved via assetUrlById. Parts
+  // whose assetId isn't a local model are skipped; if none resolve we note it.
+  const addSystem = useCallback(
+    (system: AssetSystem) => {
+      const parts = system.manifest.parts;
+      const resolved = parts.flatMap((part) => {
+        const url = assetUrlById[part.assetId];
+        if (!url) return [];
+        return [{ part, url }];
+      });
+
+      if (resolved.length === 0) {
+        setSystemNote(
+          `“${system.name}” has no parts that match this project's local models.`,
+        );
+        return;
+      }
+
+      const newInstances: SceneInstance[] = resolved.map(({ part, url }) => {
+        counterRef.current += 1;
+        return {
+          instanceId: `inst-${counterRef.current}`,
+          url,
+          label: part.role ?? system.name,
+          position: part.position,
+          rotation: part.rotation,
+          scale: part.scale,
+        };
+      });
+
+      setInstances((prev) => [...prev, ...newInstances]);
+      const last = newInstances[newInstances.length - 1];
+      if (last) setSelectedInstanceId(last.instanceId);
+
+      const skipped = parts.length - resolved.length;
+      setSystemNote(
+        skipped > 0
+          ? `Added ${resolved.length} of ${parts.length} parts from “${system.name}” (${skipped} unresolved).`
+          : null,
+      );
+    },
+    [assetUrlById],
+  );
+
+  const selectedSystem = systems.find((s) => s.id === selectedSystemId) ?? null;
+
   // Persist a gizmo drag's result back into state so it survives re-render/re-selection.
   const handleTransformEnd = useCallback(
     (instanceId: string, t: InstanceTransform) => {
@@ -324,6 +398,50 @@ function SceneEditor({ models, reduced }: { models: EditorModel[]; reduced: bool
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[16rem_1fr]">
       <div className="flex flex-col gap-4">
+        {/* System picker: import a saved bundle as one instance per part. */}
+        {systems.length > 0 && (
+          <Card className="flex flex-col gap-3 p-3">
+            <h2 className="text-sm font-medium text-foreground">Add system</h2>
+            <div className="flex items-end gap-2">
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Label htmlFor="system-picker">Saved system</Label>
+                <select
+                  id="system-picker"
+                  value={selectedSystemId}
+                  onChange={(e) => {
+                    setSelectedSystemId(e.target.value);
+                    setSystemNote(null);
+                  }}
+                  className="min-h-9 rounded-md border border-input bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="">Select a system…</option>
+                  {systems.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.manifest.parts.length})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                disabled={!selectedSystem}
+                onClick={() => {
+                  if (selectedSystem) addSystem(selectedSystem);
+                }}
+                aria-label="Add the selected system to the scene"
+              >
+                Add
+              </Button>
+            </div>
+            {systemNote && (
+              <p role="status" className="text-xs text-muted-foreground">
+                {systemNote}
+              </p>
+            )}
+          </Card>
+        )}
+
         {/* Asset library: click an asset to add an instance to the scene. */}
         <Card className="flex max-h-[40vh] flex-col overflow-hidden lg:max-h-[calc((100vh-12rem)/2)]">
           <div className="border-b border-border p-3">

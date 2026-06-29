@@ -10,6 +10,7 @@ import {
   type SystemAssetOption,
 } from "@/components/systems/CreateSystemForm";
 import { DownloadManifestButton } from "@/components/systems/DownloadManifestButton";
+import { EditSystemPanel } from "@/components/systems/EditSystemPanel";
 import type { AssetSystem } from "@/lib/asset-system/schema";
 
 export const dynamic = "force-dynamic";
@@ -95,17 +96,26 @@ export default async function SystemsPage() {
                 {systems.map((s) => (
                   <li
                     key={s.id}
-                    className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4"
+                    className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4"
                   >
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-sm font-medium text-foreground">{s.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {s.manifest.parts.length}{" "}
-                        {s.manifest.parts.length === 1 ? "part" : "parts"}
-                        {s.description ? ` · ${s.description}` : ""}
-                      </span>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-foreground">{s.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {s.manifest.parts.length}{" "}
+                          {s.manifest.parts.length === 1 ? "part" : "parts"}
+                          {s.manifest.lights?.length
+                            ? ` · ${s.manifest.lights.length} light${s.manifest.lights.length === 1 ? "" : "s"}`
+                            : ""}
+                          {s.manifest.sounds?.length
+                            ? ` · ${s.manifest.sounds.length} sound${s.manifest.sounds.length === 1 ? "" : "s"}`
+                            : ""}
+                          {s.description ? ` · ${s.description}` : ""}
+                        </span>
+                      </div>
+                      <DownloadManifestButton name={s.name} manifest={s.manifest} />
                     </div>
-                    <DownloadManifestButton name={s.name} manifest={s.manifest} />
+                    <EditSystemPanel systemId={s.id} manifest={s.manifest} />
                   </li>
                 ))}
               </ul>

@@ -293,6 +293,16 @@ superset that also covers the three.js games' art-kit ids)? where the builders l
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
 
+### Shipped 2026-06-29 (asset-system v2 + game-kit Phase-2)
+- **Asset-system v2** — `/systems` gains a per-system **lights + sounds editor** (add/remove point/
+  directional/ambient lights + sound rows; full manifest re-validated + persisted). The **scene editor**
+  (`/editor` Scene mode) can now **import a saved system** — resolves each part's assetId→library URL and
+  places all parts at their relative transforms (the campfire dropped into a level). Skips unresolved parts.
+- **game-kit Phase-2** (repo: github.com/kalogan/game-kit, pushed) — added **audio** (Web-Audio manager,
+  channel volumes, lazy ctx, DOM-safe), **hud** (framework-agnostic DOM-layer shell over a pure registry),
+  **anim** (procedural segmented-rig animator: idle/walk + wave/jump, rest-capture/restore, renderer-free).
+  Gate: tsc 0 · 58 tests. r3f variants of lighting/postfx still TODO.
+
 ### Shipped 2026-06-29 (asset-systems + game-kit + Roblox onboard)
 - **Composable asset-systems v1** — `/systems`: group library MODEL assets into a named `AssetSystem`
   (manifest = parts + optional lights/sounds/params, schema-ready), persisted (migration 0010), download

@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { getActiveProject } from "@/lib/active-project";
-import { createAssetSystem } from "@/lib/db/asset-systems";
+import { createAssetSystem, updateAssetSystem } from "@/lib/db/asset-systems";
+import { Manifest as ManifestSchema } from "@/lib/asset-system/schema";
 import type { Manifest } from "@/lib/asset-system/schema";
 import type { ActionResult } from "./projects";
 
@@ -52,6 +53,40 @@ export async function createAssetSystemAction(
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Create failed.",
+    };
+  }
+}
+
+/**
+ * Replace a saved system's manifest with a fully edited one. Reads `systemId` +
+ * `manifestJson` (the complete manifest the editor serialized — parts/params kept
+ * intact, lights/sounds replaced), validates the JSON against the Zod `Manifest`
+ * schema, then persists it. Validation failures surface as a friendly error.
+ */
+export async function updateAssetSystemManifestAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const systemId = String(formData.get("systemId") ?? "").trim();
+  if (!systemId) return { ok: false, error: "Missing system id." };
+
+  let manifest: Manifest;
+  try {
+    const raw = String(formData.get("manifestJson") ?? "");
+    const parsed: unknown = JSON.parse(raw);
+    manifest = ManifestSchema.parse(parsed);
+  } catch {
+    return { ok: false, error: "Could not read the edited manifest." };
+  }
+
+  try {
+    await updateAssetSystem(systemId, { manifest });
+    revalidatePath("/systems");
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Update failed.",
     };
   }
 }
