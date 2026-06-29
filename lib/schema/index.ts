@@ -156,6 +156,8 @@ export const ReferenceAsset = z.object({
   format: z.enum(["image", "model"]).default("image"),
   image_path: z.string(),
   art_kit_id: z.string().nullable(),
+  tags: z.array(z.string()).default([]),
+  notes: z.string().default(""),
   created_at: ts,
 });
 export type ReferenceAsset = z.infer<typeof ReferenceAsset>;
@@ -168,6 +170,7 @@ export const ReferenceAssetInsert = z.object({
   format: z.enum(["image", "model"]).optional(),
   image_path: z.string(),
   art_kit_id: z.string().nullable().optional(),
+  tags: z.array(z.string()).optional(),
 });
 export type ReferenceAssetInsert = z.infer<typeof ReferenceAssetInsert>;
 
@@ -214,6 +217,7 @@ export const Asset = z.object({
   finished_path: z.string().nullable(),
   cdn_url: z.string().nullable(),
   recipe_snapshot: z.record(z.unknown()),
+  notes: z.string().default(""),
   created_at: ts,
   updated_at: ts,
 });

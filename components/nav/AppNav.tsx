@@ -35,7 +35,7 @@ export function AppNav() {
       aria-label="Primary"
       className="border-b border-border bg-background/95 backdrop-blur"
     >
-      <div className="mx-auto flex max-w-5xl items-center gap-2 px-4">
+      <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 xl:max-w-6xl min-[1440px]:max-w-7xl">
         <Link
           href="/"
           className="mr-1 inline-flex min-h-11 items-center font-serif text-base font-semibold tracking-wide text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"

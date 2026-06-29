@@ -26,6 +26,7 @@ export interface AssetUpdate {
   finished_path?: string | null;
   cdn_url?: string | null;
   recipe_snapshot?: Record<string, unknown>;
+  notes?: string;
 }
 
 export async function updateAsset(id: string, patch: AssetUpdate): Promise<Asset> {

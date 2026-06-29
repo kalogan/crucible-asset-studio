@@ -96,6 +96,28 @@ Three options, cheapest first:
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
 
+### Shipped 2026-06-29 (live library + grab-from-Wayfinders)
+- **Procgen grab pipeline, end-to-end.** project-mmo's preview harness has a DEV-only
+  "Export to Crucible" button (Props gallery): rebuilds each art-kit mesh via
+  `generateArtKit`, serializes to .glb in-browser (GLTFExporter), POSTs to `/api/import`.
+  8 Skyhold props imported + rendering live. Token in project-mmo `.env.local` (gitignored,
+  never Vercel). Crucible dev runs on :3001 while project-mmo holds :3000.
+- **Live 3D library.** `/library` renders every model inline in ONE shared WebGL context
+  (drei `<View>` + `View.Port` — avoids per-tile canvas/context exhaustion). Each tile:
+  normalized-to-fit (center + scale-to-FIT_SIZE so a tiny crystal and a tall monument frame
+  the same), gentle auto-spin, **drag-to-rotate inline**. Reduced-motion respected; per-tile
+  error boundary.
+- **Focus modal** (hover-reveal magnifier, top-right of each tile → opens): full orbit/zoom/
+  pan viewer + metadata (triangles, mesh count, material color swatches computed from the GLB,
+  added date, origin tags) + **editable notes** (persisted; routes to reference_assets or
+  assets by source) + download. Migration 0009 (`notes`).
+- **Origin/hierarchy tags.** Export auto-derives tags from the source pack/region (e.g.
+  "Skyhold") + theme; shown per-tile + as filter chips. Game = the Crucible project; tags add
+  the levels below. Generic — any game's harness contributes its own. Migration 0008 (`tags`).
+- **Responsive.** Grid 2→3(sm)→4(lg)→5(xl)→6(1440); page container + nav + modal widen lg→1440.
+- **Import endpoint:** CORS (OPTIONS + ACAO:*) so the harness can POST cross-origin; exempt
+  from the Basic-auth gate (token-authed).
+
 ### Shipped 2026-06-29 (design system + import CORS)
 - **Atelier design-system migration complete.** All remaining pages moved off raw zinc/amber to
   Atelier tokens + `components/ui` primitives (Button/Input/Textarea/Label/Card/Badge), matching

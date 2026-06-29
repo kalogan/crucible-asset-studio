@@ -25,6 +25,10 @@ export default async function LibraryPage() {
       source: "procgen",
       format: r.format,
       url: r.image_path,
+      tags: r.tags,
+      notes: r.notes,
+      createdAt: r.created_at,
+      artKitId: r.art_kit_id,
     }));
     const genItems: LibraryItem[] = generated
       .filter((a) => a.stage !== "rejected")
@@ -35,12 +39,16 @@ export default async function LibraryPage() {
         source: "generated",
         format: a.kind,
         url: a.raw_path,
+        tags: [],
+        notes: a.notes,
+        createdAt: a.created_at,
+        artKitId: null,
       }));
     items = [...refItems, ...genItems];
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-8 px-6 py-12">
+    <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-8 px-6 py-12 lg:max-w-5xl xl:max-w-6xl min-[1440px]:max-w-7xl">
       <header className="flex flex-col gap-2">
         <Link href="/" className="w-fit text-sm text-primary underline underline-offset-2">
           ← Games

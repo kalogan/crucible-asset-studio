@@ -46,6 +46,10 @@ export async function POST(req: Request): Promise<NextResponse> {
   const mimeType = String(body.mimeType ?? "image/png");
   const artKitId = body.artKitId ? String(body.artKitId) : null;
   const format = mimeType.includes("gltf") || mimeType.includes("glb") ? "model" : "image";
+  // Origin/hierarchy tags (e.g. ["Skyhold"]) — sanitize: strings, trimmed, deduped, capped.
+  const tags = Array.isArray(body.tags)
+    ? [...new Set(body.tags.map((t) => String(t).trim()).filter(Boolean))].slice(0, 12)
+    : [];
 
   if (!slug || !label || !typeParsed.success || !dataBase64) {
     return json({ error: "Required: projectSlug, type, label, dataBase64 (or imageBase64)." }, 400);
@@ -66,6 +70,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       format,
       image_path: url,
       art_kit_id: artKitId,
+      tags,
     });
     return json({ ok: true, id: ref.id, url, format });
   } catch (err) {
