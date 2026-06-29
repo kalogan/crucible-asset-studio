@@ -3,6 +3,7 @@
 import {
   Suspense,
   useActionState,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -14,9 +15,11 @@ import {
   Lightformer,
   OrbitControls,
   PerspectiveCamera,
+  useAnimations,
   useGLTF,
 } from "@react-three/drei";
 import { Box3, Vector3, Group, Mesh, Color, type Material } from "three";
+import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { saveAssetNotesAction } from "@/app/actions/library";
@@ -57,10 +60,23 @@ function computeStats(root: Group): ModelStats {
   return { triangles: Math.round(triangles), meshes, colors: [...colors].slice(0, 12) };
 }
 
-function FocusModel({ url, onStats }: { url: string; onStats: (s: ModelStats) => void }) {
-  const { scene } = useGLTF(url);
+function FocusModel({
+  url,
+  onStats,
+  onClips,
+  activeClip,
+}: {
+  url: string;
+  onStats: (s: ModelStats) => void;
+  onClips: (names: string[]) => void;
+  activeClip: string | null;
+}) {
+  const { scene, animations } = useGLTF(url);
+  const groupRef = useRef<Group>(null);
+  // SkeletonUtils.clone (not scene.clone) so rigged/skinned meshes keep a working
+  // skeleton — required for animation playback to deform correctly.
   const fitted = useMemo(() => {
-    const obj = scene.clone(true);
+    const obj = cloneSkeleton(scene);
     const box = new Box3().setFromObject(obj);
     const size = box.getSize(new Vector3());
     const center = box.getCenter(new Vector3());
@@ -72,10 +88,30 @@ function FocusModel({ url, onStats }: { url: string; onStats: (s: ModelStats) =>
     wrap.add(obj);
     return wrap;
   }, [scene]);
+
+  const { actions, names } = useAnimations(animations, groupRef);
+
   useEffect(() => {
     onStats(computeStats(fitted));
   }, [fitted, onStats]);
-  return <primitive object={fitted} />;
+  useEffect(() => {
+    onClips(names);
+  }, [names, onClips]);
+  useEffect(() => {
+    if (!activeClip) return;
+    const action = actions[activeClip];
+    if (!action) return;
+    action.reset().fadeIn(0.25).play();
+    return () => {
+      action.fadeOut(0.25);
+    };
+  }, [activeClip, actions]);
+
+  return (
+    <group ref={groupRef}>
+      <primitive object={fitted} />
+    </group>
+  );
 }
 
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -89,8 +125,21 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
 
 export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () => void }) {
   const [stats, setStats] = useState<ModelStats | null>(null);
+  const [clipNames, setClipNames] = useState<string[]>([]);
+  const [activeClip, setActiveClip] = useState<string | null>(null);
   const [saveState, saveAction, saving] = useActionState(saveAssetNotesAction, null);
   const closeRef = useRef<HTMLButtonElement>(null);
+
+  // When a model's clips load, auto-play an idle-ish one (else the first) so it's lively.
+  const onClips = useCallback((names: string[]) => {
+    setClipNames(names);
+    setActiveClip((cur) => {
+      if (cur && names.includes(cur)) return cur;
+      if (names.length === 0) return null;
+      const idle = names.find((n) => /idle|survey|rest|breath/i.test(n));
+      return idle ?? names[0] ?? null;
+    });
+  }, []);
 
   // Esc closes; focus the close button on open (lightweight focus management).
   useEffect(() => {
@@ -138,7 +187,12 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
               <directionalLight position={[5, 8, 5]} intensity={1.1} />
               <directionalLight position={[-5, 2, -3]} intensity={0.4} />
               <Suspense fallback={null}>
-                <FocusModel url={item.url} onStats={setStats} />
+                <FocusModel
+                  url={item.url}
+                  onStats={setStats}
+                  onClips={onClips}
+                  activeClip={activeClip}
+                />
                 <Environment resolution={48} frames={1}>
                   <Lightformer intensity={3} position={[0, 5, 0]} scale={[8, 8, 1]} />
                   <Lightformer intensity={1.5} position={[5, 1, 4]} scale={[6, 6, 1]} />
@@ -215,6 +269,32 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
             )}
             {item.artKitId && <MetaRow label="Art-kit id">{item.artKitId}</MetaRow>}
           </div>
+
+          {/* Animations — play any embedded glTF clip (idle/walk/attack/dance/…). */}
+          {clipNames.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-foreground">
+                Animations ({clipNames.length})
+              </span>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Animation clips">
+                {clipNames.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => setActiveClip(name)}
+                    aria-pressed={activeClip === name}
+                    className={`min-h-8 rounded-full border px-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      activeClip === name
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Notes */}
           <form action={saveAction} className="flex flex-col gap-2">

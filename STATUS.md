@@ -208,6 +208,21 @@ procedural anims is the follow-on per-game export work.
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
 
+### Shipped 2026-06-29 (animation viewer + scene composer + deceive-me-daddy)
+- **Animation viewer.** The focus modal now plays a model's embedded glTF AnimationClips — a clip
+  picker (idle/walk/attack/dance/…) auto-plays an idle-ish clip on open, click to switch. Uses drei
+  `useAnimations` + `SkeletonUtils.clone` (so rigged/skinned meshes deform correctly). Clip-less assets
+  show no picker. Procgen games (project-mmo) are PROCEDURAL (no clips/skeleton — confirmed) → playable
+  export needs **baking** (sample animator → KeyframeTracks → clips); that's the per-game follow-on.
+- **Scene-layout composer.** `/editor` gains an Object/Scene mode toggle: Scene mode adds multiple
+  library models, transform each (gizmo per selection, orbit suspended mid-drag), export the combined
+  scene as one GLB. Shared `<Model>` loader extracted (object + scene reuse it).
+- **deceive-me-daddy onboarded** as the animation TEST IMPORT: project created + 7 non-DRACO GLBs
+  imported (4 rigged characters Robot/Fox/CesiumMan/RiggedFigure + 3 props) — they carry real clips, so
+  the viewer plays them directly (no baking). (DRACO assets LittlestTokyo/ToyCar skipped — viewer isn't
+  DRACO-configured; a follow-up if wanted.) Now 7 projects total.
+- Gate: typecheck 0 · lint 0 · test 103 · build 0.
+
 ### Shipped 2026-06-29 (import-from-GitHub + object editor + more games)
 - **Import a game from GitHub.** `/projects/new` has an "Import from GitHub" field: paste a repo URL
   (or `owner/repo`) → server fetches the repo's metadata via the GitHub API → auto-fills
