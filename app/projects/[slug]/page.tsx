@@ -6,6 +6,7 @@ import { canonReadiness } from "@/lib/canon/precision";
 import { statusBadgeClass } from "@/lib/projects/status";
 import { openWorkspaceAction } from "@/app/actions/projects";
 import { ProjectOverviewForm } from "@/components/games/ProjectOverviewForm";
+import { ScreenshotUpload } from "@/components/games/ScreenshotUpload";
 
 export const dynamic = "force-dynamic";
 
@@ -85,8 +86,9 @@ export default async function ProjectDetailPage({
       </section>
 
       {/* Overview — the portfolio face. */}
-      <section aria-label="Overview" className="flex flex-col gap-3">
+      <section aria-label="Overview" className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold text-zinc-100">Overview</h2>
+        <ScreenshotUpload projectId={project.id} slug={project.slug} />
         <ProjectOverviewForm project={project} />
       </section>
     </main>
