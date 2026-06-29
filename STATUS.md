@@ -213,9 +213,33 @@ or drop it into a level in the scene composer. Extends the library + scene edito
 (b) a template/starter repo cloned per game; (c) Crucible as the catalog + a "scaffold new game"
 generator. Likely a mix — a `game-kit` package for the code, Crucible as the catalog/scaffolder.
 
-**Audit in progress** (parallel explorers) across project-mmo / storm-break-hockey / corrupted-void /
-woodturning-studio / deceive-me-daddy + infra (Supabase storage, Colyseus, fly.io/Vercel) → the
-duplicated patterns that are the standardization candidates. Synthesis → a kit inventory + first slices.
+**Kit inventory (from the audit — project-mmo / storm-break-hockey / corrupted-void / woodturning-studio
+/ deceive-me-daddy).** Prioritized by adoption × low-risk. project-mmo is the "gold reference" for most.
+
+| Candidate | Tier | Adoption | Notes |
+|---|---|---|---|
+| Settings store (load/save/subscribe) | system | 5/5 | localStorage + schema-version merge; React(Zustand) + vanilla(emitter) variants |
+| Scene state machine (title→play→pause→over) | system | 5/5 | table-driven enter/exit/update |
+| Seeded PRNG + sim utils (mulberry32) | atom | 2/5 + discipline | formalize project-mmo `sim-core`; "never Math.random in sim" |
+| Lighting rig (ambient+sun+fill+rim, shadows) | atom | 3/5 | near-identical; r3f + vanilla variants |
+| Bloom / EffectComposer pipeline | system | 4/5 | RenderPass→Bloom→OutputPass; r3f wrapper + vanilla class |
+| Audio engine (Web-Audio synth, worker, cache) | system | 3/5 | project-mmo's is best; others reinvent |
+| Procedural animator (idle/walk + one-shots) | system | 3/5 | the no-rig driver; ties to anim baking + a SkeletalAnimator sibling (2/5) |
+| HUD shell + menu/settings modal | system | 4–5/5 | per-frame DOM mutation (no React churn); shared settings tabs |
+| Input mapper + keybind rebinding | atom | 2/5 | conflict-swap logic |
+| Vite preset + deploy templates (Fly/Vercel/Docker) | kit | 4–5/5 | monorepo vs single-app; Colyseus-on-Fly + SPA-on-Vercel presets |
+| Colyseus room template (rooms/schema/lobby) | system | 2/5 | project-mmo ≈ deceive-me-daddy; ~1k LOC dup |
+| Palette + material factory (flat + emissive/Bloom) | atom | 1–2/5 | project-mmo PAL + `material:<name>` discipline |
+| First-person controller / camera rigs | atom | 2/5 | FPS reusable; orbit/chase too game-tuned to share |
+
+Cross-cutting: **r3f (2) vs vanilla-three (3) split** — most render/anim atoms need TWO variants.
+**Correction:** NONE of the games use Supabase (project-mmo = Postgres+Kysely+Redis; others = localStorage/
+IndexedDB) — Supabase is Crucible's own stack, so a Supabase adapter would be a *new* convenience, not a dedup.
+
+**First "spin-up" kit (Phase 1, do first):** settings store + scene state machine + lighting rig + bloom +
+seeded-PRNG + vite/deploy presets — all 3–5/5 adoption, low complexity. **Where kits live:** a versioned
+workspace package (mirror project-mmo's `packages/shared` + `sim-core`) with r3f + vanilla entry points,
+catalogued/scaffolded by Crucible. Decide package layout before extracting.
 
 **Animation baking (in progress):** bake procgen games' PROCEDURAL animators (project-mmo —
 `ProceduralCharacterAnimator` / creature animator, segmented groups, no skeleton) into glTF
