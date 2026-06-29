@@ -310,6 +310,49 @@ Generalize this into the interchange standard; make **Crucible the porting hub**
 superset that also covers the three.js games' art-kit ids)? where the builders live (`game-kit/targets/
 {web,roblox}`)? asset-resolution (where `Raptor_Torso` parts come from — CDN vs procedural greybox).
 
+### Roadmap — NPC expansion: memory v2 + behavior (added 2026-06-29)
+Where `game-kit/npc` is today: dialogue brain (provider seam + Grok + firewall), budgeted, and a
+STRING memory (episodic append + relational summary from `recall` notes only + last-8-turns view) over an
+injectable `NpcMemoryStore` (in-memory default). NO summarization model, NO semantic recall, NO behavior.
+Behavior EXISTS in Wayfinders but in **sim-core** (`tickNpcBehavior` + nav `Pathfinder` + bounds
+wander/region/patrol; `companionManager`/`tickCompanionFollow`) — NOT in the npc module. **Invariant to
+preserve: the LLM never moves an NPC.** Movement is pure, seeded, deterministic; the brain stays advisory
+(exactly the intent-firewall philosophy). Two independent tracks:
+
+**Track A — Memory v2 ("local model": insert / summarize / store / load / recall).** Each phase is a seam
++ a local default + a provider/remote adapter as a future add; all pure logic unit-tested with a fake model.
+- **A1 — Durable store adapter** (the already-deferred item): a reference `NpcMemoryStore` over SQLite/
+  Postgres/IndexedDB + a `withSafeStore` wrapper that degrades to no-memory on throw. Makes store/load real.
+- **A2 — Rolling summarization** (the missing "summary"): a `Summarizer` seam `summarize(turns, prev) →
+  string` invoked when episodic overflows. Local default = extractive/heuristic (zero-cost); provider-backed
+  variant uses the reasoning provider's `complete`. Compacts old turns into the relational summary.
+- **A3 — Local embeddings + semantic recall** (the "local model"): an `Embedder` seam `embed(text)→number[]`
+  with a LOCAL default via transformers.js (e.g. all-MiniLM-L6-v2, in-process, no API cost). Store vectors
+  with episodic turns; `buildMemoryView` upgrades from "last 8" → top-K by cosine + a few most-recent.
+  Pluggable vector index (brute-force in-memory default; pgvector/HNSW = future). **Decision (like zod):**
+  transformers.js is a real dep + ~25MB model download — scope it to the npc/memory entry, opt-in.
+- **A4 — Consolidation / forgetting** (polish): periodic merge of near-duplicate memories + recency×salience
+  decay so long-term memory stays small + relevant.
+
+**Track B — Behavior (walking / pathfinding / actions), distilled from sim-core.** Sim-side + deterministic
+(seeded via kit `prng`); the game renders synced state (an optional r3f helper renders it).
+- **B1 — Nav + pathfinding atom** (`game-kit/nav`): a `Pathfinder` seam + an A* grid impl distilled from
+  sim-core's nav engine. Pure, three-free (walkable grid / poly list). Gate: A* correctness.
+- **B2 — Deterministic behavior runtime** (`createNpcBehavior`, from `tickNpcBehavior`): bounds
+  (wander/region/patrol) → pick goal in bounds → request route → walk it → leash home. `tick(dt)`. Gate:
+  same seed → same path.
+- **B3 — Steering / follow** (from `tickCompanionFollow`): follow a moving target + arrive + separation —
+  powers companions and "walk beside the player" NPCs.
+- **B4 — Action / utility layer:** a small utility-AI (or tiny behavior tree) selecting among deterministic
+  actions (idle/wander/patrol/goToStation/interact/flee). This is the "actions" ask.
+- **B5 — Reasoning↔behavior bridge (the careful boundary widening):** OPTIONALLY let the brain *suggest* a
+  high-level goal via a NEW bounded intent (`goTo`/`emote`/`setGoal`) added to the firewall as an explicit,
+  reviewed widening. The deterministic layer validates + plans + executes; the LLM still never sets a
+  position. This is where "I'll show you the way" becomes movement — safely. Stop-and-confirm before B5.
+
+Sequencing: A1→A2→A3 and B1→B2→B3 are independent and parallelizable; B5 is gated behind a firewall-widening
+review. Relates to [[project-game-kit-frontier]].
+
 ### Later phases
 - **Phase 3 — bulk + finish + publish:** resumable, cost-capped **batch worker** (sync gen is
   prod-unsafe at volume); **Kiln** finishing module (retopo + baked PBR); **CDN publish** + per-project
