@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Reference source — local-only backstop (carries its own nested .git, and
+# KERNEL_LESSONS.md is the committed authority). Kept on disk, excluded from the repo.
+_reference/
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+*.local
+
+# Build output
+dist/
+build/
+.next/
+out/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
