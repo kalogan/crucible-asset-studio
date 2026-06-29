@@ -24,9 +24,20 @@ export type PublicEnv = z.infer<typeof publicSchema>;
 let cachedServer: ServerEnv | null = null;
 let cachedPublic: PublicEnv | null = null;
 
+/** Treat empty-string env values as absent (so an empty optional key is undefined). */
+function val(name: string): string | undefined {
+  const v = process.env[name];
+  return v && v.length > 0 ? v : undefined;
+}
+
 export function getServerEnv(): ServerEnv {
   if (cachedServer) return cachedServer;
-  const parsed = serverSchema.safeParse(process.env);
+  const parsed = serverSchema.safeParse({
+    NEXT_PUBLIC_SUPABASE_URL: val("NEXT_PUBLIC_SUPABASE_URL"),
+    SUPABASE_SERVICE_ROLE_KEY: val("SUPABASE_SERVICE_ROLE_KEY"),
+    REPLICATE_API_TOKEN: val("REPLICATE_API_TOKEN"),
+    ANTHROPIC_API_KEY: val("ANTHROPIC_API_KEY"),
+  });
   if (!parsed.success) {
     throw new Error(
       `Invalid/missing server env:\n${parsed.error.issues
@@ -41,8 +52,8 @@ export function getServerEnv(): ServerEnv {
 export function getPublicEnv(): PublicEnv {
   if (cachedPublic) return cachedPublic;
   const parsed = publicSchema.safeParse({
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_SUPABASE_URL: val("NEXT_PUBLIC_SUPABASE_URL"),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: val("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
   });
   if (!parsed.success) {
     throw new Error(
