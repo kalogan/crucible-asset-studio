@@ -318,6 +318,20 @@ superset that also covers the three.js games' art-kit ids)? where the builders l
   auto-draft now works with the Anthropic key) → decompose into props; zero style cross-contamination.
 - **Phase 5 — avatars** (deferred): rigging-ready character pipeline, separate from props.
 
+### Shipped 2026-06-29 (game-kit npc — Wayfinders NPC brain)
+- **NPC reasoning module** ported from Wayfinders into game-kit behind a new **server-only** entry
+  `game-kit/npc` (game-kit `f2ac2f4`). It's the Grok-backed conversation+memory brain, generalized:
+  provider-agnostic seam (Grok = `createGrokProvider({apiKey})` → just `api.x.ai/v1` + a model), the
+  **firewall** `parseReasoningResponse` (validate-and-drop bounded intents: say/setMood/wait/end/recall),
+  a budgeted provider (timeout + global/per-player rate limit + scripted fallback — never throws/hangs/
+  overspends), a pure per-(NPC×player) memory model + injectable `NpcMemoryStore` (in-memory default; DB
+  adapter = future add), and `createNpcBrain().say()` orchestration + companion banter. **zod scoped to the
+  npc entry only** (Director's call) — three/r3f entries stay zero-dep. Server-side boundary preserved:
+  keyed providers never touch the browser bundle. Gate: tsc 0 · 216 tests (+38).
+- **/kit catalog**: added `npc-reasoning` (kit tier, module `npc`) — 21 built systems now; project-mmo=core,
+  others n/a. Catalog-derived derive tests still green. (Pure-core pass; DB store adapter + a Crucible NPC
+  demo page deferred per scope.)
+
 ### Shipped 2026-06-29 (later)
 - **Projects-as-Games**: home is now a **Games gallery**; per-game **/projects/[slug]** = editable
   portfolio Overview + a Generation workspace (sets the game active → Generate/Review/Canon/Prompts).

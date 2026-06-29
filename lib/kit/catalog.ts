@@ -64,6 +64,7 @@ export const SYSTEMS: readonly KitSystem[] = [
   { id: "fx-particles", name: "FX Particles", tier: "system", status: "built", module: "fx" },
   { id: "skeletal-anim", name: "Skeletal Anim", tier: "system", status: "built", module: "clip" },
   { id: "deploy-presets", name: "Deploy Presets", tier: "kit", status: "built", module: "presets" },
+  { id: "npc-reasoning", name: "NPC Reasoning", tier: "kit", status: "built", module: "npc" },
 ] as const;
 
 /**
@@ -91,6 +92,9 @@ export const ADOPTION: Record<string, Record<string, Adoption>> = {
   "fx-particles": { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "gap" },
   "skeletal-anim": { "project-mmo": "gap", "woodturning-studio": "core", "storm-break-hockey": "gap", "corrupted-veil": "gap", "deceive-me-daddy": "core" },
   "deploy-presets": { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core" },
+  // Wayfinders (project-mmo) shipped the Grok-backed conversational NPC brain; the
+  // other games have no dialogue-NPC system today, so it's n/a to their current design.
+  "npc-reasoning": { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na" },
 };
 
 /** Look up adoption for a (system, game) pair. Returns `na` if unmapped. */
