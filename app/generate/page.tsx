@@ -7,7 +7,12 @@ import { GenerateForm } from "@/components/generate/GenerateForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function GeneratePage() {
+export default async function GeneratePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ title?: string; prompt?: string }>;
+}) {
+  const sp = await searchParams;
   const configured = isSupabaseConfigured();
   const active = configured ? await getActiveProject() : null;
   const canon = active ? await getCanonByProject(active.id) : null;
@@ -63,7 +68,7 @@ export default async function GeneratePage() {
               .
             </p>
           )}
-          <GenerateForm />
+          <GenerateForm initialTitle={sp.title ?? ""} initialPrompt={sp.prompt ?? ""} />
         </>
       )}
     </main>

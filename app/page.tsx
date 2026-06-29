@@ -82,6 +82,12 @@ export default async function HomePage() {
                   >
                     Canon
                   </Link>
+                  <Link
+                    href="/prompts"
+                    className="inline-flex min-h-11 w-fit items-center rounded-md border border-zinc-700 px-4 font-medium text-zinc-100 hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+                  >
+                    Prompt library
+                  </Link>
                 </div>
               </div>
             ) : (

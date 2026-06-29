@@ -88,7 +88,13 @@ function StageIndicator({
   );
 }
 
-export function GenerateForm() {
+export function GenerateForm({
+  initialTitle = "",
+  initialPrompt = "",
+}: {
+  initialTitle?: string;
+  initialPrompt?: string;
+}) {
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
     runGenerateAction,
     null,
@@ -135,6 +141,7 @@ export function GenerateForm() {
           name="title"
           required
           minLength={2}
+          defaultValue={initialTitle}
           placeholder="e.g. Wooden barrel"
           autoComplete="off"
           className={control}
@@ -151,6 +158,7 @@ export function GenerateForm() {
           required
           minLength={3}
           rows={3}
+          defaultValue={initialPrompt}
           placeholder="a simple wooden barrel"
           className={`${control} resize-y`}
         />
