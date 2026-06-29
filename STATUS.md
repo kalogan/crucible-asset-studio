@@ -344,7 +344,11 @@ superset that also covers the three.js games' art-kit ids)? where the builders l
   `render-bootstrap` now uses the REAL `createRenderer()` (no `app` arg, no returned camera — it mints its
   own `PerspectiveCamera` + resize) and `createLoop((dt,alpha)=>…)`; `camera-rigs` calls
   `createOrbitCamera(camera, opts)` not `(camera, domElement)`.
-- Gate (Crucible): typecheck 0 · lint 0 · test 148 (+10) · build 0. `/kit/scaffold` 11.3 kB.
+- **GitHub bootstrap** (`a4617d2`) — every starter now ships `create-repo.sh`: `sh create-repo.sh [name]
+  [private|public]` runs git init + first commit + `gh repo create --source --push` using the user's own
+  `gh` auth (no tokens, no server — Director chose the script-in-zip path over a token'd server action). Plus
+  a `.gitignore` (keeps node_modules out of the first commit) + README "Push to GitHub" section + UI hint.
+- Gate (Crucible): typecheck 0 · lint 0 · test 149 · build 0. `/kit/scaffold` 12.2 kB.
 
 ### Shipped 2026-06-29 (kit r3f variants + /kit scaffolder)
 - **game-kit r3f variants** (pushed `e35ad84`) — `useOrbitCamera`/`useChaseCamera`/`useFirstPersonCamera`,
