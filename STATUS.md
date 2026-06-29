@@ -116,6 +116,39 @@ cheap→expensive:
   Crucible → reusable kit). **Decision needed:** which direction — and is the trigger per-game ad-hoc
   or a registered "linked source" per project?
 
+### Roadmap — authoring & reuse (added 2026-06-29)
+
+**C. In-Crucible editor view (levels or art).** Two distinct editors — decide scope before building:
+- **Scene / level composer** — drag library assets (props/creatures/biomes) onto a canvas to lay out
+  a scene or level, then export the layout (placements + asset refs) back to a game or as a reusable
+  set. project-mmo already has a pack/placement Editor; Crucible's version composes from the
+  *grabbed/generated* library and is game-agnostic. Output = a placement manifest, not baked geometry.
+- **Per-asset art editor** — tweak a single asset post-gen: recolor to the canon palette, swap
+  materials, re-pose, re-scale/orient, relight. Lighter than full retopo; complements the planned
+  **Kiln** finishing module (retopo + baked PBR).
+- Decisions: which first (scene composer vs art editor)? layout-data vs merged-GLB output? 2D canvas
+  vs the live 3D viewer with transform gizmos?
+
+**D. Generate from existing assets / remix.** Condition generation on a library asset, not a blank prompt:
+- **Remix** — pick a source asset (its render/image) as the reference + a prompt ("this barrel as a
+  crate", "autumn version of this tree") → reference-conditioned / img2img gen → review queue.
+  **Nano Banana (Gemini) already conditions on reference images** — the natural lever; wire a library
+  asset in as the reference input.
+- **Cohesive set** — pick N anchors → generate a matching family (a whole prop set in one pass).
+- Composes with the canon (style) + per-asset-type framing we already inject. Decisions: single-source
+  remix vs multi-anchor set; FLUX img2img vs Nano-Banana reference path (or both); source-image capture
+  (use an existing image vs a fresh turntable shot of a GLB).
+
+**E. Save / export for use across one-to-many games (reusable kits).** Make assets portable beyond their origin project:
+- **Cross-project copy / link** — promote a library asset (or a tagged set) into another game's
+  project. The library is per-project today, so this adds copy-or-link semantics + a shared source.
+- **Publish a kit** — package a set (a biome's props, a creature family, a character roster) as a
+  *versioned kit*, export to a CDN / per-project manifest (extends Phase 3 CDN publish), so a new game
+  plugs the kit in instead of starting from scratch.
+- The concrete form of the existing **"reusable generation/render kit"** goal + the kit-registry
+  "linked art-kit." Decisions: copy vs link; kit = static assets only or assets + their generators/canon;
+  versioning + where kits live (Supabase Storage → R2 when distribution matters).
+
 ### Later phases
 - **Phase 3 — bulk + finish + publish:** resumable, cost-capped **batch worker** (sync gen is
   prod-unsafe at volume); **Kiln** finishing module (retopo + baked PBR); **CDN publish** + per-project
