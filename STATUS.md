@@ -242,18 +242,18 @@ workspace package (mirror project-mmo's `packages/shared` + `sim-core`) with r3f
 catalogued/scaffolded by Crucible. Decide package layout before extracting.
 
 #### game-kit — built vs gaps (audit 2026-06-29; live view at `/kit`)
-**Built** (`github.com/kalogan/game-kit`): prng · settings · scene-state · lighting (+r3f) · postfx (+r3f)
-· audio · hud · anim (procedural) · **geo · palette · artkit** (the procgen backbone) · **input · save ·
-math**. So the HIGH-leverage trio + the MED input/save/math are DONE. **Remaining gaps:**
-- **camera rigs** (orbit/chase/FPS — the input *mapper* is built; the camera controllers aren't).
-- **render bootstrap (vanilla)** — renderer+scene+resize+RAF+fixed-timestep ticker (for the 3 vanilla games).
-- **netcode** — Colyseus room template + client connector (2–3 games).
-- **fx/particles** — smoke/glow/emitters (feeds the asset-system fx field).
-- **skeletal-anim adapter + the procedural→clip baker** (generalize project-mmo's baker into the kit).
-- **LOW** — build+deploy presets (vite + Fly/Vercel/Docker → an "ops kit") · i18n · a11y filters.
+**Built — 20 systems** (`github.com/kalogan/game-kit`): prng · settings · scene-state · lighting (+r3f) ·
+postfx (+r3f) · audio · hud · anim · geo · palette · artkit · input · save · math · **camera · render ·
+presets · fx · net · clip**. **Every system the audit flagged is now in the kit** (HIGH trio, MED
+input/save/math, and the remaining camera/render/netcode/fx/skeletal/presets). **Remaining frontier:**
+- **r3f variants** of the new vanilla systems (camera/render/fx) for the 2 r3f games (only lighting+postfx
+  have r3f variants today).
+- **LOW** — i18n · a11y filters.
+- The real wins now: **adopt the kit in a real game** (validate the API end-to-end), and grow `/kit` from a
+  dashboard → a **scaffolder** ("pick pieces → new game" — the puzzle-pieces endgame).
 
-The **`/kit` health-check** page now shows the live adoption matrix (system × game: uses-own / opportunity /
-n-a) + "build next / adopt here / expand to" rankings — the catalog/scaffolder surface, starting as a dashboard.
+The **`/kit` health-check** page shows the live adoption matrix (system × game: uses-own / opportunity /
+n-a) + "build next / adopt here / expand to" rankings — now reflecting 20 built systems.
 
 **Recommended next steps to improve the kit:**
 1. Add the **foundational trio** (art-kit registry + geometry/material helpers + palette) — unlocks procgen
@@ -327,6 +327,15 @@ superset that also covers the three.js games' art-kit ids)? where the builders l
 - **LoRA Stage 1**: training-set assembly — upload/list/remove turntable renders per project at
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
+
+### Shipped 2026-06-29 (game-kit complete — camera/render/presets/fx/net/clip)
+- **game-kit's six remaining systems** (pushed `6fbca78`) — **camera** (orbit/chase/FPS, no-alloc),
+  **render** (vanilla bootstrap + tested fixed-timestep `advance`), **presets** (vite/fly.toml/vercel.json/
+  Dockerfile templates), **fx** (pooled particle emitter, zero-alloc), **net** (transport-agnostic
+  RoomClient + LocalRoom, colyseus-free), **clip** (skeletal AnimationMixer player + procedural→clip
+  baker). Gate: tsc 0 · **178 tests**. The kit now has **20 systems** — every audited gap filled.
+- **`/kit` catalog** flipped these six `planned → built`; the derive tests now assert invariants
+  (catalog-derived counts) so they survive director edits. Gate (Crucible): typecheck 0 · lint 0 · test 123 · build 0.
 
 ### Shipped 2026-06-29 (game-kit input/save/math + Kit health-check)
 - **game-kit input/save/math** (pushed `b81600d`) — keybind/action mapper (conflict-swap), versioned +

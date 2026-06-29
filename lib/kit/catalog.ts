@@ -58,13 +58,12 @@ export const SYSTEMS: readonly KitSystem[] = [
   { id: "input", name: "Input", tier: "system", status: "built", module: "input" },
   { id: "save", name: "Save", tier: "system", status: "built", module: "save" },
   { id: "math", name: "Math", tier: "atom", status: "built", module: "math" },
-  // PLANNED
-  { id: "render-bootstrap", name: "Render Bootstrap", tier: "system", status: "planned", module: "render-bootstrap" },
-  { id: "camera-rigs", name: "Camera Rigs", tier: "system", status: "planned", module: "camera-rigs" },
-  { id: "netcode", name: "Netcode", tier: "kit", status: "planned", module: "netcode" },
-  { id: "fx-particles", name: "FX Particles", tier: "system", status: "planned", module: "fx-particles" },
-  { id: "skeletal-anim", name: "Skeletal Anim", tier: "system", status: "planned", module: "skeletal-anim" },
-  { id: "deploy-presets", name: "Deploy Presets", tier: "kit", status: "planned", module: "deploy-presets" },
+  { id: "render-bootstrap", name: "Render Bootstrap", tier: "system", status: "built", module: "render" },
+  { id: "camera-rigs", name: "Camera Rigs", tier: "system", status: "built", module: "camera" },
+  { id: "netcode", name: "Netcode", tier: "kit", status: "built", module: "net" },
+  { id: "fx-particles", name: "FX Particles", tier: "system", status: "built", module: "fx" },
+  { id: "skeletal-anim", name: "Skeletal Anim", tier: "system", status: "built", module: "clip" },
+  { id: "deploy-presets", name: "Deploy Presets", tier: "kit", status: "built", module: "presets" },
 ] as const;
 
 /**

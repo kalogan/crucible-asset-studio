@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Game, KitSystem } from "./catalog";
+import { SYSTEMS as REAL_SYSTEMS, GAMES as REAL_GAMES } from "./catalog";
 import {
   coverageSummary,
   builtSystemGapsByGame,
@@ -7,6 +8,11 @@ import {
   adoptHere,
   expandTo,
 } from "./derive";
+
+// Expected counts derived FROM the catalog (not hardcoded), so these survive
+// director edits to the matrix.
+const REAL_BUILT = REAL_SYSTEMS.filter((s) => s.status === "built").length;
+const REAL_PLANNED = REAL_SYSTEMS.length - REAL_BUILT;
 
 // Small synthetic fixture so the ranking/counting logic is checked against
 // hand-computed expectations, independent of the live audit data.
@@ -31,22 +37,24 @@ const SYSTEMS: KitSystem[] = [
 describe("coverageSummary (real catalog)", () => {
   it("counts built vs planned and core/gap opportunities consistently", () => {
     const s = coverageSummary();
-    // 14 built, 6 planned per the audit.
-    expect(s.builtCount).toBe(14);
-    expect(s.plannedCount).toBe(6);
-    // Opportunities are non-negative and bounded by built*games (14*5 = 70).
-    expect(s.unifyOpportunities).toBeGreaterThan(0);
-    expect(s.expandOpportunities).toBeGreaterThan(0);
-    expect(s.unifyOpportunities + s.expandOpportunities).toBeLessThanOrEqual(70);
+    // Counts match the catalog (derived, not hardcoded).
+    expect(s.builtCount).toBe(REAL_BUILT);
+    expect(s.plannedCount).toBe(REAL_PLANNED);
+    // Opportunities are non-negative and bounded by built × games.
+    expect(s.unifyOpportunities).toBeGreaterThanOrEqual(0);
+    expect(s.expandOpportunities).toBeGreaterThanOrEqual(0);
+    expect(s.unifyOpportunities + s.expandOpportunities).toBeLessThanOrEqual(
+      REAL_BUILT * REAL_GAMES.length,
+    );
   });
 });
 
 describe("builtSystemGapsByGame (real catalog)", () => {
   it("returns one bar per game with gaps within [0, builtTotal]", () => {
     const bars = builtSystemGapsByGame();
-    expect(bars).toHaveLength(5);
+    expect(bars).toHaveLength(REAL_GAMES.length);
     for (const bar of bars) {
-      expect(bar.builtTotal).toBe(14);
+      expect(bar.builtTotal).toBe(REAL_BUILT);
       expect(bar.gaps).toBeGreaterThanOrEqual(0);
       expect(bar.gaps).toBeLessThanOrEqual(bar.builtTotal);
     }
@@ -60,18 +68,15 @@ describe("builtSystemGapsByGame (real catalog)", () => {
 });
 
 describe("ranking helpers are descending and exclude zero-count systems", () => {
-  it("buildNext ranks planned systems by # of core games, top is camera-rigs (5)", () => {
+  it("buildNext ranks PLANNED systems by # of core games (descending, no zero-count)", () => {
     const ranked = buildNext();
-    // camera-rigs is core in all 5 games.
-    expect(ranked[0]?.system.id).toBe("camera-rigs");
-    expect(ranked[0]?.count).toBe(5);
-    // Monotonic non-increasing.
+    // Only planned systems appear (built ones are excluded).
+    expect(ranked.every((o) => o.system.status === "planned")).toBe(true);
+    // Monotonic non-increasing; no zero-count; games length matches count.
     for (let i = 1; i < ranked.length; i++) {
       expect(ranked[i - 1]!.count).toBeGreaterThanOrEqual(ranked[i]!.count);
     }
-    // No zero-count entries.
     expect(ranked.every((o) => o.count > 0)).toBe(true);
-    // games array length matches the count.
     expect(ranked.every((o) => o.games.length === o.count)).toBe(true);
   });
 
