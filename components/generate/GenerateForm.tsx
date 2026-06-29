@@ -13,15 +13,32 @@ const control =
   "placeholder:text-zinc-500 focus-visible:outline focus-visible:outline-2 " +
   "focus-visible:outline-amber-400";
 
-const PHASES: { key: GenerationStatus["phase"]; label: string }[] = [
+type Mode = "image" | "model";
+
+const ALL_PHASES: { key: GenerationStatus["phase"]; label: string }[] = [
   { key: "image", label: "Generating image (FLUX)" },
   { key: "cutout", label: "Removing background" },
   { key: "model", label: "Building 3D model (TRELLIS)" },
   { key: "saving", label: "Saving" },
 ];
 
-function StageIndicator({ phase, seconds }: { phase: GenerationStatus["phase"] | null; seconds: number }) {
-  const activeIdx = phase ? PHASES.findIndex((p) => p.key === phase) : 0;
+function phasesFor(mode: Mode) {
+  return mode === "image"
+    ? ALL_PHASES.filter((p) => p.key === "image" || p.key === "saving")
+    : ALL_PHASES;
+}
+
+function StageIndicator({
+  phase,
+  seconds,
+  mode,
+}: {
+  phase: GenerationStatus["phase"] | null;
+  seconds: number;
+  mode: Mode;
+}) {
+  const phases = phasesFor(mode);
+  const activeIdx = phase ? phases.findIndex((p) => p.key === phase) : 0;
   return (
     <div
       role="status"
@@ -33,9 +50,8 @@ function StageIndicator({ phase, seconds }: { phase: GenerationStatus["phase"] |
         <span className="font-mono text-xs text-zinc-400">{seconds}s</span>
       </div>
       <ol className="flex flex-col gap-1.5">
-        {PHASES.map((p, i) => {
-          const state =
-            i < activeIdx ? "done" : i === activeIdx ? "active" : "pending";
+        {phases.map((p, i) => {
+          const state = i < activeIdx ? "done" : i === activeIdx ? "active" : "pending";
           return (
             <li key={p.key} className="flex items-center gap-2 text-sm">
               <span
@@ -65,7 +81,9 @@ function StageIndicator({ phase, seconds }: { phase: GenerationStatus["phase"] |
           );
         })}
       </ol>
-      <p className="text-xs text-zinc-500">~2 minutes total — keep this tab open.</p>
+      <p className="text-xs text-zinc-500">
+        {mode === "image" ? "~20 seconds" : "~2 minutes total"} — keep this tab open.
+      </p>
     </div>
   );
 }
@@ -75,6 +93,7 @@ export function GenerateForm() {
     runGenerateAction,
     null,
   );
+  const [mode, setMode] = useState<Mode>("image");
   const [phase, setPhase] = useState<GenerationStatus["phase"] | null>(null);
   const [seconds, setSeconds] = useState(0);
 
@@ -100,6 +119,10 @@ export function GenerateForm() {
       clearInterval(poll);
     };
   }, [pending]);
+
+  const radio =
+    "flex flex-1 cursor-pointer flex-col gap-1 rounded-md border p-3 text-sm " +
+    "focus-within:outline focus-within:outline-2 focus-within:outline-amber-400";
 
   return (
     <form action={action} className="flex flex-col gap-4">
@@ -132,20 +155,65 @@ export function GenerateForm() {
           className={`${control} resize-y`}
         />
         <p className="text-xs text-zinc-500">
-          Phase 1 is canon-free — no LoRA yet. We append “isolated object, neutral
-          background” for a clean mesh.
+          Describe the subject — the project canon supplies the style.
         </p>
       </div>
+
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="mb-1 text-sm font-medium text-zinc-300">Output</legend>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <label
+            htmlFor="mode-image"
+            className={`${radio} ${mode === "image" ? "border-amber-500 bg-amber-500/5" : "border-zinc-700"}`}
+          >
+            <span className="flex items-center gap-2">
+              <input
+                type="radio"
+                id="mode-image"
+                name="mode"
+                value="image"
+                checked={mode === "image"}
+                onChange={() => setMode("image")}
+                className="accent-amber-500"
+              />
+              <span className="font-medium text-zinc-100">Image only (~$0.003)</span>
+            </span>
+            <span className="pl-6 text-xs text-zinc-400">
+              Review the 2D image first, then make it 3D if you like it.
+            </span>
+          </label>
+          <label
+            htmlFor="mode-model"
+            className={`${radio} ${mode === "model" ? "border-amber-500 bg-amber-500/5" : "border-zinc-700"}`}
+          >
+            <span className="flex items-center gap-2">
+              <input
+                type="radio"
+                id="mode-model"
+                name="mode"
+                value="model"
+                checked={mode === "model"}
+                onChange={() => setMode("model")}
+                className="accent-amber-500"
+              />
+              <span className="font-medium text-zinc-100">Straight to 3D (~$0.09)</span>
+            </span>
+            <span className="pl-6 text-xs text-zinc-400">
+              FLUX → TRELLIS in one pass. Skips the 2D review.
+            </span>
+          </label>
+        </div>
+      </fieldset>
 
       <button
         type="submit"
         disabled={pending}
         className="min-h-11 w-fit rounded-md bg-amber-500 px-5 font-medium text-zinc-950 hover:bg-amber-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pending ? "Generating…" : "Generate"}
+        {pending ? "Generating…" : mode === "image" ? "Generate image" : "Generate 3D"}
       </button>
 
-      {pending && <StageIndicator phase={phase} seconds={seconds} />}
+      {pending && <StageIndicator phase={phase} seconds={seconds} mode={mode} />}
       {state?.error && (
         <p role="alert" className="text-sm text-rose-300">
           {state.error}

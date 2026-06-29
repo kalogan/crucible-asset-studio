@@ -12,12 +12,13 @@ export function buildFinalPrompt(canon: Pick<
   Canon,
   "prompt_prefix" | "prompt_suffix"
 > | null, subject: string): string {
-  const subj = subject.trim();
+  const clean = (s: string) => s.trim().replace(/^[,\s]+|[,\s]+$/g, "");
+  const subj = clean(subject);
   if (!canon) {
     // Canon-free fallback (Phase 1 behavior).
     return `${subj}, isolated object, neutral background`;
   }
-  return [canon.prompt_prefix.trim(), subj, canon.prompt_suffix.trim()]
+  return [clean(canon.prompt_prefix), subj, clean(canon.prompt_suffix)]
     .filter((p) => p.length > 0)
     .join(", ");
 }

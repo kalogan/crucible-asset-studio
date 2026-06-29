@@ -65,6 +65,7 @@ export const goldenAsset = {
   spec_id: goldenAssetSpec.id,
   job_id: goldenJob.id,
   stage: "in_review",
+  kind: "model",
   raw_path: "wayfinders/prop.station.ticket_booth.glb",
   finished_path: null,
   cdn_url: null,

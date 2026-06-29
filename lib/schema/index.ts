@@ -18,6 +18,8 @@ export const JobStatus = z.enum([
 export const AssetStage = z.enum([
   "queued", "generating", "in_review", "approved", "rejected", "finished", "published",
 ]);
+export const AssetKind = z.enum(["image", "model"]);
+export type AssetKind = z.infer<typeof AssetKind>;
 
 export type LoraStatus = z.infer<typeof LoraStatus>;
 export type AssetType = z.infer<typeof AssetType>;
@@ -151,6 +153,7 @@ export const Asset = z.object({
   spec_id: uuid.nullable(),
   job_id: uuid.nullable(),
   stage: AssetStage,
+  kind: AssetKind.default("model"),
   raw_path: z.string().nullable(),
   finished_path: z.string().nullable(),
   cdn_url: z.string().nullable(),
@@ -165,6 +168,7 @@ export const AssetInsert = z.object({
   spec_id: uuid.nullable().optional(),
   job_id: uuid.nullable().optional(),
   stage: AssetStage.optional(),
+  kind: AssetKind.optional(),
   raw_path: z.string().nullable().optional(),
   finished_path: z.string().nullable().optional(),
   cdn_url: z.string().nullable().optional(),

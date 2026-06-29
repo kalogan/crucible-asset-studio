@@ -1,7 +1,9 @@
 import "server-only";
-import { createAssetSpec } from "@/lib/db/specs";
+import { createAssetSpec, getAssetSpec } from "@/lib/db/specs";
 import { createJob, updateJob } from "@/lib/db/jobs";
-import { createAsset } from "@/lib/db/assets";
+import { createAsset, getAsset, updateAsset } from "@/lib/db/assets";
+import { getProject } from "@/lib/db/projects";
+import { getCanonByProject } from "@/lib/db/canons";
 import {
   generateImage,
   removeBackground,
@@ -11,8 +13,7 @@ import {
   FLUX_TEXT2IMG,
   TRELLIS_DEFAULTS,
 } from "@/lib/executor";
-import type { Asset } from "@/lib/schema";
-import { getCanonByProject } from "@/lib/db/canons";
+import type { Asset, Canon } from "@/lib/schema";
 import { buildFinalPrompt } from "@/lib/canon/prompt";
 import { buildStoragePath, catalogKeyFor } from "./paths";
 
@@ -24,19 +25,83 @@ export interface PipelineInput {
 }
 
 /**
- * The Phase-1 vertical slice: hand-entered spec -> (optional) Claude enrich ->
- * FLUX text-to-image -> persist -> background cutout -> TRELLIS image-to-3D ->
- * persist GLB -> asset in_review. Canon-free in Phase 1 (no LoRA); Phase 2 swaps
- * the generic enrich for canon scaffolding. Reproducibility frozen in recipe_snapshot.
- *
- * NOTE: synchronous + long (~2 min). Fine for local/single runs; Phase 3 moves bulk
- * generation to the resumable batch worker (Vercel function timeouts make sync
- * generation prod-unsafe at volume).
+ * Canon-aware subject expansion. When a canon governs style, enrichment must
+ * describe ONLY the object (form/parts/materials) — never rendering/realism/
+ * lighting — so it can't fight the canon (the bug that made a "faceted low-poly"
+ * palm come out photoreal). Without a canon, fall back to the generic enrich.
  */
-export async function runGenerationPipeline(input: PipelineInput): Promise<Asset> {
+const CANON_SUBJECT_SYSTEM =
+  "Expand the user's asset request into a concrete description of the OBJECT only — " +
+  "its form, parts, proportions, and materials. Do NOT mention art style, rendering " +
+  "technique, realism, level of detail, lighting, camera, framing, or background — " +
+  "those are defined separately by the art canon. Reply with ONLY the description, 20-50 words.";
+
+async function expandSubject(canon: Canon | null, prompt: string): Promise<string> {
+  return canon
+    ? enrichPrompt(prompt, { system: CANON_SUBJECT_SYSTEM })
+    : enrichPrompt(prompt);
+}
+
+function baseRecipe(input: PipelineInput, canon: Canon | null, finalPrompt: string) {
+  return {
+    title: input.title,
+    prompt: finalPrompt,
+    image_model: FLUX_TEXT2IMG,
+    canon_id: canon?.id ?? null,
+    canon_name: canon?.name ?? null,
+    lora_ref: canon?.lora_ref ?? null,
+    lora_trigger: canon?.lora_trigger ?? null,
+  } satisfies Record<string, unknown>;
+}
+
+/** FLUX text->image, persisted. Sets job phase 'image'. */
+async function generate2D(
+  jobId: string,
+  input: PipelineInput,
+  canon: Canon | null,
+  catalogKey: string,
+) {
+  await updateJob(jobId, { phase: "image" });
+  const subject = await expandSubject(canon, input.prompt);
+  const finalPrompt = buildFinalPrompt(canon, subject);
+  const image = await generateImage(finalPrompt, { width: 1024, height: 1024 });
+  const imageUrl = await persistToStorage({
+    sourceUrl: image.url,
+    path: buildStoragePath(input.projectSlug, catalogKey, "png"),
+    contentType: "image/png",
+  });
+  return { imageUrl, finalPrompt, predictionId: image.predictionId };
+}
+
+/** Background cutout (fail-soft) -> TRELLIS -> persisted GLB. Phases cutout/model/saving. */
+async function generate3D(
+  jobId: string,
+  projectSlug: string,
+  catalogKey: string,
+  sourceImageUrl: string,
+) {
+  await updateJob(jobId, { phase: "cutout" });
+  let cutoutUrl = sourceImageUrl;
+  try {
+    cutoutUrl = await removeBackground(sourceImageUrl);
+  } catch {
+    // keep the original image
+  }
+  await updateJob(jobId, { phase: "model" });
+  const model = await generateModelFromImage(cutoutUrl);
+  await updateJob(jobId, { phase: "saving" });
+  const glbUrl = await persistToStorage({
+    sourceUrl: model.url,
+    path: buildStoragePath(projectSlug, catalogKey, "glb"),
+    contentType: "model/gltf-binary",
+  });
+  return { glbUrl, predictionId: model.predictionId };
+}
+
+/** Image-only: cheap FLUX -> review queue as a 2D image (no TRELLIS spend yet). */
+export async function runImagePipeline(input: PipelineInput): Promise<Asset> {
   const catalogKey = catalogKeyFor(input.title);
   const canon = await getCanonByProject(input.projectId);
-
   const spec = await createAssetSpec({
     project_id: input.projectId,
     canon_id: canon?.id ?? null,
@@ -45,83 +110,102 @@ export async function runGenerationPipeline(input: PipelineInput): Promise<Asset
     title: input.title,
     prompt: input.prompt,
   });
-  const job = await createJob({
-    spec_id: spec.id,
-    status: "generating",
-    executor: "replicate",
-  });
-
+  const job = await createJob({ spec_id: spec.id, status: "generating", executor: "replicate" });
   try {
-    // Canon supplies the style (prefix/suffix); the user supplies the subject.
-    // enrich is fail-soft (no-op without an Anthropic key).
-    const subject = await enrichPrompt(input.prompt);
-    const finalPrompt = buildFinalPrompt(canon, subject);
-
-    // 1. FLUX text -> image, persist the raw 2D output.
-    await updateJob(job.id, { phase: "image" });
-    const image = await generateImage(finalPrompt, { width: 1024, height: 1024 });
-    const imagePath = buildStoragePath(input.projectSlug, catalogKey, "png");
-    const imageUrl = await persistToStorage({
-      sourceUrl: image.url,
-      path: imagePath,
-      contentType: "image/png",
-    });
-
-    // 2. Background cutout (fail-soft — a clean isolated subject -> better mesh).
-    await updateJob(job.id, { phase: "cutout" });
-    let cutoutUrl = image.url;
-    try {
-      cutoutUrl = await removeBackground(image.url);
-    } catch {
-      // keep the original image
-    }
-
-    // 3. TRELLIS image -> 3D, persist the GLB.
-    await updateJob(job.id, { phase: "model" });
-    const model = await generateModelFromImage(cutoutUrl);
-    await updateJob(job.id, { phase: "saving" });
-    const glbPath = buildStoragePath(input.projectSlug, catalogKey, "glb");
-    const glbUrl = await persistToStorage({
-      sourceUrl: model.url,
-      path: glbPath,
-      contentType: "model/gltf-binary",
-    });
-
-    const recipe: Record<string, unknown> = {
-      title: input.title,
-      prompt: finalPrompt,
-      image_model: FLUX_TEXT2IMG,
-      model_3d: "firtoz/trellis",
-      image_url: imageUrl,
-      image_prediction: image.predictionId,
-      model_prediction: model.predictionId,
-      trellis: TRELLIS_DEFAULTS,
-      canon_id: canon?.id ?? null,
-      canon_name: canon?.name ?? null,
-      lora_ref: canon?.lora_ref ?? null,
-      lora_trigger: canon?.lora_trigger ?? null,
-    };
-
-    await updateJob(job.id, {
-      status: "succeeded",
-      provider_ref: model.predictionId,
-      recipe_snapshot: recipe,
-      cost: 0.09,
-    });
-
+    const { imageUrl, finalPrompt, predictionId } = await generate2D(job.id, input, canon, catalogKey);
+    const recipe = { ...baseRecipe(input, canon, finalPrompt), image_url: imageUrl, image_prediction: predictionId };
+    await updateJob(job.id, { status: "succeeded", phase: "saving", provider_ref: predictionId, recipe_snapshot: recipe, cost: 0.01 });
     return createAsset({
       project_id: input.projectId,
       spec_id: spec.id,
       job_id: job.id,
       stage: "in_review",
+      kind: "image",
+      raw_path: imageUrl,
+      recipe_snapshot: recipe,
+    });
+  } catch (err) {
+    await updateJob(job.id, { status: "failed", error: err instanceof Error ? err.message : String(err) });
+    throw err;
+  }
+}
+
+/** Full 2D->3D: FLUX -> cutout -> TRELLIS -> review queue as a 3D model. */
+export async function runGenerationPipeline(input: PipelineInput): Promise<Asset> {
+  const catalogKey = catalogKeyFor(input.title);
+  const canon = await getCanonByProject(input.projectId);
+  const spec = await createAssetSpec({
+    project_id: input.projectId,
+    canon_id: canon?.id ?? null,
+    catalog_key: catalogKey,
+    asset_type: "model_3d",
+    title: input.title,
+    prompt: input.prompt,
+  });
+  const job = await createJob({ spec_id: spec.id, status: "generating", executor: "replicate" });
+  try {
+    const img = await generate2D(job.id, input, canon, catalogKey);
+    const { glbUrl, predictionId } = await generate3D(job.id, input.projectSlug, catalogKey, img.imageUrl);
+    const recipe = {
+      ...baseRecipe(input, canon, img.finalPrompt),
+      model_3d: "firtoz/trellis",
+      image_url: img.imageUrl,
+      image_prediction: img.predictionId,
+      model_prediction: predictionId,
+      trellis: TRELLIS_DEFAULTS,
+    };
+    await updateJob(job.id, { status: "succeeded", provider_ref: predictionId, recipe_snapshot: recipe, cost: 0.09 });
+    return createAsset({
+      project_id: input.projectId,
+      spec_id: spec.id,
+      job_id: job.id,
+      stage: "in_review",
+      kind: "model",
       raw_path: glbUrl,
       recipe_snapshot: recipe,
     });
   } catch (err) {
-    await updateJob(job.id, {
-      status: "failed",
-      error: err instanceof Error ? err.message : String(err),
+    await updateJob(job.id, { status: "failed", error: err instanceof Error ? err.message : String(err) });
+    throw err;
+  }
+}
+
+/** Promote a reviewed 2D image asset to 3D — the expensive TRELLIS step, on demand. */
+export async function convertAssetTo3D(assetId: string): Promise<Asset> {
+  const asset = await getAsset(assetId);
+  if (!asset) throw new Error("Asset not found.");
+  if (asset.kind !== "image") throw new Error("Asset is already a 3D model.");
+  const sourceImage =
+    asset.raw_path ?? (asset.recipe_snapshot["image_url"] as string | undefined) ?? null;
+  if (!sourceImage) throw new Error("No source image to convert.");
+
+  const spec = asset.spec_id ? await getAssetSpec(asset.spec_id) : null;
+  const project = await getProject(asset.project_id);
+  if (!project) throw new Error("Project not found.");
+  const catalogKey = spec?.catalog_key ?? catalogKeyFor(String(asset.recipe_snapshot["title"] ?? assetId));
+
+  const job = await createJob({
+    spec_id: asset.spec_id ?? spec?.id ?? "",
+    status: "generating",
+    executor: "replicate",
+  });
+  try {
+    const { glbUrl, predictionId } = await generate3D(job.id, project.slug, catalogKey, sourceImage);
+    const recipe = {
+      ...asset.recipe_snapshot,
+      model_3d: "firtoz/trellis",
+      model_prediction: predictionId,
+      trellis: TRELLIS_DEFAULTS,
+    };
+    await updateJob(job.id, { status: "succeeded", provider_ref: predictionId, recipe_snapshot: recipe, cost: 0.08 });
+    return updateAsset(asset.id, {
+      kind: "model",
+      stage: "in_review",
+      raw_path: glbUrl,
+      recipe_snapshot: recipe,
     });
+  } catch (err) {
+    await updateJob(job.id, { status: "failed", error: err instanceof Error ? err.message : String(err) });
     throw err;
   }
 }

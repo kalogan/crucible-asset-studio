@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { getActiveProject } from "@/lib/active-project";
-import { runGenerationPipeline } from "@/lib/pipeline/generate";
+import { runGenerationPipeline, runImagePipeline } from "@/lib/pipeline/generate";
 import { getCanonByProject } from "@/lib/db/canons";
 import { canonReadiness } from "@/lib/canon/precision";
 import {
@@ -64,13 +64,11 @@ export async function runGenerateAction(
     };
   }
 
+  const mode = String(formData.get("mode") ?? "image") === "model" ? "model" : "image";
+  const run = mode === "model" ? runGenerationPipeline : runImagePipeline;
+
   try {
-    await runGenerationPipeline({
-      projectId: active.id,
-      projectSlug: active.slug,
-      title,
-      prompt,
-    });
+    await run({ projectId: active.id, projectSlug: active.slug, title, prompt });
   } catch (err) {
     return {
       ok: false,
