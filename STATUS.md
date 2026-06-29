@@ -116,6 +116,30 @@ cheap→expensive:
   Crucible → reusable kit). **Decision needed:** which direction — and is the trigger per-game ad-hoc
   or a registered "linked source" per project?
 
+### Multi-game import — other games (added 2026-06-29)
+Crucible projects created (prototype) for **storm-break-hockey**, **corrupted-veil**
+(`corrupted-void` repo), **fractured-domains** — `/api/import` is game-agnostic, so receiving
+costs only the project row (done). What's left per game is a small EXPORT ADAPTER (no Crucible
+change). Explored verdicts:
+- **Storm-Break Hockey** — vanilla three.js, fully runtime-built meshes (3 player archetypes,
+  puck + skins, 9 obstacle types, rink). GLB path applies. Builders are inline `_build*` fns in
+  `src/main.js` + `ObstacleRenderer`/`Materials` (not a clean registry) → adapter must call/expose
+  them. Has a menu-preview + hazard-editor to host the dev button. **Best first (fastest QA loop).**
+- **Corrupted Veil** — vanilla three.js, blueprint-driven generators: `ProxyKitbasher.assemble`
+  (46 creatures), `HeroBuilder.build` (6 classes), `EnvironmentFactory` (biome props). GLB path
+  applies (~400 LOC). No preview harness → adapter builds its own trigger UI. Loops
+  `MonsterRegistry.json` + the player registry.
+- **Fractured Domains** — **2D Canvas, no three.js**; generators emit `HTMLCanvasElement`. GLB does
+  NOT apply (would need a 3D rewrite). BUT the **image-grab path works**: `canvas.toDataURL()` →
+  `/api/import` as `format: image` (library already renders images). Grab tiles/sprites/props as PNGs.
+
+**Reusable adapter recipe** (extract once, each game adapts): a generic core
+`exportToCrucible(items, { url, token, slug })` — strip non-mesh renderables → `GLTFExporter`
+(or skip for 2D) → base64 → POST with `{type,label,artKitId,tags}` + progress. Each game writes a
+thin builder-list adapter (its `_build*` / registry loop) + a DEV-gated button; token from the
+game's local `.env` (never its public bundle), `VITE_CRUCIBLE_URL` → Crucible. The Wayfinders
+`exportToCrucible.ts` is the working reference. Each adapter needs an in-game click-test (QA).
+
 ### Roadmap — authoring & reuse (added 2026-06-29)
 
 **C. In-Crucible editor view (levels or art).** Two distinct editors — decide scope before building:
