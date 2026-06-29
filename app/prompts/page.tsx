@@ -11,7 +11,7 @@ export default async function PromptsPage() {
   const specs = configured && active ? await listSpecsWithAssetByProject(active.id) : [];
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-6 py-12">
+    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-6 py-12 lg:max-w-5xl xl:max-w-6xl">
       <header className="flex flex-col gap-2">
         <Link
           href="/"
@@ -47,7 +47,7 @@ export default async function PromptsPage() {
           and it’ll show up here.
         </p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {specs.map((s) => (
             <li
               key={s.id}

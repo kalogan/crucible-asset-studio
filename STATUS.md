@@ -134,6 +134,18 @@ cheap→expensive:
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
 
+### Shipped 2026-06-29 (bulk grab + splash hero + responsive)
+- **Bulk import (harness side).** project-mmo preview now exports, beyond the per-pack button:
+  **"All props (every pack)"** (every pack's declared props, deduped, each tagged with the pack/region(s)
+  that use it) and **"All creatures"** (the **full Bestiary ~77** via the creature engine — not just the
+  legacy `mob.*` kit). Characters/biomes still per roadmap. Export module refactored to a generic
+  mesh→glb→POST core. (Cross-pack procedurally-placed set-dressing not yet resolved — follow-up.)
+- **Splash → portfolio hero.** "Capture splash → hero" renders the title-screen `<Globe>` vista
+  offscreen (`preserveDrawingBuffer`) → PNG → new authed **`POST /api/project-screenshot`** (CORS +
+  Basic-auth-exempt, sets `projects.screenshot`).
+- **Responsive (Kevin's choice: forms readable, grids widen).** Home/Review/Prompts grids widen +
+  add columns lg→xl→1440 like Library; nav already widened. Form pages kept at reading width.
+
 ### Shipped 2026-06-29 (live library + grab-from-Wayfinders)
 - **Procgen grab pipeline, end-to-end.** project-mmo's preview harness has a DEV-only
   "Export to Crucible" button (Props gallery): rebuilds each art-kit mesh via

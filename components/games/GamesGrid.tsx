@@ -38,7 +38,7 @@ export function GamesGrid({ projects }: { projects: Project[] }) {
           {projects.length === 0 ? "No games yet." : `No games match “${q}”.`}
         </p>
       ) : (
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((p) => (
             <li
               key={p.id}
