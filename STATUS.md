@@ -191,6 +191,20 @@ game's local `.env` (never its public bundle), `VITE_CRUCIBLE_URL` → Crucible.
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
 
+### Shipped 2026-06-29 (import-from-GitHub + object editor + more games)
+- **Import a game from GitHub.** `/projects/new` has an "Import from GitHub" field: paste a repo URL
+  (or `owner/repo`) → server fetches the repo's metadata via the GitHub API → auto-fills
+  name/description/url/repo → creates the project. Public repos work unauthenticated; private need
+  `GITHUB_TOKEN`. Pure parse/map helpers (`lib/github/repo.ts`) tested; `fetchGithubRepo` server-only.
+  The reusable on-ramp for new games (meteor, rhythm-tower, etc. — not local).
+- **Single-object 3D editor** (`/editor`, foundation of roadmap C). Pick a library MODEL asset →
+  orbit + TransformControls (translate/rotate/scale, orbit suspended mid-drag) + recolor (clones
+  materials, library untouched) + reset + Download edited GLB. Reuses the GLBViewer IBL + normalize.
+  **Scene-layout/multi-object composition is the next phase.** Needs a click-test (interactive UI).
+- **More games onboarded as projects:** woodturning-studio (local, R3F procgen lathe). Plus the
+  earlier storm-break-hockey / corrupted-veil / fractured-domains. 6 projects total.
+- +13 tests (github + library/import helpers). Gate: typecheck 0 · lint 0 · test 103 · build 0.
+
 ### Shipped 2026-06-29 (bulk grab + splash hero + responsive)
 - **Bulk import (harness side).** project-mmo preview now exports, beyond the per-pack button:
   **"All props (every pack)"** (every pack's declared props, deduped, each tagged with the pack/region(s)

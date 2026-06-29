@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/config";
 import { CreateGameForm } from "@/components/games/CreateGameForm";
+import { GithubImportForm } from "@/components/games/GithubImportForm";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,15 @@ export default function NewProjectPage() {
         </p>
       </header>
       {configured ? (
-        <CreateGameForm />
+        <div className="flex flex-col gap-6">
+          <GithubImportForm />
+          <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            or enter manually
+            <span className="h-px flex-1 bg-border" />
+          </div>
+          <CreateGameForm />
+        </div>
       ) : (
         <p className="text-sm text-foreground">Connect Supabase first (see the home page).</p>
       )}

@@ -8,6 +8,8 @@ import { parseCreateProjectForm } from "@/lib/projects/createInput";
 import { ProjectStatus } from "@/lib/schema";
 import { uploadProjectScreenshot } from "@/lib/projects/screenshot";
 import { ACTIVE_PROJECT_COOKIE } from "@/lib/active-project";
+import { parseRepoUrl, mapRepoToProject } from "@/lib/github/repo";
+import { fetchGithubRepo } from "@/lib/github/fetch";
 
 function formStr(formData: FormData, key: string): string | null {
   const v = String(formData.get(key) ?? "").trim();
@@ -17,6 +19,42 @@ function formStr(formData: FormData, key: string): string | null {
 export interface ActionResult {
   ok: boolean;
   error?: string;
+}
+
+/**
+ * Import a game as a project straight from a GitHub repo URL (or owner/repo). Fetches the
+ * repo's metadata + auto-fills name/description/url/repo, then creates the project. Public
+ * repos work unauthenticated; private repos need GITHUB_TOKEN.
+ */
+export async function importProjectFromGithubAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const ref = parseRepoUrl(String(formData.get("repoUrl") ?? ""));
+  if (!ref) return { ok: false, error: "Enter a GitHub repo URL or owner/repo." };
+
+  let slug = "";
+  try {
+    const meta = await fetchGithubRepo(ref.owner, ref.repo);
+    const p = mapRepoToProject(meta);
+    slug = p.slug;
+    if (await getProjectBySlug(slug)) {
+      return { ok: false, error: `A project with slug "${slug}" already exists.` };
+    }
+    await createProject({
+      slug: p.slug,
+      name: p.name,
+      description: p.description,
+      url: p.url,
+      repo_url: p.repo_url,
+      status: "prototype",
+    });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Import failed." };
+  }
+
+  revalidatePath("/");
+  redirect(`/projects/${slug}`);
 }
 
 async function setActiveCookie(projectId: string): Promise<void> {
