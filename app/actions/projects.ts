@@ -133,7 +133,7 @@ export async function uploadScreenshotAction(
   }
 }
 
-const WORKSPACE_PATHS = new Set(["/generate", "/review", "/canon", "/prompts"]);
+const WORKSPACE_PATHS = new Set(["/generate", "/review", "/canon", "/prompts", "/library"]);
 
 /** Set a game active, then enter its generation workspace. */
 export async function openWorkspaceAction(formData: FormData): Promise<void> {

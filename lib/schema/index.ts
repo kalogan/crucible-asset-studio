@@ -141,6 +141,34 @@ export const AssetSpecInsert = z.object({
 });
 export type AssetSpecInsert = z.infer<typeof AssetSpecInsert>;
 
+// ── reference_assets (a game's existing/procgen assets, imported as renders) ──
+export const ReferenceAssetType = z.enum([
+  "character", "creature", "prop", "fx", "biome", "ui", "other",
+]);
+export type ReferenceAssetType = z.infer<typeof ReferenceAssetType>;
+
+export const ReferenceAsset = z.object({
+  id: uuid,
+  project_id: uuid,
+  asset_type: ReferenceAssetType,
+  label: z.string().min(1),
+  source: z.enum(["procgen", "external"]),
+  image_path: z.string(),
+  art_kit_id: z.string().nullable(),
+  created_at: ts,
+});
+export type ReferenceAsset = z.infer<typeof ReferenceAsset>;
+
+export const ReferenceAssetInsert = z.object({
+  project_id: uuid,
+  asset_type: ReferenceAssetType,
+  label: z.string().min(1),
+  source: z.enum(["procgen", "external"]).optional(),
+  image_path: z.string(),
+  art_kit_id: z.string().nullable().optional(),
+});
+export type ReferenceAssetInsert = z.infer<typeof ReferenceAssetInsert>;
+
 // ── jobs ─────────────────────────────────────────────────────────────────────
 export const GenerationPhase = z.enum(["image", "cutout", "model", "saving"]);
 export type GenerationPhase = z.infer<typeof GenerationPhase>;

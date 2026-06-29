@@ -79,6 +79,9 @@ export default async function ProjectDetailPage({
           <button type="submit" name="target" value="/canon" className={wsBtn}>
             Canon
           </button>
+          <button type="submit" name="target" value="/library" className={wsBtn}>
+            Library
+          </button>
           <button type="submit" name="target" value="/prompts" className={wsBtn}>
             Prompts
           </button>
