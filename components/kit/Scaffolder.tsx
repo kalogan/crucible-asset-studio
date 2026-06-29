@@ -270,6 +270,19 @@ export function Scaffolder({ systems }: { systems: readonly ScaffoldSystem[] }) 
             </Badge>
           </div>
 
+          <p className="text-sm text-muted-foreground">
+            Download the{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">.zip</code>,
+            then turn it into a GitHub repo with{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              sh create-repo.sh
+            </code>{" "}
+            (uses your local{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">gh</code> auth
+            — no tokens). See the generated{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">README.md</code>.
+          </p>
+
           {files.map((file) => (
             <Card key={file.path}>
               <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">

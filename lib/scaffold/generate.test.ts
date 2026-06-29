@@ -15,7 +15,9 @@ describe("generateScaffold — file tree", () => {
     const paths = files.map((f) => f.path).sort();
     expect(paths).toEqual(
       [
+        ".gitignore",
         "README.md",
+        "create-repo.sh",
         "index.html",
         "package.json",
         "src/main.ts",
@@ -222,6 +224,29 @@ describe("generateScaffold — README + determinism", () => {
       systemIds: ["render-bootstrap", "audio", "lighting"],
     });
     expect(a).toEqual(b);
+  });
+});
+
+describe("generateScaffold — GitHub bootstrap", () => {
+  it("emits create-repo.sh wired to gh repo create + a .gitignore", () => {
+    const map = fileMap(
+      generateScaffold({
+        name: "Ship It",
+        target: "vanilla",
+        systemIds: ["render-bootstrap"],
+      }),
+    );
+    const sh = map.get("create-repo.sh") as string;
+    expect(sh).toContain("gh repo create");
+    expect(sh).toContain("--source=.");
+    expect(sh).toContain("--push");
+    // Defaults to the slug + private, with a gh-not-installed guard.
+    expect(sh).toContain('REPO_NAME="${1:-ship-it}"');
+    expect(sh).toContain('VISIBILITY="${2:-private}"');
+    expect(sh).toContain("command -v gh");
+
+    const ignore = map.get(".gitignore") as string;
+    expect(ignore).toContain("node_modules/");
   });
 });
 

@@ -1052,6 +1052,60 @@ function buildR3fMain(
   return lines.join("\n");
 }
 
+/** A starter `.gitignore` so the first commit never drags in node_modules/dist. */
+function buildGitignore(): string {
+  return [
+    `node_modules/`,
+    `dist/`,
+    `*.local`,
+    `.env`,
+    `.env.*`,
+    `.DS_Store`,
+    ``,
+  ].join("\n");
+}
+
+/**
+ * A one-shot bootstrap script: `sh create-repo.sh [name] [private|public]`
+ * runs git init + first commit + `gh repo create --source --push`, using the
+ * user's already-authenticated GitHub CLI. No tokens, no server — it runs on
+ * the user's machine with their own `gh` auth.
+ */
+function buildCreateRepoSh(slug: string): string {
+  return [
+    `#!/usr/bin/env sh`,
+    `# Bootstrap this starter into a fresh GitHub repo using the GitHub CLI (gh).`,
+    `#`,
+    `#   sh create-repo.sh [repo-name] [private|public|internal]`,
+    `#`,
+    `# Prereqs: git installed, and \`gh auth login\` already done.`,
+    `set -e`,
+    ``,
+    `REPO_NAME="\${1:-${slug}}"`,
+    `VISIBILITY="\${2:-private}"`,
+    ``,
+    `if ! command -v gh >/dev/null 2>&1; then`,
+    `  echo "error: GitHub CLI (gh) not found — install https://cli.github.com/ then run 'gh auth login'." >&2`,
+    `  exit 1`,
+    `fi`,
+    ``,
+    `if [ -d .git ]; then`,
+    `  echo "error: a .git directory already exists here — refusing to re-init." >&2`,
+    `  exit 1`,
+    `fi`,
+    ``,
+    `git init -b main`,
+    `git add -A`,
+    `git commit -m "chore: scaffold ${slug} from Crucible game-kit"`,
+    ``,
+    `# Create the repo on your account, wire it as origin, and push.`,
+    `gh repo create "$REPO_NAME" --source=. --remote=origin --push --"$VISIBILITY"`,
+    ``,
+    `echo "✓ Pushed to GitHub as $REPO_NAME ($VISIBILITY)."`,
+    ``,
+  ].join("\n");
+}
+
 function buildReadme(
   name: string,
   target: ScaffoldTarget,
@@ -1121,6 +1175,18 @@ function buildReadme(
 
   lines.push(
     ``,
+    `## Push to GitHub`,
+    ``,
+    `With the GitHub CLI (\`gh auth login\` done once), turn this folder into a repo:`,
+    ``,
+    `\`\`\`sh`,
+    `sh create-repo.sh                 # repo named "${slugify(name) || "game"}", private`,
+    `sh create-repo.sh my-game public  # custom name + visibility`,
+    `\`\`\``,
+    ``,
+    `It runs \`git init\` + a first commit + \`gh repo create --source --push\` using`,
+    `your own \`gh\` auth — no tokens stored anywhere.`,
+    ``,
     `The starter depends on \`game-kit\` (\`github:kalogan/game-kit\`). Each picked`,
     `system imports + initializes its piece in \`${entryFile}\`.`,
     `Some are stubbed with \`// TODO: game-specific wiring\` — fill those in.`,
@@ -1160,6 +1226,8 @@ export function generateScaffold(opts: ScaffoldOptions): ScaffoldFile[] {
       path: "README.md",
       content: buildReadme(opts.name, opts.target, resolved, template),
     },
+    { path: ".gitignore", content: buildGitignore() },
+    { path: "create-repo.sh", content: buildCreateRepoSh(slug) },
     ...contrib.files,
   ];
 }
