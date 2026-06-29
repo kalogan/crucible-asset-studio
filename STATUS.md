@@ -173,6 +173,23 @@ game's local `.env` (never its public bundle), `VITE_CRUCIBLE_URL` → Crucible.
   "linked art-kit." Decisions: copy vs link; kit = static assets only or assets + their generators/canon;
   versioning + where kits live (Supabase Storage → R2 when distribution matters).
 
+**F. Upgrade a procgen asset → refined 3D model (TRELLIS / other).** Take a grabbed/procgen library
+asset and produce a higher-fidelity 3D model from it (a per-asset "Upgrade to 3D" action → review queue):
+- **Image asset → 3D** — run the asset image through TRELLIS (image→3D); reuses the existing
+  `convertAssetTo3D` / generate pipeline. Direct for the 2D-game grabs (Fractured Domains) + image refs.
+- **Procgen GLB → refined 3D** — capture a hero render of the chunky low-poly GLB → TRELLIS → a cleaner
+  detailed mesh; or a mesh→mesh refiner model. Turns the faceted procgen look into a finished asset.
+- Money boundary (TRELLIS ≈ $0.09/run) — guarded by the daily cap + review gate. Decisions: source
+  (image vs GLB-render); model (TRELLIS vs alternative); replace vs version the asset.
+
+**G. Animation viewer — play any asset's clips (idle/walk/attack/dance).** A viewer (in the focus modal
++ a dedicated surface) that detects a model's glTF AnimationClips and lets you pick + play them. Works
+for any asset that CARRIES clips. Open question (being explored): project-mmo's anims are PROCEDURAL
+(no clips) → exporting them playable needs the export to **bake** the procedural animator into glTF
+clips (sample bone/part transforms over time → KeyframeTracks); deceive-me-daddy's authored GLBs likely
+already have clips (the easy test case). So: build the player now (plays embedded clips); baking
+procedural anims is the follow-on per-game export work.
+
 ### Later phases
 - **Phase 3 — bulk + finish + publish:** resumable, cost-capped **batch worker** (sync gen is
   prod-unsafe at volume); **Kiln** finishing module (retopo + baked PBR); **CDN publish** + per-project
