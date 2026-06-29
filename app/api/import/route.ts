@@ -3,6 +3,7 @@ import { getProjectBySlug } from "@/lib/db/projects";
 import { createReferenceAsset } from "@/lib/db/reference-assets";
 import { persistBase64ToStorage, extForContentType } from "@/lib/executor";
 import { ReferenceAssetType } from "@/lib/schema";
+import { sanitizeTags, formatForMime } from "@/lib/import/normalize";
 
 // Bearer-token-authed, so allow any origin (the harness pushes cross-origin from its
 // own dev server / build). The token is the gate, not the origin.
@@ -45,11 +46,9 @@ export async function POST(req: Request): Promise<NextResponse> {
   const dataBase64 = String(body.dataBase64 ?? body.imageBase64 ?? "");
   const mimeType = String(body.mimeType ?? "image/png");
   const artKitId = body.artKitId ? String(body.artKitId) : null;
-  const format = mimeType.includes("gltf") || mimeType.includes("glb") ? "model" : "image";
-  // Origin/hierarchy tags (e.g. ["Skyhold"]) — sanitize: strings, trimmed, deduped, capped.
-  const tags = Array.isArray(body.tags)
-    ? [...new Set(body.tags.map((t) => String(t).trim()).filter(Boolean))].slice(0, 12)
-    : [];
+  const format = formatForMime(mimeType);
+  // Origin/hierarchy tags (e.g. ["Skyhold"]) — strings, trimmed, deduped, capped.
+  const tags = sanitizeTags(body.tags);
 
   if (!slug || !label || !typeParsed.success || !dataBase64) {
     return json({ error: "Required: projectSlug, type, label, dataBase64 (or imageBase64)." }, 400);

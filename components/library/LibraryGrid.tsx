@@ -21,6 +21,7 @@ import {
 } from "@react-three/drei";
 import { Box3, Vector3, Group } from "three";
 import { Badge } from "@/components/ui/badge";
+import { buildFacets, filterByFacet } from "@/lib/library/filter";
 import { AssetModal } from "./AssetModal";
 
 export interface LibraryItem {
@@ -126,19 +127,13 @@ function TileScene({ url, reduced }: { url: string; reduced: boolean }) {
 }
 
 export function LibraryGrid({ items }: { items: LibraryItem[] }) {
-  // Filterable facets: the asset category (type) PLUS every origin/hierarchy tag
-  // (e.g. "Skyhold"), deduped. Clicking a chip matches either dimension.
-  const types = Array.from(new Set(items.map((i) => i.type)));
-  const tags = Array.from(new Set(items.flatMap((i) => i.tags)));
-  const facets = [...types, ...tags.filter((t) => !types.includes(t))].sort();
+  // Filterable facets: asset category (type) + every origin tag (e.g. "Skyhold").
+  const facets = buildFacets(items);
   const [filter, setFilter] = useState<string>("all");
   const [focused, setFocused] = useState<LibraryItem | null>(null);
   const reduced = useReducedMotion();
   const containerRef = useRef<HTMLDivElement>(null);
-  const shown =
-    filter === "all"
-      ? items
-      : items.filter((i) => i.type === filter || i.tags.includes(filter));
+  const shown = filterByFacet(items, filter);
 
   const chip = (key: string) =>
     `min-h-9 rounded-full border px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${

@@ -5,6 +5,7 @@ import { listReferenceAssetsByProject } from "@/lib/db/reference-assets";
 import { listAssetsByProject } from "@/lib/db/assets";
 import { recipeString } from "@/lib/pipeline/paths";
 import { LibraryGrid, type LibraryItem } from "@/components/library/LibraryGrid";
+import { sortByNewest, countByType } from "@/lib/library/filter";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +45,15 @@ export default async function LibraryPage() {
         createdAt: a.created_at,
         artKitId: null,
       }));
-    items = [...refItems, ...genItems];
+    items = sortByNewest([...refItems, ...genItems]);
   }
+
+  // Per-type read-out for the header (e.g. "prop 12 · creature 8 · biome 5").
+  const typeCounts = countByType(items);
+  const countsLabel = Object.entries(typeCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([t, n]) => `${t} ${n}`)
+    .join(" · ");
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-8 px-6 py-12 lg:max-w-5xl xl:max-w-6xl min-[1440px]:max-w-7xl">
@@ -56,7 +64,8 @@ export default async function LibraryPage() {
         <h1 className="text-3xl font-semibold">Asset library</h1>
         {active && (
           <p className="text-sm text-muted-foreground">
-            {active.name} — procgen (imported) + generated assets. {items.length} total.
+            {active.name} — procgen (imported) + generated assets. {items.length} total
+            {countsLabel && <span className="text-muted-foreground/80"> · {countsLabel}</span>}.
           </p>
         )}
       </header>
