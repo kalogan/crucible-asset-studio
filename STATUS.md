@@ -77,7 +77,17 @@ Three options, cheapest first:
   auto-draft now works with the Anthropic key) → decompose into props; zero style cross-contamination.
 - **Phase 5 — avatars** (deferred): rigging-ready character pipeline, separate from props.
 
+### Validated 2026-06-29
+- **Living Dungeon control test passed.** Seeded its canon from the March art bible → generated
+  on-style 2D floor tiles **and** a player portrait that match the March originals. Confirms the
+  canon+scaffolding pipeline is sound; the Wayfinders gap is specifically 3D-faceted difficulty.
+- **Prompt library** (`/prompts`) shipped — reuse/tweak past prompts.
+
 ### Smaller follow-ups
+- **Per-asset-type framing** (worthwhile): style belongs to the canon, *format* belongs to the asset
+  (tilesheet vs portrait vs sprite vs icon) — the March model used per-asset-type prompts. Surfaced by
+  the LD portrait: the canon's `no human faces` never (right for tiles) fights a portrait. A small
+  asset-type → framing+nevers map would fix it cleanly.
 - **Intake "Save as canon"** — `/intake` currently drafts then links to `/canon`; wire a direct save so
   it's one flow (no copy-paste). Useful for the deception game.
 - Verify TRELLIS version hash before heavy 3D use; migrate off deprecated `next lint`; rotate the old
