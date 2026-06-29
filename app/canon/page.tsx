@@ -5,6 +5,8 @@ import { getCanonByProject } from "@/lib/db/canons";
 import { canonReadiness } from "@/lib/canon/precision";
 import { CanonForm } from "@/components/canon/CanonForm";
 import { SeedCanonButton } from "@/components/canon/SeedCanonButton";
+import { TrainingImages } from "@/components/lora/TrainingImages";
+import { listTrainingImages } from "@/lib/lora/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,7 @@ export default async function CanonPage() {
   const active = configured ? await getActiveProject() : null;
   const canon = active ? await getCanonByProject(active.id) : null;
   const readiness = canon ? canonReadiness(canon) : null;
+  const trainingImages = active && canon ? await listTrainingImages(active.slug) : [];
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-8 px-6 py-12">
@@ -83,6 +86,13 @@ export default async function CanonPage() {
             )}
             <CanonForm canon={canon} />
           </section>
+
+          {canon && (
+            <TrainingImages
+              images={trainingImages}
+              triggerWord={canon.lora_trigger}
+            />
+          )}
         </>
       )}
     </main>
