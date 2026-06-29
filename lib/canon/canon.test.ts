@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildFinalPrompt } from "./prompt";
 import { canonReadiness } from "./precision";
 import { wayfindersCanon } from "./seeds/wayfinders";
+import { livingDungeonCanon } from "./seeds/living-dungeon";
 import { Canon } from "@/lib/schema";
 
 const canonRow = (overrides: Record<string, unknown> = {}) =>
@@ -10,7 +11,7 @@ const canonRow = (overrides: Record<string, unknown> = {}) =>
     project_id: "22222222-2222-4222-8222-222222222222",
     name: "Wayfinders core",
     style_guide: {
-      palette: { a: ["#fff"] },
+      palette: { hexes: ["#243258", "#5cffd0"] },
       do: ["a", "b", "c"],
       never: ["x", "y", "z"],
     },
@@ -33,13 +34,14 @@ describe("buildFinalPrompt", () => {
     );
   });
 
-  it("wraps the subject in canon prefix + suffix", () => {
-    expect(
-      buildFinalPrompt(
-        { prompt_prefix: "wyfndrstyle, faceted low-poly", prompt_suffix: "3/4 view" },
-        "a barrel",
-      ),
-    ).toBe("wyfndrstyle, faceted low-poly, a barrel, 3/4 view");
+  it("wraps subject in prefix+suffix, injects palette, bakes nevers as 'no X'", () => {
+    const out = buildFinalPrompt(canonRow(), "a barrel");
+    expect(out).toContain("wyfndrstyle, faceted low-poly, flat-shaded"); // prefix
+    expect(out).toContain("a barrel"); // subject
+    expect(out).toContain("3/4 view, isolated object"); // suffix
+    expect(out).toContain("palette #243258, #5cffd0"); // palette injected
+    expect(out).toContain("no photorealistic"); // baked never
+    expect(out).toContain("no PBR");
   });
 });
 
@@ -71,5 +73,18 @@ describe("wayfindersCanon seed", () => {
     });
     expect(canonReadiness(row).ready).toBe(true);
     expect(seed.lora_trigger).toBe("wyfndrstyle");
+  });
+
+  it("Living Dungeon seed passes the precision bar", () => {
+    const seed = livingDungeonCanon("22222222-2222-4222-8222-222222222222");
+    const row = canonRow({
+      prompt_prefix: seed.prompt_prefix,
+      prompt_suffix: seed.prompt_suffix,
+      negative_prompt: seed.negative_prompt,
+      style_guide: seed.style_guide,
+      name: seed.name,
+      lora_trigger: seed.lora_trigger,
+    });
+    expect(canonReadiness(row).ready).toBe(true);
   });
 });

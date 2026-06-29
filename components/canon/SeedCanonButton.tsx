@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { seedWayfindersCanonAction } from "@/app/actions/canons";
+import { seedCanonAction } from "@/app/actions/canons";
 import type { ActionResult } from "@/app/actions/projects";
 
 const button =
@@ -12,14 +12,14 @@ const button =
 
 export function SeedCanonButton() {
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
-    seedWayfindersCanonAction,
+    seedCanonAction,
     null,
   );
 
   return (
     <form action={action} className="flex flex-col gap-2">
       <button type="submit" disabled={pending} className={button}>
-        {pending ? "Seeding…" : "Seed Wayfinders canon from the art bible"}
+        {pending ? "Seeding…" : "Seed canon from the art bible"}
       </button>
       {state?.error && (
         <p role="alert" className="text-sm text-rose-300">
@@ -28,7 +28,7 @@ export function SeedCanonButton() {
       )}
       {state?.ok && (
         <p role="status" className="text-sm text-emerald-300">
-          Wayfinders canon seeded.
+          Canon seeded from the art bible.
         </p>
       )}
     </form>

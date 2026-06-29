@@ -8,7 +8,7 @@ import {
   type CanonUpdate,
 } from "@/lib/db/canons";
 import { getActiveProject } from "@/lib/active-project";
-import { wayfindersCanon } from "@/lib/canon/seeds/wayfinders";
+import { seedForSlug } from "@/lib/canon/seeds";
 import type { ActionResult } from "./projects";
 
 /** Parse the canon form (prefix/suffix/negative + newline-delimited do/never). */
@@ -69,8 +69,10 @@ export async function saveCanonAction(
   }
 }
 
-/** One-click: seed the Wayfinders canon from the art bible (no Anthropic needed). */
-export async function seedWayfindersCanonAction(
+/** One-click: seed a hand-authored canon from a project's art bible (no Anthropic
+ *  needed). Matches the active project's slug to a seed template (wayfinders,
+ *  living-dungeon, …). */
+export async function seedCanonAction(
   _prev: ActionResult | null,
   _formData: FormData,
 ): Promise<ActionResult> {
@@ -80,7 +82,14 @@ export async function seedWayfindersCanonAction(
     if (await getCanonByProject(active.id)) {
       return { ok: false, error: "This project already has a canon." };
     }
-    await createCanon(wayfindersCanon(active.id));
+    const seed = seedForSlug(active.slug);
+    if (!seed) {
+      return {
+        ok: false,
+        error: `No built-in canon template for "${active.slug}". Use Intake to auto-draft, or fill the form.`,
+      };
+    }
+    await createCanon(seed(active.id));
     revalidatePath("/canon");
     return { ok: true };
   } catch (err) {
