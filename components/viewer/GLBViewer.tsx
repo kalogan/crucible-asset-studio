@@ -2,7 +2,7 @@
 
 import { Component, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Center, OrbitControls, useGLTF } from "@react-three/drei";
+import { Center, Environment, Lightformer, OrbitControls, useGLTF } from "@react-three/drei";
 
 /**
  * GLB review viewer (S4). Self-contained lighting (no external HDR fetch), so it
@@ -86,8 +86,8 @@ export function GLBViewer({
         ) : (
           <Canvas camera={{ position: [2.5, 2, 2.5], fov: 45 }} dpr={[1, 2]}>
             <color attach="background" args={["#18181b"]} />
-            <ambientLight intensity={0.7} />
-            <directionalLight position={[5, 8, 5]} intensity={1.3} />
+            <ambientLight intensity={0.4} />
+            <directionalLight position={[5, 8, 5]} intensity={1.2} />
             <directionalLight position={[-5, 2, -3]} intensity={0.4} />
             <Suspense fallback={null}>
               <ModelErrorBoundary onError={() => setLoadFailed(true)}>
@@ -95,6 +95,13 @@ export function GLBViewer({
                   <Model url={url} />
                 </Center>
               </ModelErrorBoundary>
+              {/* In-scene studio IBL (no external HDR fetch) so PBR/textured
+                  TRELLIS meshes show their material instead of rendering black. */}
+              <Environment resolution={64} frames={1}>
+                <Lightformer intensity={3} position={[0, 5, 0]} scale={[8, 8, 1]} />
+                <Lightformer intensity={1.5} position={[5, 1, 4]} scale={[6, 6, 1]} />
+                <Lightformer intensity={1.5} position={[-5, 1, -4]} scale={[6, 6, 1]} />
+              </Environment>
             </Suspense>
             <OrbitControls
               makeDefault
