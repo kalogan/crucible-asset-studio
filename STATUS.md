@@ -24,26 +24,54 @@ LoRA *enforces* it. Path A needs a turntable-render dataset of the game's facete
 | S4 | Accessible GLB review viewer (r3f + drei) | `d576ab0` |
 | S2 | Project switcher (create/select, cookie-backed active project) | `9d43079` |
 | S5 | 2D→3D vertical slice → `in_review` + review queue (approve/reject) | `fb33562` |
+| — | Cost guardrails (daily cap, single-in-flight, cancel-on-timeout) | `9410db3` |
+| — | Live generation status stepper; viewer IBL fix | `5f0b8c4`, `e908503` |
+| P2-core | Canon engine: scaffolding wired into generation + precision gate | `cc4e0b8` |
+| P2-ui | Canon panel + intake flow (parallel builders) | `c57837d` |
+| — | 2D-review-before-3D + canon-aware enrichment | `c796f23` |
 
-**Last green gate:** typecheck 0 · lint 0 · **test 47** · build 0. Routes: `/`, `/generate`, `/review`.
-**Runtime smoke:** all routes 200 in the no-keys (setup-notice) state; clean server log.
+**Last green gate:** typecheck 0 · lint 0 · **test 59** · build 0. Routes: `/`, `/generate`, `/review`, `/canon`, `/intake`.
+**Live:** Supabase connected (`.env.local`), migrations 0001–0004 applied (`pnpm migrate`, idempotent), Anthropic + Replicate keys in. Wayfinders canon auto-drafted + active.
 
-## To activate (Director — Supabase + keys)
+## How to run
 
-1. **Create `.env.local`** from `.env.example` with the fresh Supabase project URL + anon + service-role keys, plus `REPLICATE_API_TOKEN` and (optional) `ANTHROPIC_API_KEY`.
-2. **Apply the schema:** in the Supabase dashboard SQL editor, run `supabase/migrations/0001_init.sql` then `0002_storage.sql` (creates the public `assets` bucket). (Or wire the Supabase CLI later.)
-3. `pnpm dev` → http://localhost:3000 → create a project → **Generate an asset**.
-   - ⚠️ **The first generate spends real money** (Replicate FLUX + TRELLIS ≈ $0.09, + Anthropic if enriching). This is the §8 money boundary — it runs only when you click Generate.
-4. It lands in **/review** as an `in_review` GLB you can orbit, download, approve/reject.
+`pnpm dev` → http://localhost:3000. Generate → pick **Image only** (~$0.003, review first) or **Straight to 3D** (~$0.09). ⚠️ Generation spends real money (Replicate); the Replicate dashboard spend limit + the in-app daily cap (`CRUCIBLE_DAILY_COST_CAP`, default $5) are the backstops.
 
 ## Known boundaries / follow-ups
 
 - **Verify the TRELLIS version hash** (`lib/executor/models.ts`) against Replicate before trusting 3D output (KERNEL_LESSONS §1).
 - **Generation is synchronous (~2 min/asset).** Fine locally; **prod/bulk needs the resumable batch worker — Phase 3** (Vercel function timeouts).
-- **DB-backed paths are unverified** until keys exist (the smoke only covered the no-keys path).
-- `next lint` is deprecated in Next 16 — migrate to the ESLint CLI eventually (non-blocking).
-- Rotate the old March Supabase anon key (it's in that repo's history).
+- **Don't run `pnpm build` while `next dev` is live** — it clobbers `.next` and 500s the dev server. Stop dev, gate, restart.
 
-## Next: Phase 2 — canon engine
+## Roadmap
 
-Style-profile CRUD + prompt scaffolding → intake grill → two-path LoRA (per `CANON_INTAKE.md`). The canon precision bar gates real (non-canon-free) generation.
+### Up next — close the style-fidelity gap (the live problem)
+Prompt scaffolding only *approximates* the faceted low-poly look — a "palm tree" still comes out as a
+polished stylized render, not the game's chunky faceted style. Three options, cheapest first:
+
+1. **Harder low-poly prompt tweak** (free, ~$0.003 to test) — lead the canon `prompt_prefix` with
+   stronger terms (`low-poly 3D game asset, untextured flat-shaded, hard faceted edges, blender low
+   poly, isometric prop`). One cheap image test to see how far it moves. Band-aid, but free.
+2. **Nano Banana (Gemini 2.5 Flash Image)** — add a Google adapter alongside FLUX in the executor
+   registry. Has a **free tier**. Its superpower is **reference-image editing/consistency**: feed it
+   shots of the game's faceted assets → "a palm in this style." That's the style-anchor lever
+   (KERNEL_LESSONS §0) — potentially most of the fidelity for free, **a cheaper alternative/complement
+   to the LoRA.** Try this before committing to the LoRA.
+3. **The LoRA slice** (Replicate, Path A per `CANON_INTAKE.md` §5) — the real enforcer. Train on a
+   **turntable-render dataset** of the game's actual faceted assets (~15–40 neutral shots/concept;
+   prerequisite: get those renders out of the Wayfinders engine). Freeze the LoRA version in
+   `recipe_snapshot`. `canons.lora_*` fields + trigger `wyfndrstyle` already reserved.
+
+### Later phases
+- **Phase 3 — bulk + finish + publish:** resumable, cost-capped **batch worker** (sync gen is
+  prod-unsafe at volume); **Kiln** finishing module (retopo + baked PBR); **CDN publish** + per-project
+  manifest (Supabase Storage → R2 when distribution matters).
+- **Phase 4 — two-game proof:** the **deception-game train station** as a second canon (Path B — intake
+  auto-draft now works with the Anthropic key) → decompose into props; zero style cross-contamination.
+- **Phase 5 — avatars** (deferred): rigging-ready character pipeline, separate from props.
+
+### Smaller follow-ups
+- **Intake "Save as canon"** — `/intake` currently drafts then links to `/canon`; wire a direct save so
+  it's one flow (no copy-paste). Useful for the deception game.
+- Verify TRELLIS version hash before heavy 3D use; migrate off deprecated `next lint`; rotate the old
+  March Supabase anon key.
