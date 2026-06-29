@@ -36,5 +36,7 @@ export function middleware(req: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // /api/import has its own bearer-token auth (machine-to-machine push) — exclude it
+  // from the interactive Basic-auth gate.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/import).*)"],
 };

@@ -22,44 +22,44 @@ export default async function CanonPage() {
       <header className="flex flex-col gap-2">
         <Link
           href="/"
-          className="w-fit rounded text-sm text-amber-300 underline underline-offset-2 hover:text-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400"
+          className="w-fit rounded text-sm text-primary underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           ← Crucible
         </Link>
-        <h1 className="text-3xl font-semibold text-zinc-50">Canon</h1>
+        <h1 className="text-3xl font-semibold text-foreground">Canon</h1>
       </header>
 
       {!configured ? (
-        <p className="text-sm text-zinc-300">Connect Supabase first (see the home page).</p>
+        <p className="text-sm text-foreground">Connect Supabase first (see the home page).</p>
       ) : !active ? (
-        <p className="text-sm text-zinc-300">
+        <p className="text-sm text-foreground">
           No active project.{" "}
-          <Link href="/" className="text-amber-300 underline underline-offset-2">
+          <Link href="/" className="text-primary underline underline-offset-2">
             Pick or create one
           </Link>{" "}
           first.
         </p>
       ) : (
         <>
-          <p className="text-sm text-zinc-400">
-            Project: <span className="text-zinc-200">{active.name}</span> — the style
+          <p className="text-sm text-muted-foreground">
+            Project: <span className="text-foreground">{active.name}</span> — the style
             guide that scaffolds every generation.
           </p>
 
           {readiness && (
             <section aria-label="Canon readiness" className="flex flex-col gap-2">
-              <h2 className="text-lg font-semibold text-zinc-100">Readiness</h2>
+              <h2 className="text-lg font-semibold text-foreground">Readiness</h2>
               {readiness.ready ? (
-                <p className="text-sm font-medium text-emerald-300">Canon ready ✓</p>
+                <p className="text-sm font-medium text-accent">Canon ready ✓</p>
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  <p className="text-sm font-medium text-amber-300">
+                  <p className="text-sm font-medium text-primary">
                     Not ready — missing:
                   </p>
-                  <ul className="flex flex-col gap-1 text-sm text-rose-300">
+                  <ul className="flex flex-col gap-1 text-sm text-destructive">
                     {readiness.missing.map((m) => (
                       <li key={m} className="flex gap-2">
-                        <span aria-hidden className="text-rose-400">
+                        <span aria-hidden className="text-destructive">
                           •
                         </span>
                         <span>{m}</span>
@@ -72,12 +72,12 @@ export default async function CanonPage() {
           )}
 
           <section aria-label="Canon details" className="flex flex-col gap-4">
-            <h2 className="text-lg font-semibold text-zinc-100">
+            <h2 className="text-lg font-semibold text-foreground">
               {canon ? "Edit canon" : "Create canon"}
             </h2>
             {!canon && (
-              <div className="flex flex-col gap-4 rounded-md border border-amber-500/30 bg-amber-500/5 p-4">
-                <p className="text-sm text-zinc-300">
+              <div className="flex flex-col gap-4 rounded-md border border-primary/40 bg-primary/5 p-4">
+                <p className="text-sm text-foreground">
                   No canon yet. Seed the Wayfinders canon from the art bible, or fill
                   in the fields below.
                 </p>

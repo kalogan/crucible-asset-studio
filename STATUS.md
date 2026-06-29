@@ -30,7 +30,7 @@ LoRA *enforces* it. Path A needs a turntable-render dataset of the game's facete
 | P2-ui | Canon panel + intake flow (parallel builders) | `c57837d` |
 | — | 2D-review-before-3D + canon-aware enrichment | `c796f23` |
 
-**Last green gate:** typecheck 0 · lint 0 · **test 59** · build 0. Routes: `/`, `/generate`, `/review`, `/canon`, `/intake`.
+**Last green gate:** typecheck 0 · lint 0 · **test 75** · build 0. Routes: `/`, `/generate`, `/review`, `/canon`, `/intake`, `/prompts`, `/library`, `/projects/[slug]`, `/projects/new`, `/api/import`.
 **Live:** Supabase connected (`.env.local`), migrations 0001–0004 applied (`pnpm migrate`, idempotent), Anthropic + Replicate keys in. Wayfinders canon auto-drafted + active.
 
 ## How to run
@@ -95,6 +95,18 @@ Three options, cheapest first:
 - **LoRA Stage 1**: training-set assembly — upload/list/remove turntable renders per project at
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
+
+### Shipped 2026-06-29 (design system + import CORS)
+- **Atelier design-system migration complete.** All remaining pages moved off raw zinc/amber to
+  Atelier tokens + `components/ui` primitives (Button/Input/Textarea/Label/Card/Badge), matching
+  home/nav/library: generate, canon (+LoRA TrainingImages), review (+GLBViewer frame), prompts,
+  project detail, new game, intake. Convention: success → `accent` (sage), primary CTA → `primary`
+  (terracotta), errors → `destructive`. Native `<select>` kept (no select primitive) but token-styled
+  via a local Input-mirroring const — **candidate for a real Select primitive later.** 3D Canvas /
+  IBL lighting in GLBViewer untouched (frame-only restyle).
+- **Import endpoint CORS** — `/api/import` now handles OPTIONS preflight + `Access-Control-Allow-Origin:*`
+  on all responses (token-authed, so origin-open is fine), so the Wayfinders harness can POST GLBs
+  cross-origin from its own dev server / Vercel.
 
 ### Shipped 2026-06-29 (parallel batch)
 - **Nano Banana** (Gemini 2.5 Flash Image) image provider — selectable per generation, conditions

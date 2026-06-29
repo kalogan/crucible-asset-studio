@@ -11,19 +11,19 @@ export default function NewProjectPage() {
       <header className="flex flex-col gap-2">
         <Link
           href="/"
-          className="w-fit rounded text-sm text-amber-300 underline underline-offset-2 hover:text-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400"
+          className="w-fit rounded text-sm text-primary underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           ← Games
         </Link>
-        <h1 className="text-3xl font-semibold text-zinc-50">New game</h1>
-        <p className="text-sm text-zinc-400">
+        <h1 className="text-3xl font-semibold text-foreground">New game</h1>
+        <p className="text-sm text-muted-foreground">
           Register a game — fill in what you have; you can edit it all later on its page.
         </p>
       </header>
       {configured ? (
         <CreateGameForm />
       ) : (
-        <p className="text-sm text-zinc-300">Connect Supabase first (see the home page).</p>
+        <p className="text-sm text-foreground">Connect Supabase first (see the home page).</p>
       )}
     </main>
   );

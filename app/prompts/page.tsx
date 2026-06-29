@@ -15,13 +15,13 @@ export default async function PromptsPage() {
       <header className="flex flex-col gap-2">
         <Link
           href="/"
-          className="w-fit rounded text-sm text-amber-300 underline underline-offset-2 hover:text-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400"
+          className="w-fit rounded text-sm text-primary underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           ← Crucible
         </Link>
-        <h1 className="text-3xl font-semibold text-zinc-50">Prompt library</h1>
+        <h1 className="text-3xl font-semibold text-foreground">Prompt library</h1>
         {active && (
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-muted-foreground">
             {active.name} — {specs.length} past prompt{specs.length === 1 ? "" : "s"}. Reuse one
             and tweak it.
           </p>
@@ -29,19 +29,19 @@ export default async function PromptsPage() {
       </header>
 
       {!configured ? (
-        <p className="text-sm text-zinc-300">Connect Supabase first (see the home page).</p>
+        <p className="text-sm text-foreground">Connect Supabase first (see the home page).</p>
       ) : !active ? (
-        <p className="text-sm text-zinc-300">
+        <p className="text-sm text-foreground">
           No active project.{" "}
-          <Link href="/" className="text-amber-300 underline underline-offset-2">
+          <Link href="/" className="text-primary underline underline-offset-2">
             Pick one
           </Link>
           .
         </p>
       ) : specs.length === 0 ? (
-        <p className="text-sm text-zinc-300">
+        <p className="text-sm text-foreground">
           No prompts yet.{" "}
-          <Link href="/generate" className="text-amber-300 underline underline-offset-2">
+          <Link href="/generate" className="text-primary underline underline-offset-2">
             Generate an asset
           </Link>{" "}
           and it’ll show up here.
@@ -51,9 +51,9 @@ export default async function PromptsPage() {
           {specs.map((s) => (
             <li
               key={s.id}
-              className="flex gap-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4"
+              className="flex gap-4 rounded-lg border border-border bg-card p-4"
             >
-              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md border border-zinc-800 bg-zinc-900">
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
                 {s.thumbPath ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -62,17 +62,17 @@ export default async function PromptsPage() {
                     className="h-full w-full object-contain"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-[10px] text-zinc-500">
+                  <div className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground">
                     {s.assetKind === "model" ? "3D" : "—"}
                   </div>
                 )}
               </div>
               <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <h2 className="font-medium text-zinc-100">{s.title}</h2>
-                <p className="line-clamp-2 text-sm text-zinc-400">{s.prompt}</p>
+                <h2 className="font-medium text-foreground">{s.title}</h2>
+                <p className="line-clamp-2 text-sm text-muted-foreground">{s.prompt}</p>
                 <Link
                   href={`/generate?title=${encodeURIComponent(s.title)}&prompt=${encodeURIComponent(s.prompt)}`}
-                  className="mt-1 inline-flex min-h-11 w-fit items-center rounded-md border border-zinc-700 px-3 text-sm font-medium text-amber-300 hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+                  className="mt-1 inline-flex min-h-11 w-fit items-center rounded-md border border-input px-3 text-sm font-medium text-primary hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   Reuse & tweak →
                 </Link>

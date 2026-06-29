@@ -60,7 +60,7 @@ export function GLBViewer({
   const [loadFailed, setLoadFailed] = useState(false);
 
   const frame =
-    "relative aspect-square w-full overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900";
+    "relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-muted";
 
   if (!url) {
     return (
@@ -69,7 +69,7 @@ export function GLBViewer({
         aria-label="No 3D model to preview yet"
         className={`${frame} flex items-center justify-center ${className ?? ""}`}
       >
-        <p className="text-sm text-zinc-400">No model yet</p>
+        <p className="text-sm text-muted-foreground">No model yet</p>
       </div>
     );
   }
@@ -79,7 +79,7 @@ export function GLBViewer({
       <div role="img" aria-label={label} className={frame}>
         {loadFailed ? (
           <div className="flex h-full items-center justify-center">
-            <p className="px-4 text-center text-sm text-rose-300">
+            <p className="px-4 text-center text-sm text-destructive">
               Could not load this model.
             </p>
           </div>
@@ -112,12 +112,12 @@ export function GLBViewer({
           </Canvas>
         )}
       </div>
-      <figcaption className="flex items-center justify-between text-xs text-zinc-400">
+      <figcaption className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{label}</span>
         <a
           href={url}
           download
-          className="rounded text-amber-300 underline underline-offset-2 hover:text-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400"
+          className="rounded text-primary underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Download GLB
         </a>

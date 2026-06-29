@@ -3,10 +3,15 @@
 import { useActionState } from "react";
 import { updateProjectAction, type ActionResult } from "@/app/actions/projects";
 import { ProjectStatus, type Project } from "@/lib/schema";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
-const control =
-  "min-h-11 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 " +
-  "placeholder:text-zinc-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400";
+// Native <select> isn't a shared primitive yet; match Input's token styling by hand.
+const selectControl =
+  "min-h-11 rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function ProjectOverviewForm({ project }: { project: Project }) {
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
@@ -20,25 +25,21 @@ export function ProjectOverviewForm({ project }: { project: Project }) {
       <input type="hidden" name="slug" value={project.slug} />
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="description" className="text-sm font-medium text-zinc-300">
-          Description
-        </label>
-        <textarea
+        <Label htmlFor="description">Description</Label>
+        <Textarea
           id="description"
           name="description"
           rows={2}
           defaultValue={project.description ?? ""}
           placeholder="What is this game?"
-          className={`${control} resize-y`}
+          className="resize-y"
         />
       </div>
 
       <div className="flex flex-wrap gap-3">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="status" className="text-sm font-medium text-zinc-300">
-            Status
-          </label>
-          <select id="status" name="status" defaultValue={project.status} className={control}>
+          <Label htmlFor="status">Status</Label>
+          <select id="status" name="status" defaultValue={project.status} className={selectControl}>
             {ProjectStatus.options.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -47,41 +48,31 @@ export function ProjectOverviewForm({ project }: { project: Project }) {
           </select>
         </div>
         <div className="flex flex-1 flex-col gap-1.5">
-          <label htmlFor="url" className="text-sm font-medium text-zinc-300">
-            Play URL
-          </label>
-          <input id="url" name="url" defaultValue={project.url ?? ""} placeholder="https://…" className={control} />
+          <Label htmlFor="url">Play URL</Label>
+          <Input id="url" name="url" defaultValue={project.url ?? ""} placeholder="https://…" />
         </div>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="repo_url" className="text-sm font-medium text-zinc-300">
-          Repo URL
-        </label>
-        <input id="repo_url" name="repo_url" defaultValue={project.repo_url ?? ""} placeholder="https://github.com/…" className={control} />
+        <Label htmlFor="repo_url">Repo URL</Label>
+        <Input id="repo_url" name="repo_url" defaultValue={project.repo_url ?? ""} placeholder="https://github.com/…" />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="screenshot" className="text-sm font-medium text-zinc-300">
-          Screenshot URL
-        </label>
-        <input id="screenshot" name="screenshot" defaultValue={project.screenshot ?? ""} placeholder="https://… (hero image)" className={control} />
+        <Label htmlFor="screenshot">Screenshot URL</Label>
+        <Input id="screenshot" name="screenshot" defaultValue={project.screenshot ?? ""} placeholder="https://… (hero image)" />
       </div>
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="min-h-11 w-fit rounded-md bg-amber-500 px-5 font-medium text-zinc-950 hover:bg-amber-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:opacity-60"
-      >
+      <Button type="submit" disabled={pending} className="w-fit">
         {pending ? "Saving…" : "Save overview"}
-      </button>
+      </Button>
       {state?.error && (
-        <p role="alert" className="text-sm text-rose-300">
+        <p role="alert" className="text-sm text-destructive">
           {state.error}
         </p>
       )}
       {state?.ok && (
-        <p role="status" className="text-sm text-emerald-300">
+        <p role="status" className="text-sm text-primary">
           Saved.
         </p>
       )}

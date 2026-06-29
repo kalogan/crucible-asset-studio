@@ -3,27 +3,20 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { draftCanonAction, type DraftResult } from "@/app/actions/intake";
-
-const control =
-  "rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-zinc-100 " +
-  "placeholder:text-zinc-500 focus-visible:outline focus-visible:outline-2 " +
-  "focus-visible:outline-amber-400";
-
-const canonLink =
-  "min-h-11 inline-flex w-fit items-center rounded-md bg-amber-500 px-5 font-medium " +
-  "text-zinc-950 hover:bg-amber-400 focus-visible:outline focus-visible:outline-2 " +
-  "focus-visible:outline-offset-2 focus-visible:outline-amber-300";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 const inlineCanonLink =
-  "rounded text-amber-300 underline underline-offset-2 hover:text-amber-200 " +
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400";
+  "rounded text-primary underline underline-offset-2 hover:opacity-80 " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <h3 className="text-sm font-medium text-zinc-300">{label}</h3>
-      <p className="rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2.5 text-sm text-zinc-100 whitespace-pre-wrap">
-        {value.trim() ? value : <span className="text-zinc-500">(none)</span>}
+      <h3 className="text-sm font-medium text-foreground">{label}</h3>
+      <p className="rounded-md border border-border bg-card px-3 py-2.5 text-sm text-foreground whitespace-pre-wrap">
+        {value.trim() ? value : <span className="text-muted-foreground">(none)</span>}
       </p>
     </div>
   );
@@ -32,11 +25,11 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
 function RuleList({ label, rules }: { label: string; rules: string[] }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <h3 className="text-sm font-medium text-zinc-300">{label}</h3>
+      <h3 className="text-sm font-medium text-foreground">{label}</h3>
       {rules.length === 0 ? (
-        <p className="text-sm text-zinc-500">(none)</p>
+        <p className="text-sm text-muted-foreground">(none)</p>
       ) : (
-        <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-zinc-100">
+        <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-foreground">
           {rules.map((rule, i) => (
             <li key={i}>{rule}</li>
           ))}
@@ -49,22 +42,22 @@ function RuleList({ label, rules }: { label: string; rules: string[] }) {
 function Palette({ hexes }: { hexes: string[] }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <h3 className="text-sm font-medium text-zinc-300">Palette</h3>
+      <h3 className="text-sm font-medium text-foreground">Palette</h3>
       {hexes.length === 0 ? (
-        <p className="text-sm text-zinc-500">(none)</p>
+        <p className="text-sm text-muted-foreground">(none)</p>
       ) : (
         <ul className="flex flex-wrap gap-2">
           {hexes.map((hex, i) => (
             <li
               key={i}
-              className="flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/60 px-2 py-1.5"
+              className="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1.5"
             >
               <span
                 aria-hidden
-                className="h-5 w-5 rounded border border-zinc-700"
+                className="h-5 w-5 rounded border border-border"
                 style={{ backgroundColor: hex }}
               />
-              <span className="font-mono text-xs text-zinc-200">{hex}</span>
+              <span className="font-mono text-xs text-foreground">{hex}</span>
             </li>
           ))}
         </ul>
@@ -78,11 +71,11 @@ function DraftResultView({ draft }: { draft: NonNullable<DraftResult["draft"]> }
     <section aria-labelledby="draft-heading" className="flex flex-col gap-4">
       <div
         role="status"
-        className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-300"
+        className="rounded-md border border-accent/30 bg-accent/5 p-3 text-sm text-accent"
       >
         Drafted. Review the fields below, then carry them into the Canon panel to save.
       </div>
-      <h2 id="draft-heading" className="text-xl font-semibold text-zinc-50">
+      <h2 id="draft-heading" className="text-xl font-semibold text-foreground">
         Drafted canon
       </h2>
       <ReadOnlyField label="Prompt prefix" value={draft.prompt_prefix} />
@@ -91,9 +84,9 @@ function DraftResultView({ draft }: { draft: NonNullable<DraftResult["draft"]> }
       <RuleList label="Do rules" rules={draft.do_rules} />
       <RuleList label="Never rules" rules={draft.never_rules} />
       <Palette hexes={draft.palette_hexes} />
-      <Link href="/canon" className={canonLink}>
-        Review &amp; save in Canon panel
-      </Link>
+      <Button asChild className="w-fit">
+        <Link href="/canon">Review &amp; save in Canon panel</Link>
+      </Button>
     </section>
   );
 }
@@ -108,32 +101,26 @@ export function IntakeForm() {
     <div className="flex flex-col gap-6">
       <form action={action} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="text" className="text-sm font-medium text-zinc-300">
-            Art-bible text
-          </label>
-          <textarea
+          <Label htmlFor="text">Art-bible text</Label>
+          <Textarea
             id="text"
             name="text"
             required
             rows={12}
             placeholder="Paste your game's art-bible text here…"
-            className={`${control} resize-y`}
+            className="resize-y"
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="min-h-11 w-fit rounded-md bg-amber-500 px-5 font-medium text-zinc-950 hover:bg-amber-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
-        >
+        <Button type="submit" disabled={pending} className="w-fit">
           {pending ? "Drafting…" : "Draft canon"}
-        </button>
+        </Button>
       </form>
 
       {state && !state.ok && state.error && (
         <div role="alert" className="flex flex-col gap-2">
-          <p className="text-sm text-rose-300">{state.error}</p>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-destructive">{state.error}</p>
+          <p className="text-sm text-muted-foreground">
             You can{" "}
             <Link href="/canon" className={inlineCanonLink}>
               hand-author in the Canon panel

@@ -7,6 +7,9 @@ import {
 } from "@/app/actions/lora";
 import type { ActionResult } from "@/app/actions/projects";
 import type { TrainingImage } from "@/lib/lora/storage";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function TrainingImages({
   images,
@@ -27,11 +30,11 @@ export function TrainingImages({
   return (
     <section aria-label="LoRA training set" className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-zinc-100">LoRA training set</h2>
-        <p className="text-sm text-zinc-400">
+        <h2 className="text-lg font-semibold text-foreground">LoRA training set</h2>
+        <p className="text-sm text-muted-foreground">
           Path A — upload ~15–40 neutral turntable renders (front / 3-4 / side / back, plain
           background, even lighting). Captioned as{" "}
-          <code className="rounded bg-zinc-800 px-1 text-zinc-200">
+          <code className="rounded bg-muted px-1 text-foreground">
             {triggerWord ?? "wyfndrstyle"}, &lt;content&gt;
           </code>{" "}
           for training.
@@ -39,56 +42,46 @@ export function TrainingImages({
       </div>
 
       <form action={upload} className="flex flex-col gap-2">
-        <label htmlFor="training-images" className="text-sm font-medium text-zinc-300">
-          Add images
-        </label>
-        <input
+        <Label htmlFor="training-images">Add images</Label>
+        <Input
           id="training-images"
           name="images"
           type="file"
           accept="image/*"
           multiple
-          className="min-h-11 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-300 file:mr-3 file:rounded file:border-0 file:bg-amber-500 file:px-3 file:py-1.5 file:font-medium file:text-zinc-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400"
         />
-        <button
-          type="submit"
-          disabled={uploading}
-          className="min-h-11 w-fit rounded-md bg-amber-500 px-5 font-medium text-zinc-950 hover:bg-amber-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:opacity-60"
-        >
+        <Button type="submit" disabled={uploading} className="w-fit">
           {uploading ? "Uploading…" : "Upload images"}
-        </button>
+        </Button>
         {upState?.error && (
-          <p role="alert" className="text-sm text-rose-300">
+          <p role="alert" className="text-sm text-destructive">
             {upState.error}
           </p>
         )}
         {rmState?.error && (
-          <p role="alert" className="text-sm text-rose-300">
+          <p role="alert" className="text-sm text-destructive">
             {rmState.error}
           </p>
         )}
       </form>
 
       {images.length === 0 ? (
-        <p className="text-sm text-zinc-500">No training images yet.</p>
+        <p className="text-sm text-muted-foreground">No training images yet.</p>
       ) : (
         <>
-          <p className="text-sm text-zinc-400">{images.length} image(s) in the set.</p>
+          <p className="text-sm text-muted-foreground">{images.length} image(s) in the set.</p>
           <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4">
             {images.map((img) => (
               <li key={img.name} className="flex flex-col gap-1">
-                <div className="aspect-square overflow-hidden rounded-md border border-zinc-800 bg-zinc-900">
+                <div className="aspect-square overflow-hidden rounded-md border border-border bg-muted">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.url} alt={img.name} className="h-full w-full object-contain" />
                 </div>
                 <form action={remove}>
                   <input type="hidden" name="name" value={img.name} />
-                  <button
-                    type="submit"
-                    className="w-full rounded text-xs text-zinc-400 underline underline-offset-2 hover:text-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400"
-                  >
+                  <Button type="submit" variant="destructive" size="sm" className="w-full">
                     Remove
-                  </button>
+                  </Button>
                 </form>
               </li>
             ))}
@@ -96,7 +89,7 @@ export function TrainingImages({
         </>
       )}
 
-      <p className="rounded-md border border-zinc-700 bg-zinc-900/50 px-3 py-2 text-xs text-zinc-400">
+      <p className="rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
         Next: training runs on Replicate (~$2–4, ~15–25 min) once you’ve assembled the set and
         configured a destination model. Trigger word: <strong>{triggerWord ?? "—"}</strong>.
       </p>

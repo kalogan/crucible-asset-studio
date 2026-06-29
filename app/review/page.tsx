@@ -19,32 +19,32 @@ export default async function ReviewPage() {
       <header className="flex flex-col gap-2">
         <Link
           href="/"
-          className="w-fit rounded text-sm text-amber-300 underline underline-offset-2 hover:text-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400"
+          className="w-fit rounded text-sm text-primary underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           ← Crucible
         </Link>
-        <h1 className="text-3xl font-semibold text-zinc-50">Review queue</h1>
+        <h1 className="text-3xl font-semibold text-foreground">Review queue</h1>
         {active && (
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-muted-foreground">
             {active.name} — {assets.length} awaiting review
           </p>
         )}
       </header>
 
       {!configured ? (
-        <p className="text-sm text-zinc-300">Connect Supabase first (see the home page).</p>
+        <p className="text-sm text-foreground">Connect Supabase first (see the home page).</p>
       ) : !active ? (
-        <p className="text-sm text-zinc-300">
+        <p className="text-sm text-foreground">
           No active project.{" "}
-          <Link href="/" className="text-amber-300 underline underline-offset-2">
+          <Link href="/" className="text-primary underline underline-offset-2">
             Pick one
           </Link>
           .
         </p>
       ) : assets.length === 0 ? (
-        <p className="text-sm text-zinc-300">
+        <p className="text-sm text-foreground">
           Nothing in review.{" "}
-          <Link href="/generate" className="text-amber-300 underline underline-offset-2">
+          <Link href="/generate" className="text-primary underline underline-offset-2">
             Generate an asset
           </Link>
           .

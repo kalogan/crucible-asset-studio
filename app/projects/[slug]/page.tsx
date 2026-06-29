@@ -7,12 +7,9 @@ import { statusBadgeClass } from "@/lib/projects/status";
 import { openWorkspaceAction } from "@/app/actions/projects";
 import { ProjectOverviewForm } from "@/components/games/ProjectOverviewForm";
 import { ScreenshotUpload } from "@/components/games/ScreenshotUpload";
+import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
-
-const wsBtn =
-  "min-h-11 rounded-md border border-zinc-700 px-4 font-medium text-zinc-100 hover:bg-zinc-800 " +
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300";
 
 export default async function ProjectDetailPage({
   params,
@@ -25,10 +22,10 @@ export default async function ProjectDetailPage({
   if (!project) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 px-6 py-12">
-        <Link href="/" className="w-fit text-sm text-amber-300 underline underline-offset-2">
+        <Link href="/" className="w-fit text-sm text-primary underline underline-offset-2">
           ← Games
         </Link>
-        <p className="text-sm text-zinc-300">Game not found.</p>
+        <p className="text-sm text-foreground">Game not found.</p>
       </main>
     );
   }
@@ -39,11 +36,11 @@ export default async function ProjectDetailPage({
   return (
     <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-6 py-12">
       <header className="flex flex-col gap-3">
-        <Link href="/" className="w-fit text-sm text-amber-300 underline underline-offset-2 hover:text-amber-200">
+        <Link href="/" className="w-fit text-sm text-primary underline underline-offset-2 hover:opacity-80">
           ← Games
         </Link>
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-semibold text-zinc-50">{project.name}</h1>
+          <h1 className="text-3xl font-semibold text-foreground">{project.name}</h1>
           <span
             className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusBadgeClass(project.status)}`}
           >
@@ -55,7 +52,7 @@ export default async function ProjectDetailPage({
           <img
             src={project.screenshot}
             alt={`${project.name} screenshot`}
-            className="aspect-video w-full rounded-lg border border-zinc-800 object-cover"
+            className="aspect-video w-full rounded-lg border border-border object-cover"
           />
         )}
       </header>
@@ -63,34 +60,34 @@ export default async function ProjectDetailPage({
       {/* Generation workspace — sets this game active, then navigates. */}
       <section aria-label="Generation workspace" className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-zinc-100">Generation workspace</h2>
-          <span className="text-xs text-zinc-400">
-            canon: <span className="text-zinc-200">{canonState}</span>
+          <h2 className="text-lg font-semibold text-foreground">Generation workspace</h2>
+          <span className="text-xs text-muted-foreground">
+            canon: <span className="text-foreground">{canonState}</span>
           </span>
         </div>
         <form action={openWorkspaceAction} className="flex flex-wrap gap-2">
           <input type="hidden" name="projectId" value={project.id} />
-          <button type="submit" name="target" value="/generate" className={`${wsBtn} bg-amber-500 text-zinc-950 hover:bg-amber-400`}>
+          <Button type="submit" name="target" value="/generate">
             Generate
-          </button>
-          <button type="submit" name="target" value="/review" className={wsBtn}>
+          </Button>
+          <Button type="submit" name="target" value="/review" variant="outline">
             Review
-          </button>
-          <button type="submit" name="target" value="/canon" className={wsBtn}>
+          </Button>
+          <Button type="submit" name="target" value="/canon" variant="outline">
             Canon
-          </button>
-          <button type="submit" name="target" value="/library" className={wsBtn}>
+          </Button>
+          <Button type="submit" name="target" value="/library" variant="outline">
             Library
-          </button>
-          <button type="submit" name="target" value="/prompts" className={wsBtn}>
+          </Button>
+          <Button type="submit" name="target" value="/prompts" variant="outline">
             Prompts
-          </button>
+          </Button>
         </form>
       </section>
 
       {/* Overview — the portfolio face. */}
       <section aria-label="Overview" className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold text-zinc-100">Overview</h2>
+        <h2 className="text-lg font-semibold text-foreground">Overview</h2>
         <ScreenshotUpload projectId={project.id} slug={project.slug} />
         <ProjectOverviewForm project={project} />
       </section>

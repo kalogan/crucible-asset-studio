@@ -8,11 +8,15 @@ import {
 } from "@/app/actions/generate";
 import type { ActionResult } from "@/app/actions/projects";
 import { ASSET_TYPE_OPTIONS } from "@/lib/canon/framing";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
-const control =
-  "rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-zinc-100 " +
-  "placeholder:text-zinc-500 focus-visible:outline focus-visible:outline-2 " +
-  "focus-visible:outline-amber-400";
+// <select> has no shared primitive — mirror the Input primitive's token classes.
+const selectControl =
+  "min-h-11 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 type Mode = "image" | "model";
 
@@ -44,11 +48,11 @@ function StageIndicator({
     <div
       role="status"
       aria-live="polite"
-      className="flex flex-col gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-4"
+      className="flex flex-col gap-2 rounded-md border border-primary/30 bg-primary/5 p-4"
     >
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-amber-300">Generating…</span>
-        <span className="font-mono text-xs text-zinc-400">{seconds}s</span>
+        <span className="text-sm font-medium text-primary">Generating…</span>
+        <span className="font-mono text-xs text-muted-foreground">{seconds}s</span>
       </div>
       <ol className="flex flex-col gap-1.5">
         {phases.map((p, i) => {
@@ -59,10 +63,10 @@ function StageIndicator({
                 aria-hidden
                 className={
                   state === "done"
-                    ? "text-emerald-400"
+                    ? "text-accent"
                     : state === "active"
-                      ? "text-amber-300"
-                      : "text-zinc-600"
+                      ? "text-primary"
+                      : "text-muted-foreground"
                 }
               >
                 {state === "done" ? "✓" : state === "active" ? "◌" : "○"}
@@ -70,10 +74,10 @@ function StageIndicator({
               <span
                 className={
                   state === "done"
-                    ? "text-zinc-400 line-through"
+                    ? "text-muted-foreground line-through"
                     : state === "active"
-                      ? "font-medium text-zinc-100"
-                      : "text-zinc-500"
+                      ? "font-medium text-foreground"
+                      : "text-muted-foreground"
                 }
               >
                 {p.label}
@@ -82,7 +86,7 @@ function StageIndicator({
           );
         })}
       </ol>
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-muted-foreground">
         {mode === "image" ? "~20 seconds" : "~2 minutes total"} — keep this tab open.
       </p>
     </div>
@@ -129,15 +133,13 @@ export function GenerateForm({
 
   const radio =
     "flex flex-1 cursor-pointer flex-col gap-1 rounded-md border p-3 text-sm " +
-    "focus-within:outline focus-within:outline-2 focus-within:outline-amber-400";
+    "focus-within:outline-none focus-within:ring-2 focus-within:ring-ring";
 
   return (
     <form action={action} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="title" className="text-sm font-medium text-zinc-300">
-          Title
-        </label>
-        <input
+        <Label htmlFor="title">Title</Label>
+        <Input
           id="title"
           name="title"
           required
@@ -145,15 +147,12 @@ export function GenerateForm({
           defaultValue={initialTitle}
           placeholder="e.g. Wooden barrel"
           autoComplete="off"
-          className={control}
         />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="prompt" className="text-sm font-medium text-zinc-300">
-          Prompt
-        </label>
-        <textarea
+        <Label htmlFor="prompt">Prompt</Label>
+        <Textarea
           id="prompt"
           name="prompt"
           required
@@ -161,47 +160,45 @@ export function GenerateForm({
           rows={3}
           defaultValue={initialPrompt}
           placeholder="a simple wooden barrel"
-          className={`${control} resize-y`}
+          className="resize-y"
         />
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-muted-foreground">
           Describe the subject — the project canon supplies the style.
         </p>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="flex flex-1 flex-col gap-1.5">
-          <label htmlFor="assetType" className="text-sm font-medium text-zinc-300">
-            Asset type
-          </label>
-          <select id="assetType" name="assetType" defaultValue="prop" className={`${control} min-h-11`}>
+          <Label htmlFor="assetType">Asset type</Label>
+          <select id="assetType" name="assetType" defaultValue="prop" className={selectControl}>
             {ASSET_TYPE_OPTIONS.map((o) => (
               <option key={o.key} value={o.key}>
                 {o.label}
               </option>
             ))}
           </select>
-          <p className="text-xs text-zinc-500">Supplies the format (canon supplies the style).</p>
+          <p className="text-xs text-muted-foreground">
+            Supplies the format (canon supplies the style).
+          </p>
         </div>
         <div className="flex flex-1 flex-col gap-1.5">
-          <label htmlFor="provider" className="text-sm font-medium text-zinc-300">
-            Image model
-          </label>
-          <select id="provider" name="provider" defaultValue="flux" className={`${control} min-h-11`}>
+          <Label htmlFor="provider">Image model</Label>
+          <select id="provider" name="provider" defaultValue="flux" className={selectControl}>
             <option value="flux">FLUX (Replicate)</option>
             <option value="nanobanana">Nano Banana (Gemini)</option>
           </select>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted-foreground">
             Nano Banana uses the canon’s reference images as a style anchor (needs GEMINI_API_KEY).
           </p>
         </div>
       </div>
 
       <fieldset className="flex flex-col gap-1.5">
-        <legend className="mb-1 text-sm font-medium text-zinc-300">Output</legend>
+        <legend className="mb-1 text-sm font-medium text-foreground">Output</legend>
         <div className="flex flex-col gap-2 sm:flex-row">
           <label
             htmlFor="mode-image"
-            className={`${radio} ${mode === "image" ? "border-amber-500 bg-amber-500/5" : "border-zinc-700"}`}
+            className={`${radio} ${mode === "image" ? "border-primary bg-primary/5" : "border-border"}`}
           >
             <span className="flex items-center gap-2">
               <input
@@ -211,17 +208,17 @@ export function GenerateForm({
                 value="image"
                 checked={mode === "image"}
                 onChange={() => setMode("image")}
-                className="accent-amber-500"
+                className="accent-primary"
               />
-              <span className="font-medium text-zinc-100">Image only (~$0.003)</span>
+              <span className="font-medium text-foreground">Image only (~$0.003)</span>
             </span>
-            <span className="pl-6 text-xs text-zinc-400">
+            <span className="pl-6 text-xs text-muted-foreground">
               Review the 2D image first, then make it 3D if you like it.
             </span>
           </label>
           <label
             htmlFor="mode-model"
-            className={`${radio} ${mode === "model" ? "border-amber-500 bg-amber-500/5" : "border-zinc-700"}`}
+            className={`${radio} ${mode === "model" ? "border-primary bg-primary/5" : "border-border"}`}
           >
             <span className="flex items-center gap-2">
               <input
@@ -231,28 +228,24 @@ export function GenerateForm({
                 value="model"
                 checked={mode === "model"}
                 onChange={() => setMode("model")}
-                className="accent-amber-500"
+                className="accent-primary"
               />
-              <span className="font-medium text-zinc-100">Straight to 3D (~$0.09)</span>
+              <span className="font-medium text-foreground">Straight to 3D (~$0.09)</span>
             </span>
-            <span className="pl-6 text-xs text-zinc-400">
+            <span className="pl-6 text-xs text-muted-foreground">
               FLUX → TRELLIS in one pass. Skips the 2D review.
             </span>
           </label>
         </div>
       </fieldset>
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="min-h-11 w-fit rounded-md bg-amber-500 px-5 font-medium text-zinc-950 hover:bg-amber-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
-      >
+      <Button type="submit" disabled={pending} className="w-fit px-5">
         {pending ? "Generating…" : mode === "image" ? "Generate image" : "Generate 3D"}
-      </button>
+      </Button>
 
       {pending && <StageIndicator phase={phase} seconds={seconds} mode={mode} />}
       {state?.error && (
-        <p role="alert" className="text-sm text-rose-300">
+        <p role="alert" className="text-sm text-destructive">
           {state.error}
         </p>
       )}
