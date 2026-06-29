@@ -47,7 +47,14 @@ LoRA *enforces* it. Path A needs a turntable-render dataset of the game's facete
 
 ### Up next — close the style-fidelity gap (the live problem)
 Prompt scaffolding only *approximates* the faceted low-poly look — a "palm tree" still comes out as a
-polished stylized render, not the game's chunky faceted style. Three options, cheapest first:
+polished stylized render, not the game's chunky faceted style.
+
+> **Reference to bring in (Kevin, next session):** the **Living Dungeon (March)** art bible/prompts
+> scaffolded *really good* assets — Kevin will share screenshots + the exact prompt(s) used. Study its
+> scaffolding structure and fold what worked into the canon engine. (March source incl. its
+> `GAME_PROFILES`/`buildSystem*` prompts is local-only at `_reference/march-asset-forge/`.)
+
+Three options, cheapest first:
 
 1. **Harder low-poly prompt tweak** (free, ~$0.003 to test) — lead the canon `prompt_prefix` with
    stronger terms (`low-poly 3D game asset, untextured flat-shaded, hard faceted edges, blender low
