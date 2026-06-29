@@ -77,6 +77,16 @@ Three options, cheapest first:
   auto-draft now works with the Anthropic key) → decompose into props; zero style cross-contamination.
 - **Phase 5 — avatars** (deferred): rigging-ready character pipeline, separate from props.
 
+### Shipped 2026-06-29 (later)
+- **Projects-as-Games**: home is now a **Games gallery**; per-game **/projects/[slug]** = editable
+  portfolio Overview + a Generation workspace (sets the game active → Generate/Review/Canon/Prompts).
+  Portfolio face (description/status/url/repo/screenshot) added to `projects` (migration 0005);
+  faces stay separate. Status enum: prototype/active/shipped/paused.
+- **Persistent accessible top nav** (skip link, landmarks, active route) on every page.
+- **LoRA Stage 1**: training-set assembly — upload/list/remove turntable renders per project at
+  `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
+  needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
+
 ### Shipped 2026-06-29 (parallel batch)
 - **Nano Banana** (Gemini 2.5 Flash Image) image provider — selectable per generation, conditions
   on the canon's reference images (style anchor). Needs `GEMINI_API_KEY` (free tier).
