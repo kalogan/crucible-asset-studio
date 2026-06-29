@@ -34,7 +34,7 @@ export default async function ProjectDetailPage({
   const canonState = canon ? (canonReadiness(canon).ready ? "ready" : "incomplete") : "none";
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-6 py-12">
+    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-6 py-12 lg:max-w-5xl xl:max-w-6xl">
       <header className="flex flex-col gap-3">
         <Link href="/" className="w-fit text-sm text-primary underline underline-offset-2 hover:opacity-80">
           ← Games
