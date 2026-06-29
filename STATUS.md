@@ -5,10 +5,16 @@ _Durable status for the Architect/Builder pipeline (write → persist → notify
 ## Where we are
 
 **Phase 0 — kernel mining:** ✅ done (`KERNEL_LESSONS.md`).
-**Phase 1 — platform spine:** ✅ code-complete, gate-green, pushed. Supabase **live**: keys in
-`.env.local`, migrations applied (`pnpm migrate`), DB functionally verified (insert/constraint/
-storage-bucket), app boots with the project switcher against the real DB. TRELLIS pinned version
-re-verified valid. **Only the first paid Generate remains** (Replicate token is in; ~$0.09/run).
+**Phase 1 — platform spine:** ✅ done. Supabase live; generated real Wooden Barrel + Palm Tree
+GLBs end-to-end. Cost guardrails, live status stepper, GLB viewer (IBL).
+**Phase 2 — canon engine:** ✅ canon-first done. Wayfinders canon auto-drafted from the art
+bible (Anthropic key in `.env.local`), wired into generation (prompt scaffolding), precision gate,
+canon panel + intake. **2D-review-before-3D**: choose Image-only (~$0.003) vs Straight-to-3D
+(~$0.09); promote a reviewed image to 3D on demand. Canon-aware enrichment (subject-only) so it
+stops fighting the canon. Migrations 0001-0004 applied. 59 tests green.
+**Phase 2 remaining — the LoRA slice** (Replicate, two paths per CANON_INTAKE §5): the real
+style-fidelity lever. Prompt scaffolding only *approximates* the faceted low-poly look; the trained
+LoRA *enforces* it. Path A needs a turntable-render dataset of the game's faceted assets.
 
 | Slice | What | Commit |
 |---|---|---|
