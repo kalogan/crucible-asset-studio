@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Mesh } from "three";
+import { BoxGeometry, Mesh } from "three";
 import { buildDescriptor } from "./descriptorToThree";
 import { STUDS_TO_M } from "./convert";
 import type { RobloxDescriptor, SocketSchema } from "./schema";
@@ -40,6 +40,19 @@ describe("buildDescriptor", () => {
     expect(head!.position.x).toBeCloseTo(0);
     expect(head!.position.y).toBeCloseTo(2.4 * STUDS_TO_M);
     expect(head!.position.z).toBeCloseTo(0.5 * STUDS_TO_M);
+  });
+
+  it("gives a 'head' socket a non-box (rounded) geometry", () => {
+    const group = buildDescriptor(DESCRIPTOR, SCHEMA);
+
+    const torso = group.children.find((c): c is Mesh => c.name === "Torso");
+    const head = group.children.find((c): c is Mesh => c.name === "Head");
+    expect(torso).toBeDefined();
+    expect(head).toBeDefined();
+
+    // Torso stays a box; head rounds off (not a BoxGeometry).
+    expect(torso!.geometry).toBeInstanceOf(BoxGeometry);
+    expect(head!.geometry).not.toBeInstanceOf(BoxGeometry);
   });
 
   it("applies scale as a uniform multiplier on the group", () => {

@@ -330,6 +330,18 @@ superset that also covers the three.js games' art-kit ids)? where the builders l
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
 
+### Shipped 2026-06-29 (foundational kit trio + Roblox Phase 2)
+- **game-kit foundational trio** (pushed `30eb754`) — `geo` (nonIndexedFlat + deterministic jitterVerts),
+  `palette` (createPalette → color/flatMat/emissiveMat factories incl. the toneMapped:false bloom recipe),
+  `artkit` (the `id → (rng)=>Object3D` registry, `generate(id,seed)` deterministic). The procgen backbone
+  every three.js game uses. Gate: tsc 0 · 82 tests.
+- **Roblox Phase 2** — DNA part **shapes**: socket-name heuristic picks a characterful primitive
+  (head→sphere, leg/arm/neck→cylinder, tail→tapered cylinder, torso/default→box) instead of uniform
+  greyboxes. **web→Roblox Luau emit**: `descriptorToLuau` → a self-contained `buildModel()` (Parts at
+  socket CFrames, Color3, studs kept native) + Copy/Download `.luau` per descriptor on `/roblox`. The
+  "port from here" lever. (Next: load the real DNA parts via the art-kit registry; round-trip Roblox→web.)
+- Gate (Crucible): typecheck 0 · lint 0 · test 116 · build 0.
+
 ### Shipped 2026-06-29 (r3f kit variants + asset-system v2.1 + Roblox Phase 1)
 - **game-kit r3f variants** (pushed `55cc51b`) — `<LightingRig>` + `<PostFx>` + a `game-kit/r3f` entry,
   sharing `LIGHTING_DEFAULTS`/`BLOOM_DEFAULTS` with the vanilla builders; react/r3f/drei/postprocessing as

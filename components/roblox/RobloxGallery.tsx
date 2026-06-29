@@ -17,6 +17,7 @@ import {
 } from "@react-three/drei";
 import { Box3, Vector3, Group } from "three";
 import { Badge } from "@/components/ui/badge";
+import { LuauExport } from "./LuauExport";
 import { buildDescriptor } from "@/lib/roblox/descriptorToThree";
 import { ARCHETYPES, DESCRIPTORS } from "@/lib/roblox/fixtures";
 import type { RobloxDescriptor } from "@/lib/roblox/schema";
@@ -106,25 +107,29 @@ export function RobloxGallery() {
   return (
     <div ref={containerRef} className="flex flex-col gap-4">
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {DESCRIPTORS.map((d) => (
-          <li
-            key={d.id}
-            className="group relative flex flex-col gap-1.5 rounded-lg border border-border bg-card p-2"
-          >
-            <View
-              className="aspect-square w-full cursor-grab overflow-hidden rounded-md bg-muted active:cursor-grabbing"
-              aria-label={`Greybox descriptor: ${d.id} (${d.archetype}) — drag to rotate`}
+        {DESCRIPTORS.map((d) => {
+          const schema = ARCHETYPES[d.archetype];
+          return (
+            <li
+              key={d.id}
+              className="group relative flex flex-col gap-1.5 rounded-lg border border-border bg-card p-2"
             >
-              <TileScene descriptor={d} reduced={reduced} />
-            </View>
-            <div className="flex items-center justify-between gap-1">
-              <span className="truncate text-xs text-foreground" title={d.id}>
-                {d.id}
-              </span>
-              <Badge variant="outline">{d.archetype}</Badge>
-            </div>
-          </li>
-        ))}
+              <View
+                className="aspect-square w-full cursor-grab overflow-hidden rounded-md bg-muted active:cursor-grabbing"
+                aria-label={`Greybox descriptor: ${d.id} (${d.archetype}) — drag to rotate`}
+              >
+                <TileScene descriptor={d} reduced={reduced} />
+              </View>
+              <div className="flex items-center justify-between gap-1">
+                <span className="truncate text-xs text-foreground" title={d.id}>
+                  {d.id}
+                </span>
+                <Badge variant="outline">{d.archetype}</Badge>
+              </div>
+              {schema ? <LuauExport descriptor={d} schema={schema} /> : null}
+            </li>
+          );
+        })}
       </ul>
 
       {/* One shared WebGL context renders every tile's <View> into its tracked
