@@ -190,6 +190,38 @@ clips (sample bone/part transforms over time → KeyframeTracks); deceive-me-dad
 already have clips (the easy test case). So: build the player now (plays embedded clips); baking
 procedural anims is the follow-on per-game export work.
 
+### Roadmap — reusable systems / kits / atoms (added 2026-06-29)
+Meta-goal: stop rebuilding the same web-3D-game plumbing per project. Standardize the recurring layers
+so Crucible can **"spin up these systems"** for a new game, and make **composable asset-systems**
+(a campfire = mesh + FX + lighting + sound + params as ONE unit) that export/import across games and
+drop into a level in the scene editor.
+
+Three tiers:
+- **Atoms** — smallest reusable units: a light rig, a PRNG, a geometry/material helper, a single FX
+  (smoke/glow/particles), a HUD widget, a settings field.
+- **Systems** — a working subsystem: the 3D render bootstrap (Canvas/renderer/camera/post-fx/resize/
+  loop), input + camera controls, animation runtime, audio, settings store, HUD shell, a Colyseus room,
+  persistence (Supabase), deploy config (Vercel/fly.io/Docker).
+- **Kits** — bundles forming a starting point: "r3f game starter", "vanilla-three starter", "Colyseus
+  multiplayer", each wiring atoms + systems so a new game begins with the plumbing done.
+
+**Composable asset-systems** (the campfire): an asset isn't just a mesh — it's `{ meshes + FX +
+lighting + sound + behavior params }` packaged as one unit; export it from game A → import into game B,
+or drop it into a level in the scene composer. Extends the library + scene editor + kit registry.
+
+**Where kits live (decide after the audit):** (a) a versioned workspace/npm package games install;
+(b) a template/starter repo cloned per game; (c) Crucible as the catalog + a "scaffold new game"
+generator. Likely a mix — a `game-kit` package for the code, Crucible as the catalog/scaffolder.
+
+**Audit in progress** (parallel explorers) across project-mmo / storm-break-hockey / corrupted-void /
+woodturning-studio / deceive-me-daddy + infra (Supabase storage, Colyseus, fly.io/Vercel) → the
+duplicated patterns that are the standardization candidates. Synthesis → a kit inventory + first slices.
+
+**Animation baking (in progress):** bake procgen games' PROCEDURAL animators (project-mmo —
+`ProceduralCharacterAnimator` / creature animator, segmented groups, no skeleton) into glTF
+`AnimationClip`s on export, so grabbed creatures/characters animate in Crucible's viewer and carry
+clips when reused. The procedural animator itself is a prime "system" kit candidate.
+
 ### Later phases
 - **Phase 3 — bulk + finish + publish:** resumable, cost-capped **batch worker** (sync gen is
   prod-unsafe at volume); **Kiln** finishing module (retopo + baked PBR); **CDN publish** + per-project
