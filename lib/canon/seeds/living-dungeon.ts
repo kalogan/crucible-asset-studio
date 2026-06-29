@@ -12,13 +12,13 @@ export function livingDungeonCanon(projectId: string): CanonInsert {
     name: "Living Dungeon core",
     lora_trigger: null,
     lora_status: "none",
+    // Style only — NOT format. Asset format (tilesheet / portrait / sprite) goes in
+    // the per-asset prompt, so one canon serves every asset type (the March model).
     prompt_prefix:
-      "2D top-down pixel art, 32x32 tiles, interior of a living organism — flesh, " +
-      "membranes, veins, bioluminescence, biological horror aesthetic, wet mucus " +
-      "sheen, ribbed cartilage texture, cyan emission along edges, seamlessly tileable",
-    prompt_suffix:
-      "pure black background, orthographic top-down, isolated sprite, readable " +
-      "silhouette, game asset pixel art",
+      "2D pixel art, biological horror aesthetic — the interior of a living organism: " +
+      "flesh, membranes, veins, bioluminescence; wet mucus sheen, ribbed cartilage " +
+      "texture, dark maroon body with cyan bioluminescent glow",
+    prompt_suffix: "pure black background, readable silhouette, game asset pixel art, no outlines",
     negative_prompt:
       "metal, stone, sci-fi tech, human faces, text, outlines, 3d render, " +
       "photorealistic, smooth gradients",
