@@ -23,13 +23,28 @@ const client = new pg.Client({ connectionString: url });
 
 try {
   await client.connect();
+  await client.query(
+    "create table if not exists _migrations (name text primary key, applied_at timestamptz default now())",
+  );
+  const applied = new Set(
+    (await client.query("select name from _migrations")).rows.map((r) => r.name),
+  );
+  let count = 0;
   for (const file of files) {
+    if (applied.has(file)) {
+      console.log(`skip    ${file} (already applied)`);
+      continue;
+    }
     const sql = readFileSync(path.join(dir, file), "utf8");
     process.stdout.write(`applying ${file} … `);
     await client.query(sql);
+    await client.query("insert into _migrations (name) values ($1) on conflict do nothing", [
+      file,
+    ]);
     console.log("ok");
+    count++;
   }
-  console.log(`\n✓ ${files.length} migration(s) applied.`);
+  console.log(`\n✓ ${count} applied, ${applied.size} already up to date.`);
 } catch (err) {
   console.error("\n✗ migration failed:", err.message);
   process.exitCode = 1;

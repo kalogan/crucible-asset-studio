@@ -52,6 +52,7 @@ export async function runGenerationPipeline(input: PipelineInput): Promise<Asset
     const finalPrompt = `${enriched}, isolated object, neutral background`;
 
     // 1. FLUX text -> image, persist the raw 2D output.
+    await updateJob(job.id, { phase: "image" });
     const image = await generateImage(finalPrompt, { width: 1024, height: 1024 });
     const imagePath = buildStoragePath(input.projectSlug, catalogKey, "png");
     const imageUrl = await persistToStorage({
@@ -61,6 +62,7 @@ export async function runGenerationPipeline(input: PipelineInput): Promise<Asset
     });
 
     // 2. Background cutout (fail-soft — a clean isolated subject -> better mesh).
+    await updateJob(job.id, { phase: "cutout" });
     let cutoutUrl = image.url;
     try {
       cutoutUrl = await removeBackground(image.url);
@@ -69,7 +71,9 @@ export async function runGenerationPipeline(input: PipelineInput): Promise<Asset
     }
 
     // 3. TRELLIS image -> 3D, persist the GLB.
+    await updateJob(job.id, { phase: "model" });
     const model = await generateModelFromImage(cutoutUrl);
+    await updateJob(job.id, { phase: "saving" });
     const glbPath = buildStoragePath(input.projectSlug, catalogKey, "glb");
     const glbUrl = await persistToStorage({
       sourceUrl: model.url,

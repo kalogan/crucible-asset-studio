@@ -26,7 +26,7 @@ create table if not exists projects (
   updated_at   timestamptz not null default now(),
   constraint projects_slug_format check (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$')
 );
-create trigger projects_set_updated_at before update on projects
+create or replace trigger projects_set_updated_at before update on projects
   for each row execute function set_updated_at();
 
 -- ── canons (the core domain object: per-game style + LoRA) ───────────────────
@@ -47,7 +47,7 @@ create table if not exists canons (
   updated_at      timestamptz not null default now()
 );
 create index if not exists canons_project_id_idx on canons(project_id);
-create trigger canons_set_updated_at before update on canons
+create or replace trigger canons_set_updated_at before update on canons
   for each row execute function set_updated_at();
 
 -- ── asset_specs (what to generate — the plan) ────────────────────────────────
@@ -81,7 +81,7 @@ create table if not exists batches (
   updated_at    timestamptz not null default now()
 );
 create index if not exists batches_project_id_idx on batches(project_id);
-create trigger batches_set_updated_at before update on batches
+create or replace trigger batches_set_updated_at before update on batches
   for each row execute function set_updated_at();
 
 -- ── jobs ─────────────────────────────────────────────────────────────────────
@@ -103,7 +103,7 @@ create table if not exists jobs (
 );
 create index if not exists jobs_spec_id_idx on jobs(spec_id);
 create index if not exists jobs_batch_id_idx on jobs(batch_id);
-create trigger jobs_set_updated_at before update on jobs
+create or replace trigger jobs_set_updated_at before update on jobs
   for each row execute function set_updated_at();
 
 -- ── assets (produced asset moving through lifecycle) ─────────────────────────
@@ -124,7 +124,7 @@ create table if not exists assets (
 create index if not exists assets_project_id_idx on assets(project_id);
 create index if not exists assets_spec_id_idx on assets(spec_id);
 create index if not exists assets_stage_idx on assets(stage);
-create trigger assets_set_updated_at before update on assets
+create or replace trigger assets_set_updated_at before update on assets
   for each row execute function set_updated_at();
 
 -- asset_specs.source_asset_id references assets, declared after assets exists.

@@ -3,7 +3,11 @@
 import { redirect } from "next/navigation";
 import { getActiveProject } from "@/lib/active-project";
 import { runGenerationPipeline } from "@/lib/pipeline/generate";
-import { countJobsSince, countActiveJobsSince } from "@/lib/db/jobs";
+import {
+  countJobsSince,
+  countActiveJobsSince,
+  getLatestGeneratingJob,
+} from "@/lib/db/jobs";
 import {
   getDailyCostCap,
   startOfUtcDayIso,
@@ -59,4 +63,17 @@ export async function runGenerateAction(
     };
   }
   redirect("/review");
+}
+
+export interface GenerationStatus {
+  phase: "image" | "cutout" | "model" | "saving";
+  elapsedMs: number;
+}
+
+/** Polled by the form while a generation runs, to drive the live stage indicator. */
+export async function getGenerationStatus(): Promise<GenerationStatus | null> {
+  const job = await getLatestGeneratingJob();
+  if (!job) return null;
+  const phase = (job.phase ?? "image") as GenerationStatus["phase"];
+  return { phase, elapsedMs: Date.now() - new Date(job.created_at).getTime() };
 }

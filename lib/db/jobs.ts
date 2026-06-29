@@ -16,6 +16,7 @@ export async function createJob(input: JobInsertT): Promise<Job> {
 
 export interface JobUpdate {
   status?: JobStatus;
+  phase?: string | null;
   attempt?: number;
   provider_ref?: string | null;
   recipe_snapshot?: Record<string, unknown>;
@@ -44,6 +45,23 @@ export async function countJobsSince(sinceIso: string): Promise<number> {
     .gte("created_at", sinceIso);
   if (error) throw new Error(`countJobsSince: ${error.message}`);
   return count ?? 0;
+}
+
+/** Latest still-`generating` job (phase + start) — drives the live status indicator. */
+export async function getLatestGeneratingJob(): Promise<{
+  phase: string | null;
+  created_at: string;
+} | null> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("phase,created_at")
+    .eq("status", "generating")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`getLatestGeneratingJob: ${error.message}`);
+  return (data as { phase: string | null; created_at: string } | null) ?? null;
 }
 
 /** Jobs still `generating` since `sinceIso` — the single-in-flight guard. */

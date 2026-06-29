@@ -48,6 +48,7 @@ export const goldenJob = {
   batch_id: null,
   spec_id: goldenAssetSpec.id,
   status: "succeeded",
+  phase: null,
   attempt: 1,
   executor: "replicate",
   provider_ref: "pred_abc123",

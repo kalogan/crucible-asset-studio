@@ -114,11 +114,15 @@ export const AssetSpecInsert = z.object({
 export type AssetSpecInsert = z.infer<typeof AssetSpecInsert>;
 
 // ── jobs ─────────────────────────────────────────────────────────────────────
+export const GenerationPhase = z.enum(["image", "cutout", "model", "saving"]);
+export type GenerationPhase = z.infer<typeof GenerationPhase>;
+
 export const Job = z.object({
   id: uuid,
   batch_id: uuid.nullable(),
   spec_id: uuid,
   status: JobStatus,
+  phase: GenerationPhase.nullable().optional(),
   attempt: z.number().int(),
   executor: z.string(),
   provider_ref: z.string().nullable(),
