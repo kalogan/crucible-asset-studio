@@ -20,6 +20,7 @@ describe("asset-system schema", () => {
         ],
         lights: [{ type: "point", color: "#ff8c42", intensity: 2, position: [0, 1, 0] }],
         sounds: [{ label: "crackle", url: "https://example.com/crackle.ogg" }],
+        fx: [{ kind: "fire", params: { rate: 12 } }],
         params: { flicker: true },
       },
       created_at: "2026-06-29T00:00:00.000Z",
@@ -28,6 +29,7 @@ describe("asset-system schema", () => {
     expect(parsed.name).toBe("Campfire");
     expect(parsed.manifest.parts).toHaveLength(1);
     expect(parsed.manifest.lights?.[0]?.type).toBe("point");
+    expect(parsed.manifest.fx?.[0]?.kind).toBe("fire");
   });
 
   it("applies defaults", () => {

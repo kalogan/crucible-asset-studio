@@ -5,6 +5,7 @@ import { updateAssetSystemManifestAction } from "@/app/actions/asset-systems";
 import type { ActionResult } from "@/app/actions/projects";
 import type {
   Manifest,
+  ManifestFx,
   ManifestLight,
   ManifestSound,
 } from "@/lib/asset-system/schema";
@@ -34,6 +35,13 @@ interface SoundRow {
   url: string;
 }
 
+interface FxRow {
+  key: string;
+  kind: string;
+  // Existing params are carried through untouched (a params editor is a future step).
+  params?: Record<string, unknown>;
+}
+
 function toLightRows(lights: ManifestLight[] | undefined, seed: number): LightRow[] {
   return (lights ?? []).map((l, i) => ({
     key: `light-${seed}-${i}`,
@@ -55,6 +63,14 @@ function toSoundRows(sounds: ManifestSound[] | undefined, seed: number): SoundRo
   }));
 }
 
+function toFxRows(fx: ManifestFx[] | undefined, seed: number): FxRow[] {
+  return (fx ?? []).map((f, i) => ({
+    key: `fx-${seed}-${i}`,
+    kind: f.kind,
+    ...(f.params !== undefined ? { params: f.params } : {}),
+  }));
+}
+
 function numOr(value: string, fallback: number): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -64,10 +80,14 @@ const selectClass =
   "min-h-9 rounded-md border border-input bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 /**
- * Per-system editor for the manifest's `lights` + `sounds`. Parts and params are
- * carried through untouched — on submit the FULL manifest (existing parts/params
- * + the edited lights/sounds) is serialized into a hidden `manifestJson` field and
+ * Per-system editor for the manifest's `lights` + `sounds` + `fx`. Parts and params
+ * are carried through untouched — on submit the FULL manifest (existing parts/params
+ * + the edited lights/sounds/fx) is serialized into a hidden `manifestJson` field and
  * validated server-side by the Zod schema.
+ *
+ * FX v1 edits the `kind` only (a per-fx `params` editor is a future step, and any
+ * existing params are carried through). RENDERING fx in the scene is also FUTURE —
+ * here fx is stored/edited on the manifest only.
  */
 export function EditSystemPanel({
   systemId,
@@ -86,6 +106,7 @@ export function EditSystemPanel({
   const [seed, setSeed] = useState(0);
   const [lights, setLights] = useState<LightRow[]>(() => toLightRows(manifest.lights, 0));
   const [sounds, setSounds] = useState<SoundRow[]>(() => toSoundRows(manifest.sounds, 0));
+  const [fx, setFx] = useState<FxRow[]>(() => toFxRows(manifest.fx, 0));
 
   function nextKey(prefix: string): string {
     const k = seed + 1;
@@ -129,6 +150,18 @@ export function EditSystemPanel({
     setSounds((prev) => prev.filter((s) => s.key !== key));
   }
 
+  function addFx() {
+    setFx((prev) => [...prev, { key: nextKey("fx"), kind: "" }]);
+  }
+
+  function updateFx(key: string, patch: Partial<FxRow>) {
+    setFx((prev) => prev.map((f) => (f.key === key ? { ...f, ...patch } : f)));
+  }
+
+  function removeFx(key: string) {
+    setFx((prev) => prev.filter((f) => f.key !== key));
+  }
+
   // Build the FULL manifest: keep parts + params, replace lights + sounds.
   const nextLights: ManifestLight[] = lights.map((l) => {
     const base: ManifestLight = {
@@ -147,10 +180,16 @@ export function EditSystemPanel({
     if (trimmedUrl) base.url = trimmedUrl;
     return base;
   });
+  const nextFx: ManifestFx[] = fx.map((f) => {
+    const base: ManifestFx = { kind: f.kind.trim() };
+    if (f.params !== undefined) base.params = f.params;
+    return base;
+  });
   const nextManifest: Manifest = {
     parts: manifest.parts,
     lights: nextLights,
     sounds: nextSounds,
+    fx: nextFx,
     ...(manifest.params !== undefined ? { params: manifest.params } : {}),
   };
 
@@ -344,9 +383,54 @@ export function EditSystemPanel({
           </Button>
         </fieldset>
 
+        {/* FX */}
+        <fieldset className="flex flex-col gap-3">
+          <legend className="text-sm font-medium text-foreground">FX ({fx.length})</legend>
+          {/* NOTE: fx is stored/edited only — rendering fx in the scene is a future step. */}
+          <p className="text-xs text-muted-foreground">
+            Named effects stored on the manifest. v1 edits the kind only; a params
+            editor and scene rendering are future steps.
+          </p>
+          {fx.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No fx.</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {fx.map((f) => (
+                <li
+                  key={f.key}
+                  className="flex flex-wrap items-end gap-3 rounded-md border border-border p-3"
+                >
+                  <div className="flex min-w-40 flex-1 flex-col gap-1.5">
+                    <Label htmlFor={`${f.key}-kind`}>Kind</Label>
+                    <Input
+                      id={`${f.key}-kind`}
+                      value={f.kind}
+                      placeholder="e.g. fire, smoke, sparks"
+                      autoComplete="off"
+                      onChange={(e) => updateFx(f.key, { kind: e.target.value })}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => removeFx(f.key)}
+                    aria-label="Remove this fx"
+                  >
+                    Remove
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Button type="button" variant="outline" size="sm" className="w-fit" onClick={addFx}>
+            Add fx
+          </Button>
+        </fieldset>
+
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={pending} className="w-fit">
-            {pending ? "Saving…" : "Save lights & sounds"}
+            {pending ? "Saving…" : "Save lights, sounds & fx"}
           </Button>
           {state?.error && (
             <p role="alert" className="text-sm text-destructive">

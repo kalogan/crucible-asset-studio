@@ -41,10 +41,21 @@ export const ManifestSound = z.object({
 });
 export type ManifestSound = z.infer<typeof ManifestSound>;
 
+/**
+ * Optional FX ref — a named effect (e.g. "fire", "smoke") with free-form params.
+ * Editor v1 edits `kind` only; a `params` editor + scene rendering are future steps.
+ */
+export const ManifestFx = z.object({
+  kind: z.string(),
+  params: z.record(z.unknown()).optional(),
+});
+export type ManifestFx = z.infer<typeof ManifestFx>;
+
 export const Manifest = z.object({
   parts: z.array(ManifestPart).default([]),
   lights: z.array(ManifestLight).optional(),
   sounds: z.array(ManifestSound).optional(),
+  fx: z.array(ManifestFx).optional(),
   params: z.record(z.unknown()).optional(),
 });
 export type Manifest = z.infer<typeof Manifest>;

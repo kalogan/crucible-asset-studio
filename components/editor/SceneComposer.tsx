@@ -29,8 +29,19 @@ export interface InstanceTransform {
   scale: number;
 }
 
+/** A light contributed by an imported system's manifest. Keyed for clear/removal. */
+export interface SceneLight {
+  lightId: string;
+  type: "point" | "directional" | "ambient";
+  color: string;
+  intensity: number;
+  position?: [number, number, number];
+}
+
 export interface SceneComposerProps {
   instances: SceneInstance[];
+  /** Lights contributed by imported systems — added ON TOP of the studio IBL. */
+  lights?: SceneLight[];
   selectedInstanceId: string | null;
   mode: TransformMode;
   reduced: boolean;
@@ -42,6 +53,7 @@ export interface SceneComposerProps {
 
 export function SceneComposer({
   instances,
+  lights = [],
   selectedInstanceId,
   mode,
   reduced,
@@ -83,6 +95,38 @@ export function SceneComposer({
       <ambientLight intensity={0.5} />
       <directionalLight position={[5, 8, 5]} intensity={1.1} />
       <directionalLight position={[-5, 2, -3]} intensity={0.4} />
+
+      {/* System-contributed lights — add ON TOP of the base lights + IBL below.
+          Not part of the export root group (lights aren't geometry). */}
+      {lights.map((light) => {
+        if (light.type === "ambient") {
+          return (
+            <ambientLight
+              key={light.lightId}
+              color={light.color}
+              intensity={light.intensity}
+            />
+          );
+        }
+        if (light.type === "directional") {
+          return (
+            <directionalLight
+              key={light.lightId}
+              color={light.color}
+              intensity={light.intensity}
+              position={light.position ?? [0, 5, 0]}
+            />
+          );
+        }
+        return (
+          <pointLight
+            key={light.lightId}
+            color={light.color}
+            intensity={light.intensity}
+            position={light.position ?? [0, 2, 0]}
+          />
+        );
+      })}
 
       <Suspense fallback={null}>
         {/* Root group: the single export target containing all placed instances. */}

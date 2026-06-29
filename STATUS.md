@@ -330,6 +330,19 @@ superset that also covers the three.js games' art-kit ids)? where the builders l
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
 
+### Shipped 2026-06-29 (r3f kit variants + asset-system v2.1 + Roblox Phase 1)
+- **game-kit r3f variants** (pushed `55cc51b`) — `<LightingRig>` + `<PostFx>` + a `game-kit/r3f` entry,
+  sharing `LIGHTING_DEFAULTS`/`BLOOM_DEFAULTS` with the vanilla builders; react/r3f/drei/postprocessing as
+  OPTIONAL peer deps (vanilla entry stays react-free). Gate: tsc 0 · 58 tests.
+- **Asset-system v2.1** — importing a system into the scene composer now also renders its **lights**
+  (point/directional/ambient) live; added an **FX field + editor** (`manifest.fx[]`, stored/edited; scene
+  rendering of fx is the next step). "Clear scene" drops instances + lights.
+- **Roblox ingest Phase 1** — `/roblox` renders dino-tracks' engine-agnostic descriptors as greybox
+  three.js: `lib/roblox` socket/DNA schema + `descriptor→three` builder + studs→m conversion (0.28) +
+  fixtures (Biped/Quadruped archetypes, Raptor/Rex/Trike). Read-only render; **next: DNA part-loading,
+  GLB export, web→Roblox Luau emit** (reuse dino-tracks' KitbashAssembler).
+- Gate (Crucible): typecheck 0 · lint 0 · test 109 · build 0.
+
 ### Shipped 2026-06-29 (asset-system v2 + game-kit Phase-2)
 - **Asset-system v2** — `/systems` gains a per-system **lights + sounds editor** (add/remove point/
   directional/ambient lights + sound rows; full manifest re-validated + persisted). The **scene editor**

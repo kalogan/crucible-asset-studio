@@ -11,6 +11,7 @@ import {
   SceneComposer,
   type InstanceTransform,
   type SceneInstance,
+  type SceneLight,
 } from "./SceneComposer";
 import type { AssetSystem } from "@/lib/asset-system/schema";
 
@@ -291,6 +292,8 @@ function SceneEditor({
   reduced: boolean;
 }) {
   const [instances, setInstances] = useState<SceneInstance[]>([]);
+  // Lights contributed by imported systems — rendered on top of the studio IBL.
+  const [sceneLights, setSceneLights] = useState<SceneLight[]>([]);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [mode, setMode] = useState<TransformMode>("translate");
   const [exporting, setExporting] = useState(false);
@@ -360,15 +363,45 @@ function SceneEditor({
       const last = newInstances[newInstances.length - 1];
       if (last) setSelectedInstanceId(last.instanceId);
 
+      // Collect the system's manifest lights (if any) so they render in the scene.
+      // Each is tagged with a unique id so "Clear scene" can drop them again.
+      const manifestLights = system.manifest.lights ?? [];
+      if (manifestLights.length > 0) {
+        const newLights: SceneLight[] = manifestLights.map((light) => {
+          counterRef.current += 1;
+          const base: SceneLight = {
+            lightId: `light-${counterRef.current}`,
+            type: light.type,
+            color: light.color,
+            intensity: light.intensity,
+          };
+          if (light.position) base.position = light.position;
+          return base;
+        });
+        setSceneLights((prev) => [...prev, ...newLights]);
+      }
+
       const skipped = parts.length - resolved.length;
+      const lightNote =
+        manifestLights.length > 0 ? ` +${manifestLights.length} light(s)` : "";
       setSystemNote(
         skipped > 0
-          ? `Added ${resolved.length} of ${parts.length} parts from “${system.name}” (${skipped} unresolved).`
-          : null,
+          ? `Added ${resolved.length} of ${parts.length} parts from “${system.name}” (${skipped} unresolved)${lightNote}.`
+          : lightNote
+            ? `Added ${resolved.length} part(s) from “${system.name}”${lightNote}.`
+            : null,
       );
     },
     [assetUrlById],
   );
+
+  // Clear the whole scene — placed instances AND any system-contributed lights.
+  const clearScene = useCallback(() => {
+    setInstances([]);
+    setSceneLights([]);
+    setSelectedInstanceId(null);
+    setSystemNote(null);
+  }, []);
 
   const selectedSystem = systems.find((s) => s.id === selectedSystemId) ?? null;
 
@@ -525,6 +558,7 @@ function SceneEditor({
           {instances.length > 0 ? (
             <SceneComposer
               instances={instances}
+              lights={sceneLights}
               selectedInstanceId={selectedInstanceId}
               mode={mode}
               reduced={reduced}
@@ -570,6 +604,16 @@ function SceneEditor({
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={clearScene}
+              disabled={instances.length === 0 && sceneLights.length === 0}
+              aria-label="Clear all placed instances and system lights from the scene"
+            >
+              Clear scene
+            </Button>
             <Button
               type="button"
               size="sm"
