@@ -246,6 +246,35 @@ catalogued/scaffolded by Crucible. Decide package layout before extracting.
 `AnimationClip`s on export, so grabbed creatures/characters animate in Crucible's viewer and carry
 clips when reused. The procedural animator itself is a prime "system" kit candidate.
 
+### Roadmap — Roblox + web↔engine porting (added 2026-06-29)
+Added 4 Roblox/Luau procgen games as projects (GitHub kal101246): **dino-tracks, visual-escape,
+arrivals, polymatrix** (public; auto-filled from GitHub metadata). Roblox is NOT three.js — the
+`GLTFExporter`→GLB grab does NOT apply (Luau + Parts/MeshParts, studs, Color3). So the grab path differs.
+
+**The bridge = an engine-agnostic asset SCHEMA (dino-tracks, mapped).** dino-tracks' interchange is a
+**socket-schema + DNA descriptor** (engine-agnostic Luau data, `src/shared/Kitbash/SocketSchemas.luau`
++ `Data/*Registry.luau`): an archetype defines named sockets `{ CF, Size }`; a descriptor's `DNA` maps
+each socket → a part name (+ stats/color/scale). Its `KitbashAssembler.luau` already EMITS Roblox (DNA +
+schema → welded Model, procedural-primitive fallback when a part is missing) — but **no three.js emitter
+exists**. Conversions: studs↔m (~1 stud≈0.28m), `Color3`↔hex, `CFrame`↔quat+pos, Material enum↔PBR.
+Generalize this into the interchange standard; make **Crucible the porting hub**:
+- **Ingest (Roblox→Crucible):** read the agnostic descriptors (JSON) → a `descriptor→three` builder
+  renders them in Crucible's viewer/library (no GLB needed). For pure-Roblox assets, capture-as-image is
+  the fallback.
+- **Port web→Roblox:** a `descriptor→Luau/rbxm` emitter — author/edit in Crucible (scene editor +
+  composable asset-systems) → export Roblox instances. "Port from here with ease."
+- **Port Roblox→web:** Roblox Parts → descriptor → three (+ optional GLB).
+- This unifies with the **composable asset-system** (the campfire bundle IS a descriptor) and the
+  **kits** (the `descriptor→three` builder + `descriptor→luau` emitter are kit "systems"; likely live in
+  the `game-kit` package with `web` + `roblox` targets).
+
+**Build plan (from the audit, ~1k LOC):** (1) export the Luau registries+schemas → `descriptors.json`
+(small Luau→JSON script); (2) build a `descriptor→three` renderer in the `game-kit` (sockets → primitives
+/ loaded parts, apply DNA + scale + studs→m) → render in Crucible's viewer/library; (3) web→Roblox reuses
+`KitbashAssembler` (wrap it). Decisions: adopt dino-tracks' socket/DNA schema as the standard (or a
+superset that also covers the three.js games' art-kit ids)? where the builders live (`game-kit/targets/
+{web,roblox}`)? asset-resolution (where `Raptor_Torso` parts come from — CDN vs procedural greybox).
+
 ### Later phases
 - **Phase 3 — bulk + finish + publish:** resumable, cost-capped **batch worker** (sync gen is
   prod-unsafe at volume); **Kiln** finishing module (retopo + baked PBR); **CDN publish** + per-project
@@ -263,6 +292,17 @@ clips when reused. The procedural animator itself is a prime "system" kit candid
 - **LoRA Stage 1**: training-set assembly — upload/list/remove turntable renders per project at
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
+
+### Shipped 2026-06-29 (asset-systems + game-kit + Roblox onboard)
+- **Composable asset-systems v1** — `/systems`: group library MODEL assets into a named `AssetSystem`
+  (manifest = parts + optional lights/sounds/params, schema-ready), persisted (migration 0010), download
+  the manifest JSON. Scene-editor import + the lights/fx/sound editors are the next steps.
+- **`game-kit` package** (`web-projects/game-kit`) — Phase-1 reusable systems from the audit: seeded PRNG
+  (mulberry32), settings store, scene state machine (pure, tested) + lighting rig + bloom/post-fx (vanilla
+  three; r3f variants TODO). Standalone (own pnpm root). Gate: tsc 0 · 28 tests.
+- **4 Roblox games onboarded** as projects (dino-tracks / visual-escape / arrivals / polymatrix) +
+  dino-tracks agnostic-schema audit (socket/DNA + KitbashAssembler) → the web↔Roblox porting roadmap.
+- Gate (Crucible): typecheck 0 · lint 0 · test 106 · build 0.
 
 ### Shipped 2026-06-29 (animation viewer + scene composer + deceive-me-daddy)
 - **Animation viewer.** The focus modal now plays a model's embedded glTF AnimationClips — a clip
