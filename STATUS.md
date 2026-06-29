@@ -77,6 +77,18 @@ Three options, cheapest first:
   auto-draft now works with the Anthropic key) → decompose into props; zero style cross-contamination.
 - **Phase 5 — avatars** (deferred): rigging-ready character pipeline, separate from props.
 
+### Shipped 2026-06-29 (parallel batch)
+- **Nano Banana** (Gemini 2.5 Flash Image) image provider — selectable per generation, conditions
+  on the canon's reference images (style anchor). Needs `GEMINI_API_KEY` (free tier).
+- **Per-asset-type framing** — canon=style, asset type=format (+ format nevers). Asset-type dropdown.
+  Fixes the no-faces-vs-portrait conflict.
+- **Prompt library** embed bug fixed (named the assets FK). Harder low-poly Wayfinders prefix.
+- vitest aliases `server-only` so pure helpers in server modules are testable. 72 tests.
+
+### NEXT: the LoRA slice (the real 3D-faceted enforcer)
+Replicate, Path A per CANON_INTAKE §5. Train on turntable renders of the game's faceted assets;
+freeze the LoRA version in recipe_snapshot. Prereq: a turntable-render dataset from the engine.
+
 ### Validated 2026-06-29
 - **Living Dungeon control test passed.** Seeded its canon from the March art bible → generated
   on-style 2D floor tiles **and** a player portrait that match the March originals. Confirms the
