@@ -153,6 +153,7 @@ export const ReferenceAsset = z.object({
   asset_type: ReferenceAssetType,
   label: z.string().min(1),
   source: z.enum(["procgen", "external"]),
+  format: z.enum(["image", "model"]).default("image"),
   image_path: z.string(),
   art_kit_id: z.string().nullable(),
   created_at: ts,
@@ -164,6 +165,7 @@ export const ReferenceAssetInsert = z.object({
   asset_type: ReferenceAssetType,
   label: z.string().min(1),
   source: z.enum(["procgen", "external"]).optional(),
+  format: z.enum(["image", "model"]).optional(),
   image_path: z.string(),
   art_kit_id: z.string().nullable().optional(),
 });

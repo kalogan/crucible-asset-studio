@@ -26,13 +26,16 @@ export async function POST(req: Request): Promise<NextResponse> {
   const slug = String(body.projectSlug ?? "");
   const label = String(body.label ?? "");
   const typeParsed = ReferenceAssetType.safeParse(body.type);
-  const imageBase64 = String(body.imageBase64 ?? "");
+  // Accept a PNG capture (imageBase64) or a GLB exported via GLTFExporter (dataBase64).
+  const dataBase64 = String(body.dataBase64 ?? body.imageBase64 ?? "");
   const mimeType = String(body.mimeType ?? "image/png");
   const artKitId = body.artKitId ? String(body.artKitId) : null;
+  const format =
+    mimeType.includes("gltf") || mimeType.includes("glb") ? "model" : "image";
 
-  if (!slug || !label || !typeParsed.success || !imageBase64) {
+  if (!slug || !label || !typeParsed.success || !dataBase64) {
     return NextResponse.json(
-      { error: "Required: projectSlug, type, label, imageBase64." },
+      { error: "Required: projectSlug, type, label, dataBase64 (or imageBase64)." },
       { status: 400 },
     );
   }
@@ -43,16 +46,17 @@ export async function POST(req: Request): Promise<NextResponse> {
   try {
     const safe = (artKitId ?? label).replace(/[^a-zA-Z0-9._-]/g, "_");
     const path = `${slug}/reference/${typeParsed.data}/${safe}.${extForContentType(mimeType)}`;
-    const url = await persistBase64ToStorage({ base64: imageBase64, mimeType, path });
+    const url = await persistBase64ToStorage({ base64: dataBase64, mimeType, path });
     const ref = await createReferenceAsset({
       project_id: project.id,
       asset_type: typeParsed.data,
       label,
       source: "procgen",
+      format,
       image_path: url,
       art_kit_id: artKitId,
     });
-    return NextResponse.json({ ok: true, id: ref.id, url });
+    return NextResponse.json({ ok: true, id: ref.id, url, format });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Import failed." },

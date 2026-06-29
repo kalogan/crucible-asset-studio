@@ -23,7 +23,8 @@ export default async function LibraryPage() {
       label: r.label,
       type: r.asset_type,
       source: "procgen",
-      imageUrl: r.image_path,
+      format: r.format,
+      url: r.image_path,
     }));
     const genItems: LibraryItem[] = generated
       .filter((a) => a.stage !== "rejected")
@@ -32,10 +33,8 @@ export default async function LibraryPage() {
         label: recipeString(a.recipe_snapshot, "title", "asset"),
         type: "generated",
         source: "generated",
-        imageUrl:
-          a.kind === "image"
-            ? a.raw_path
-            : ((a.recipe_snapshot["image_url"] as string | undefined) ?? a.raw_path),
+        format: a.kind,
+        url: a.raw_path,
       }));
     items = [...refItems, ...genItems];
   }

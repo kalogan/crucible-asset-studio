@@ -69,6 +69,15 @@ Three options, cheapest first:
    prerequisite: get those renders out of the Wayfinders engine). Freeze the LoRA version in
    `recipe_snapshot`. `canons.lora_*` fields + trigger `wyfndrstyle` already reserved.
 
+### Roadmap (added 2026-06-29)
+- **Batch worker** (deferred — mobile is mostly review/library, not creation): resumable, cost-capped,
+  enables remote/bulk generation. Build when remote creation becomes the need.
+- **Live procgen renderer, evolutionary:** (1) NOW — harness exports each runtime mesh via GLTFExporter
+  and pushes the GLB to `/api/import`; Crucible renders it live in the GLBViewer (done — import +
+  library accept `model` format). (2) LATER — run the game's generators *inside* Crucible. (3) GOAL —
+  a **reusable generation/render kit** (the kit-registry "linked art-kit") so new games plug in instead
+  of starting from scratch.
+
 ### Later phases
 - **Phase 3 — bulk + finish + publish:** resumable, cost-capped **batch worker** (sync gen is
   prod-unsafe at volume); **Kiln** finishing module (retopo + baked PBR); **CDN publish** + per-project
