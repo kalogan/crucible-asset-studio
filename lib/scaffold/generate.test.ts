@@ -224,3 +224,149 @@ describe("generateScaffold — README + determinism", () => {
     expect(a).toEqual(b);
   });
 });
+
+describe("generateScaffold — blank template default", () => {
+  it("omitting template equals template: 'blank' (back-compat)", () => {
+    const implicit = generateScaffold({
+      name: "G",
+      target: "r3f",
+      systemIds: ["lighting"],
+    });
+    const explicit = generateScaffold({
+      name: "G",
+      target: "r3f",
+      template: "blank",
+      systemIds: ["lighting"],
+    });
+    expect(implicit).toEqual(explicit);
+  });
+
+  it("blank emits no server / world files", () => {
+    const paths = generateScaffold({
+      name: "G",
+      target: "vanilla",
+      template: "blank",
+      systemIds: ["render-bootstrap"],
+    }).map((f) => f.path);
+    expect(paths.some((p) => p.startsWith("server/"))).toBe(false);
+    expect(paths).not.toContain("src/world.ts");
+  });
+});
+
+describe("generateScaffold — render bootstrap (real API)", () => {
+  it("creates its own PerspectiveCamera and renders with (scene, camera)", () => {
+    const main = fileMap(
+      generateScaffold({
+        name: "G",
+        target: "vanilla",
+        systemIds: ["render-bootstrap"],
+      }),
+    ).get("src/main.ts") as string;
+    // createRenderer() takes no mount node and returns no camera.
+    expect(main).toContain("const { renderer, scene } = createRenderer();");
+    expect(main).toContain("new THREE.PerspectiveCamera(");
+    expect(main).toContain("renderer.render(scene, camera)");
+    expect(main).not.toContain("createRenderer(app)");
+  });
+});
+
+describe("generateScaffold — multiplayer template", () => {
+  const files = generateScaffold({
+    name: "Arena Game",
+    target: "vanilla",
+    template: "multiplayer",
+    systemIds: [],
+  });
+  const map = fileMap(files);
+
+  it("emits a Colyseus server package + room + client adapter", () => {
+    const paths = files.map((f) => f.path);
+    expect(paths).toContain("server/package.json");
+    expect(paths).toContain("server/src/index.ts");
+    expect(paths).toContain("server/src/rooms/GameRoom.ts");
+    expect(paths).toContain("src/net/colyseusRoom.ts");
+  });
+
+  it("client adapter implements game-kit's RoomClient<S> over colyseus.js", () => {
+    const adapter = map.get("src/net/colyseusRoom.ts") as string;
+    expect(adapter).toContain('import type { RoomClient } from "game-kit"');
+    expect(adapter).toContain('from "colyseus.js"');
+    expect(adapter).toContain("Promise<RoomClient<S>>");
+  });
+
+  it("adds colyseus.js to client deps and colyseus to the server package", () => {
+    const clientPkg = JSON.parse(map.get("package.json") as string) as {
+      dependencies: Record<string, string>;
+    };
+    expect(clientPkg.dependencies["colyseus.js"]).toBeDefined();
+    const serverPkg = JSON.parse(
+      map.get("server/package.json") as string,
+    ) as { name: string; dependencies: Record<string, string> };
+    expect(serverPkg.name).toBe("arena-game-server");
+    expect(serverPkg.dependencies["colyseus"]).toBeDefined();
+    expect(serverPkg.dependencies["@colyseus/schema"]).toBeDefined();
+  });
+
+  it("wires connectColyseus into the entry (both targets)", () => {
+    const vanillaMain = map.get("src/main.ts") as string;
+    expect(vanillaMain).toContain(
+      'import { connectColyseus } from "./net/colyseusRoom"',
+    );
+    expect(vanillaMain).toContain("connectColyseus()");
+
+    const r3fMain = fileMap(
+      generateScaffold({
+        name: "Arena Game",
+        target: "r3f",
+        template: "multiplayer",
+        systemIds: [],
+      }),
+    ).get("src/main.tsx") as string;
+    expect(r3fMain).toContain("connectColyseus()");
+  });
+
+  it("forces in render-bootstrap + netcode even with empty systemIds", () => {
+    const main = map.get("src/main.ts") as string;
+    expect(main).toContain("createRenderer");
+    expect(main).toContain("createLocalRoom");
+  });
+});
+
+describe("generateScaffold — procgen-world template", () => {
+  it("emits a seeded world builder using prng + palette + geo (vanilla)", () => {
+    const files = generateScaffold({
+      name: "Wild",
+      target: "vanilla",
+      template: "procgen-world",
+      systemIds: [],
+    });
+    const map = fileMap(files);
+    const world = map.get("src/world.ts") as string;
+    expect(world).toBeDefined();
+    expect(world).toContain("export function buildWorld");
+    expect(world).toContain("createRng");
+    expect(world).toContain("createPalette");
+    expect(world).toContain("jitterVerts");
+
+    const main = map.get("src/main.ts") as string;
+    expect(main).toContain('import { buildWorld } from "./world"');
+    expect(main).toContain("scene.add(buildWorld({ seed: 1 }))");
+    // No standalone Colyseus server for this template.
+    expect(files.some((f) => f.path.startsWith("server/"))).toBe(false);
+  });
+
+  it("emits a <World/> component and renders it under <Canvas> (r3f)", () => {
+    const files = generateScaffold({
+      name: "Wild",
+      target: "r3f",
+      template: "procgen-world",
+      systemIds: [],
+    });
+    const map = fileMap(files);
+    expect(map.has("src/World.tsx")).toBe(true);
+    expect(map.has("src/world.ts")).toBe(true);
+    const main = map.get("src/main.tsx") as string;
+    expect(main).toContain('import { World } from "./World"');
+    expect(main).toContain("<World seed={1} />");
+  });
+});

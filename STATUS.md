@@ -328,6 +328,24 @@ superset that also covers the three.js games' art-kit ids)? where the builders l
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
 
+### Shipped 2026-06-29 (scaffolder v2 — templates: multiplayer + procgen-world)
+- **Scaffolder v2** (`lib/scaffold/generate.ts`, `/kit/scaffold`) — the picker now sits under a **template**
+  selector that layers richer starters on top of the system picker:
+  - **Multiplayer (Colyseus)** — emits a standalone `server/` Colyseus package (Server + `GameRoom` with
+    `@colyseus/schema` Player/GameState) **and** `src/net/colyseusRoom.ts`, a client adapter that REALIZES
+    game-kit's transport-agnostic `RoomClient<S>` seam over `colyseus.js` (the "future add" net/index.ts
+    documents). Wires `connectColyseus()` into the entry (both targets); adds `colyseus.js` to client deps.
+  - **Procgen World** — emits `src/world.ts` (`buildWorld({ seed })`: seeded jittered ground + scattered
+    faceted rocks/trees via game-kit `createRng`/`createPalette`/`nonIndexedFlat`/`jitterVerts`) + a
+    `<World seed/>` r3f wrapper. Same seed → identical world. Forces in prng/palette/geo/lighting/bootstrap.
+  - Templates pre-check their implied systems in the UI; "Blank" = the v1 free picker (back-compat: omitting
+    `template` ≡ `"blank"`, verified by test).
+- **Fixed two real wiring bugs** the string-only tests missed (procgen depends on a working bootstrap):
+  `render-bootstrap` now uses the REAL `createRenderer()` (no `app` arg, no returned camera — it mints its
+  own `PerspectiveCamera` + resize) and `createLoop((dt,alpha)=>…)`; `camera-rigs` calls
+  `createOrbitCamera(camera, opts)` not `(camera, domElement)`.
+- Gate (Crucible): typecheck 0 · lint 0 · test 148 (+10) · build 0. `/kit/scaffold` 11.3 kB.
+
 ### Shipped 2026-06-29 (kit r3f variants + /kit scaffolder)
 - **game-kit r3f variants** (pushed `e35ad84`) — `useOrbitCamera`/`useChaseCamera`/`useFirstPersonCamera`,
   `<Particles>`, `useClipPlayer`, `useFixedLoop` (via `game-kit/r3f`). The 2 r3f games can now adopt the

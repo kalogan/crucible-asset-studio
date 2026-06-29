@@ -8,8 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   generateScaffold,
+  TEMPLATES,
   type ScaffoldFile,
   type ScaffoldTarget,
+  type ScaffoldTemplate,
 } from "@/lib/scaffold/generate";
 import type { Tier } from "@/lib/kit/catalog";
 
@@ -31,9 +33,15 @@ function groupByTier(systems: readonly ScaffoldSystem[]) {
   })).filter((g) => g.items.length > 0);
 }
 
+/** Set of system ids that a given template implies (and pre-checks). */
+function templateSystemIds(template: ScaffoldTemplate): ReadonlySet<string> {
+  return new Set(TEMPLATES.find((t) => t.id === template)?.systemIds ?? []);
+}
+
 export function Scaffolder({ systems }: { systems: readonly ScaffoldSystem[] }) {
   const [name, setName] = useState("My Game");
   const [target, setTarget] = useState<ScaffoldTarget>("r3f");
+  const [template, setTemplate] = useState<ScaffoldTemplate>("blank");
   const [selected, setSelected] = useState<ReadonlySet<string>>(
     () => new Set(systems.map((s) => s.id)),
   );
@@ -51,15 +59,31 @@ export function Scaffolder({ systems }: { systems: readonly ScaffoldSystem[] }) 
     });
   }, []);
 
+  // Picking a template (other than blank) narrows the selection to exactly the
+  // pieces it needs, so the preview matches what the template wires. "Blank"
+  // restores the full set so you're back to a free pick.
+  const onTemplate = useCallback(
+    (next: ScaffoldTemplate) => {
+      setTemplate(next);
+      setSelected(
+        next === "blank"
+          ? new Set(systems.map((s) => s.id))
+          : templateSystemIds(next),
+      );
+    },
+    [systems],
+  );
+
   const onGenerate = useCallback(() => {
     setFiles(
       generateScaffold({
         name: name.trim() || "My Game",
         target,
+        template,
         systemIds: [...selected],
       }),
     );
-  }, [name, target, selected]);
+  }, [name, target, template, selected]);
 
   const onCopy = useCallback(async (file: ScaffoldFile) => {
     try {
@@ -113,6 +137,43 @@ export function Scaffolder({ systems }: { systems: readonly ScaffoldSystem[] }) 
               autoComplete="off"
             />
           </div>
+
+          {/* Template */}
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-sm font-medium text-foreground">
+              Template
+            </legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {TEMPLATES.map((t) => {
+                const active = template === t.id;
+                return (
+                  <label
+                    key={t.id}
+                    className={`flex cursor-pointer flex-col gap-1 rounded-md border px-3 py-2 text-sm ${
+                      active
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-card"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 font-medium text-foreground">
+                      <input
+                        type="radio"
+                        name="scaffold-template"
+                        value={t.id}
+                        checked={active}
+                        onChange={() => onTemplate(t.id)}
+                        className="h-4 w-4 accent-primary"
+                      />
+                      {t.label}
+                    </span>
+                    <span className="text-xs leading-snug text-muted-foreground">
+                      {t.description}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
 
           {/* Target */}
           <fieldset className="flex flex-col gap-2">

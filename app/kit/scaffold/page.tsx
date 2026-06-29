@@ -31,12 +31,16 @@ export default function ScaffoldPage() {
         </Link>
         <h1 className="text-3xl font-semibold">Scaffold a game</h1>
         <p className="text-sm text-muted-foreground">
-          Pick kit pieces + a starter target, then generate a runnable Vite
-          project wired to{" "}
+          Pick a template + starter target + kit pieces, then generate a runnable
+          Vite project wired to{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">game-kit</code>.
-          Each picked system imports + initializes its piece in the generated
-          entry file — a compiling skeleton you fill in. Copy individual files or
-          download the whole thing as a <code className="rounded bg-muted px-1 py-0.5 text-xs">.zip</code>.
+          Templates go further than the picker: <strong>Multiplayer</strong>{" "}
+          scaffolds a Colyseus server + a client adapter for game-kit&apos;s{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">RoomClient</code>{" "}
+          seam; <strong>Procgen World</strong> emits a seeded low-poly world
+          generator. Each picked system imports + initializes its piece in the
+          generated entry file. Copy individual files or download the whole thing
+          as a <code className="rounded bg-muted px-1 py-0.5 text-xs">.zip</code>.
         </p>
       </header>
 
