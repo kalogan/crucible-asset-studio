@@ -3,10 +3,9 @@ import { fileURLToPath } from "node:url";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // game-kit's `exports` point at TypeScript source — let Next compile it.
-  transpilePackages: ["game-kit"],
-  // game-kit (ESM TS) imports with explicit ".js" specifiers; map them to ".ts"
-  // source so webpack resolves them the way tsc's bundler resolution does.
+  // game-kit is VENDORED under vendor/game-kit (private repo — can't be cloned on
+  // Vercel), aliased via tsconfig `paths`. Its ESM TS uses explicit ".js" specifiers;
+  // map them to ".ts" source so webpack resolves them like tsc's bundler resolution.
   webpack(config) {
     config.resolve.extensionAlias = {
       ...(config.resolve.extensionAlias ?? {}),

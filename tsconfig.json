@@ -15,7 +15,13 @@
     "jsx": "preserve",
     "incremental": true,
     "plugins": [{ "name": "next" }],
-    "paths": { "@/*": ["./*"] }
+    "paths": {
+      "@/*": ["./*"],
+      "game-kit": ["./vendor/game-kit/src/index.ts"],
+      "game-kit/r3f": ["./vendor/game-kit/src/r3f.ts"],
+      "game-kit/npc": ["./vendor/game-kit/src/npc.ts"],
+      "game-kit/brief": ["./vendor/game-kit/src/brief.ts"]
+    }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules", "_reference", ".next", "out"]
