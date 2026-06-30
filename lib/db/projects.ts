@@ -27,7 +27,19 @@ export async function listProjects(): Promise<Project[]> {
     .select()
     .order("created_at", { ascending: true });
   if (error) throw new Error(`listProjects: ${error.message}`);
-  return (data ?? []).map((row) => Project.parse(row));
+  // Tolerant parse: a single malformed row (e.g. an unexpected status) must NOT
+  // 500 the whole gallery — skip + warn so the front door always renders.
+  const projects: Project[] = [];
+  for (const row of data ?? []) {
+    const parsed = Project.safeParse(row);
+    if (parsed.success) {
+      projects.push(parsed.data);
+    } else {
+      const id = (row as { id?: unknown })?.id;
+      console.warn(`listProjects: skipping malformed project row ${String(id)}:`, parsed.error.message);
+    }
+  }
+  return projects;
 }
 
 export async function getProject(id: string): Promise<Project | null> {

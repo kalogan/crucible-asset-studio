@@ -25,7 +25,18 @@ function SetupNotice() {
 
 export default async function HomePage() {
   const configured = isSupabaseConfigured();
-  const projects = configured ? await listProjects() : [];
+  // Never let a transient DB/parse error take down the front door — degrade to an
+  // empty gallery (the SetupNotice covers the not-configured case).
+  let projects: Awaited<ReturnType<typeof listProjects>> = [];
+  let loadFailed = false;
+  if (configured) {
+    try {
+      projects = await listProjects();
+    } catch (err) {
+      loadFailed = true;
+      console.error("HomePage: listProjects failed:", err);
+    }
+  }
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-8 px-6 py-12 lg:max-w-5xl xl:max-w-6xl min-[1440px]:max-w-7xl">
@@ -44,7 +55,18 @@ export default async function HomePage() {
         </p>
       </header>
 
-      {!configured ? <SetupNotice /> : <GamesGrid projects={projects} />}
+      {!configured ? (
+        <SetupNotice />
+      ) : loadFailed ? (
+        <section
+          aria-label="Load error"
+          className="rounded-lg border border-destructive/40 bg-destructive/5 p-5 text-sm text-muted-foreground"
+        >
+          Couldn&apos;t load games right now. Check the database connection and refresh.
+        </section>
+      ) : (
+        <GamesGrid projects={projects} />
+      )}
     </main>
   );
 }
