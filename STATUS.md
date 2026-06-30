@@ -42,24 +42,42 @@ Crucible is now a **multi-project studio hub**, not just a game asset studio:
     is the next slice). Game generator untouched.
   - **Sort/filter polish** (`2477b83`): Creations **Last-updated / Name** sort (new `CreationsList`); dashboard
     **Tech/Genre chips are clickable filters** in GamesGrid (aria-pressed + active-tag clear).
-- **Audio asset kind — STARTED then PAUSED (~70%, STASHED):** WAV renderer baking the procgen synth, "audio"
-  added to AssetKind, Library tile, unapplied migration 0017. `git stash list` → `stash@{0}`. Resume: `git
-  stash pop`, finish AssetModal's audio branch, `pnpm migrate`, commit.
+### Shipped 2026-06-30 (evening — audio + 5 more parallel threads)
+- **Audio = a first-class AssetKind** (`adf442f`): `lib/pipeline/audio.ts` bakes a procgen synth recipe
+  (tones + noise + envelope) to a 16-bit PCM WAV (pure, 8 tests); `bakeAudioAsset` stores `kind:"audio"`
+  with the recipe in `recipe_snapshot`. Library tile + AssetModal play it; `/api/bake-audio` + `pnpm
+  bake-audio <slug>` create one (free — no cost gate). Migration 0017 widened the kind/format CHECK constraints.
+- **Batch enqueue + monitor UI** (`d4e444e`, Phase 3 slice 2): a **Batches** tab on the project workspace —
+  pick specs → `enqueueBatch` ($0), batch list with per-status job rollup, **Run (dry-run)** button. No paid
+  trigger exposed.
+- **app-kit Phase 2** (`3417a34`): **App Shell/Layout** + **Deploy Config** modules (`vendor/app-kit`), a
+  runnable Next.js **app-starter generator** (`generate-app.ts`) + `/api/scaffold-app` zip route; catalog rows
+  + scaffolder Generate/Download now live for the app family (was preview-only).
+- **game-kit npc wiring** (`3417a34`): WIRING recipes for **nav / npc-behavior / npc-reasoning** (were inert);
+  reasoning emits server-only refs (zod stays out of the client bundle).
+- **Gated B5 reasoning→movement bridge** (`1533779`): `goTo`/`emote` admitted ONLY when `allowMovement:true`
+  (default off = byte-for-byte safe — drops like an unknown kind); `goTo` clamped to walkable nav bounds,
+  `emote` a bounded enum. Own catalog flag `npc-reasoning-movement` in `DEFAULT_OFF_SYSTEM_IDS` (never
+  pre-selected). 13 safety tests. The pathfinder still owns movement — the model only proposes a goal.
+- **Optional transformers.js embedder** (`fb54075`): `game-kit/npc-transformers` sub-entry wraps
+  `@xenova/transformers` via `createModelEmbedder`, lazily imported so tsc passes with the dep ABSENT; declared
+  an OPTIONAL peerDependency (core kit stays zero-dep). Opt in with `pnpm add @xenova/transformers`.
 
 ### Next up (pick a thread)
-- **Finish audio asset kind** (stashed, ~70%): pop the stash, add the `<audio>` branch in AssetModal, wire a
-  bake invocation path, gate + `pnpm migrate` (0017), commit. Then: where do audio recipes come from (UI /
-  asset-system sounds editor / per-game canon)?
-- **Asset-gen core, rest of Phase 3:** worker **enqueue UI** (producer route/button on review/library — none
-  yet); **LoRA enforcer** (precision gate in the worker — fail canon-free runs when `lora_status: ready`);
-  **Kiln finishing** (`approved → finished`, own `executor: "kiln"` job type); **CDN publish** (`finished →
-  published` via per-project `cdn_endpoint`). Worker is sequential — parallel fan-out deferred.
-- **app-kit Phase 2 cont.:** next modules **App Shell/Layout** + **Deploy Config** (order TBD); the **runnable
-  app starter** (Next.js zip like the game scaffolder, vendors `vendor/app-kit`); maybe an app health-check
-  matrix (kept flat for now).
-- **game-kit frontier:** scaffolder doesn't yet WIRE npc-reasoning/nav/npc-behavior (shown but inert) — add
-  their generator wiring; the real local-MODEL embedder (transformers.js, dep call open); the GATED **B5**
-  reasoning→behavior bridge (firewall-widening `goTo`/`emote` — stop-and-confirm); B3/B4 follow/utility done.
+- **Wire B5 goal-injection into the runtime:** the firewall now *admits* a clamped `goTo`/`emote`, but
+  `createNpcBehavior` doesn't yet *consume* it as a next-goal (left to the consumer + documented). Optional:
+  auto-append `REASONING_MOVEMENT_GUARDRAILS` to the prompt when movement is enabled; make `navBounds`
+  mandatory (drop `goTo` when absent) instead of admitting it unclamped.
+- **Audio recipes — where from?** Bake works via script/route; next give it a source: a small UI, the
+  asset-system **sounds editor** (the `ManifestSound` stub), or per-game canon.
+- **Asset-gen core, rest of Phase 3:** **LoRA enforcer** (precision gate in the worker — fail canon-free runs
+  when `lora_status: ready`); **Kiln finishing** (`approved → finished`, own `executor:"kiln"` job type);
+  **CDN publish** (`finished → published` via per-project `cdn_endpoint`). Worker is sequential — parallel
+  fan-out deferred.
+- **app-kit Phase 2 cont.:** generated auth `signIn()` is a TODO (pick OAuth/magic-link/password); maybe an
+  app health-check matrix (kept flat for now); more modules as needed.
+- **Chore (chip spawned):** re-encode `vendor/game-kit/src/npc/memory.ts` — it's the one non-UTF-8 file in
+  the repo (~194 NUL bytes, likely a UTF-16 artifact); compiles fine but breaks grep/tooling.
 
 ---
 
