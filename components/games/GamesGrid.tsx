@@ -17,10 +17,13 @@ function typeLabel(p: Project): string {
 export function GamesGrid({
   projects,
   repoUpdated = {},
+  derivedTags = {},
 }: {
   projects: Project[];
   /** projectId → GitHub repo pushed_at (ISO). */
   repoUpdated?: Record<string, string>;
+  /** projectId → tech/genres auto-derived from the GitHub repo (used when not set manually). */
+  derivedTags?: Record<string, { tech: string[]; genres: string[] }>;
 }) {
   const [q, setQ] = useState("");
   const [kind, setKind] = useState<KindFilter>("all");
@@ -105,7 +108,7 @@ export function GamesGrid({
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                       {typeLabel(p)}
                     </span>
-                    {p.tech.map((t) => (
+                    {(p.tech.length ? p.tech : derivedTags[p.id]?.tech ?? []).map((t) => (
                       <span
                         key={`tech-${t}`}
                         className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
@@ -113,7 +116,7 @@ export function GamesGrid({
                         {t}
                       </span>
                     ))}
-                    {p.genres.map((g) => (
+                    {(p.genres.length ? p.genres : derivedTags[p.id]?.genres ?? []).map((g) => (
                       <span
                         key={`genre-${g}`}
                         className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"

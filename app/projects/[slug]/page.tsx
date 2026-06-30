@@ -5,6 +5,7 @@ import { statusBadgeClass } from "@/lib/projects/status";
 import { ProjectOverviewForm } from "@/components/games/ProjectOverviewForm";
 import { ScreenshotUpload } from "@/components/games/ScreenshotUpload";
 import { FocalPointPicker } from "@/components/games/FocalPointPicker";
+import { SuggestTags } from "@/components/games/SuggestTags";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +86,7 @@ export default async function ProjectDetailPage({
             focalY={project.screenshot_focal_y}
           />
         )}
+        {project.repo_url && <SuggestTags projectId={project.id} slug={project.slug} />}
         <ProjectOverviewForm project={project} />
       </section>
     </main>

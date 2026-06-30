@@ -3,7 +3,7 @@ import { isSupabaseConfigured } from "@/lib/config";
 import { listProjects } from "@/lib/db/projects";
 import { assetCountsByProject } from "@/lib/db/assets";
 import { parseRepoUrl } from "@/lib/github/repo";
-import { fetchRepoPushedAt } from "@/lib/github/commits";
+import { fetchRepoInfo } from "@/lib/github/repo-info";
 import { GamesGrid } from "@/components/games/GamesGrid";
 import { StatRow, computeStats } from "@/components/games/StatRow";
 import { Button } from "@/components/ui/button";
@@ -34,21 +34,28 @@ export default async function HomePage() {
   let projects: Awaited<ReturnType<typeof listProjects>> = [];
   let assetCounts: Record<string, number> = {};
   let repoUpdated: Record<string, string> = {};
+  let derivedTags: Record<string, { tech: string[]; genres: string[] }> = {};
   let loadFailed = false;
   if (configured) {
     try {
       projects = await listProjects();
       assetCounts = await assetCountsByProject();
-      // GitHub repo last-update (pushed_at) per repo — cached 30 min, parallel, best-effort.
+      // One cached GitHub call per repo → pushed_at + auto-derived tech/genres.
       const entries = await Promise.all(
-        projects.map(async (p): Promise<[string, string] | null> => {
+        projects.map(async (p) => {
           const ref = p.repo_url ? parseRepoUrl(p.repo_url) : null;
           if (!ref) return null;
-          const pushed = await fetchRepoPushedAt(ref.owner, ref.repo);
-          return pushed ? [p.id, pushed] : null;
+          const info = await fetchRepoInfo(ref.owner, ref.repo);
+          return { id: p.id, info };
         }),
       );
-      repoUpdated = Object.fromEntries(entries.filter((e): e is [string, string] => e !== null));
+      for (const e of entries) {
+        if (!e) continue;
+        if (e.info.pushedAt) repoUpdated[e.id] = e.info.pushedAt;
+        if (e.info.tech.length || e.info.genres.length) {
+          derivedTags[e.id] = { tech: e.info.tech, genres: e.info.genres };
+        }
+      }
     } catch (err) {
       loadFailed = true;
       console.error("HomePage: listProjects failed:", err);
@@ -85,7 +92,7 @@ export default async function HomePage() {
       ) : (
         <>
           <StatRow stats={stats} />
-          <GamesGrid projects={projects} repoUpdated={repoUpdated} />
+          <GamesGrid projects={projects} repoUpdated={repoUpdated} derivedTags={derivedTags} />
         </>
       )}
     </main>

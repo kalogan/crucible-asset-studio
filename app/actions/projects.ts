@@ -10,6 +10,7 @@ import { uploadProjectScreenshot } from "@/lib/projects/screenshot";
 import { ACTIVE_PROJECT_COOKIE } from "@/lib/active-project";
 import { parseRepoUrl, mapRepoToProject } from "@/lib/github/repo";
 import { fetchGithubRepo } from "@/lib/github/fetch";
+import { fetchRepoInfo } from "@/lib/github/repo-info";
 
 function formStr(formData: FormData, key: string): string | null {
   const v = String(formData.get(key) ?? "").trim();
@@ -156,6 +157,32 @@ export async function updateProjectAction(
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to save." };
+  }
+}
+
+/** Auto-derive tech + genres from the linked GitHub repo (language + topics) and save them. */
+export async function suggestTagsFromRepoAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const id = String(formData.get("projectId") ?? "");
+  const slug = String(formData.get("slug") ?? "");
+  if (!id) return { ok: false, error: "Missing project." };
+  try {
+    const project = await getProject(id);
+    if (!project?.repo_url) return { ok: false, error: "Add a Repo URL first, then save." };
+    const ref = parseRepoUrl(project.repo_url);
+    if (!ref) return { ok: false, error: "Couldn't parse the repo URL." };
+    const info = await fetchRepoInfo(ref.owner, ref.repo);
+    if (info.tech.length === 0 && info.genres.length === 0) {
+      return { ok: false, error: "Nothing to suggest — add topics to the GitHub repo." };
+    }
+    await updateProject(id, { tech: info.tech, genres: info.genres });
+    revalidatePath("/");
+    if (slug) revalidatePath(`/projects/${slug}`);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to suggest tags." };
   }
 }
 
