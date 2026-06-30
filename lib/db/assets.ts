@@ -82,7 +82,11 @@ export async function listAllAssets(limit = 500): Promise<Asset[]> {
  */
 export async function assetCountsByProject(): Promise<Record<string, number>> {
   const supabase = createServiceClient();
-  const { data, error } = await supabase.from("assets").select("project_id");
+  // Match the Library's total: it excludes rejected assets, so this count must too.
+  const { data, error } = await supabase
+    .from("assets")
+    .select("project_id")
+    .neq("stage", "rejected");
   if (error) {
     console.warn("assetCountsByProject failed:", error.message);
     return {};
