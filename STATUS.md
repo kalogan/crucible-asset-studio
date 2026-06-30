@@ -407,6 +407,20 @@ The kit now has 25 systems (incl. nav/behavior/npc). To stand up a SAMPLE GAME e
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
 
+### Shipped 2026-06-29 (biome Place tab + NPC demo + sample game)
+- **Biome Place tab** (slice 2, game-kit `85e9b9c` + Crucible `32d5330`): `/biome` Tune/Place toggle;
+  Place mode click-places props/landmarks/spawn rings + draws a trail (r3f raycast → `WorldDescriptor`
+  `placements`/`trail` → `buildWorld` renders + JSON export). The level editor now matches the Wayfinders
+  Tune-knobs + Place tabs.
+- **NPC demo** (`/npc`): chat with Mira (personaed herbalist). A Crucible `ReasoningProvider` (Claude when
+  `ANTHROPIC_API_KEY` set, else the kit mock) drives a singleton `createNpcBrain` with in-memory store +
+  hashing embedder (semantic recall) + summarizer; a per-browser characterId cookie → memory persists across
+  the session.
+- **Sample game** (`/sample`): the kit END-TO-END — a procgen `buildWorld` clearing with an NPC who WANDERS
+  (`createGridNav` + `createNpcBehavior` in `useFrame`) and TALKS + remembers you (click Mira → the same
+  brain). world + nav + behavior + npc in one scene. The real adopt-the-kit-in-a-game proof.
+- Gate: typecheck 0 · lint 0 · build 0. game-kit 273 tests.
+
 ### Shipped 2026-06-29 (design-brief generator + biome editor + kit adoption)
 - **Design-brief generator** (`/brief`, game-kit `brief` entry `aae1c9a` + Crucible `6cf5aae`): idea →
   Architect agent (Claude `claude-sonnet-4-6`) → structured `DesignBrief` (pillars, core loop, first slice,
