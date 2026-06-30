@@ -64,7 +64,7 @@ export default async function HomePage() {
   const stats = computeStats(projects, assetCounts);
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-8 px-6 py-12 lg:max-w-5xl xl:max-w-6xl min-[1440px]:max-w-7xl">
+    <main className="mx-auto flex min-h-dvh w-full max-w-[110rem] flex-col gap-8 px-6 py-12">
       <header className="flex flex-col gap-3">
         <p className="text-sm font-medium uppercase tracking-widest text-primary">Crucible</p>
         <div className="flex flex-wrap items-center justify-between gap-3">

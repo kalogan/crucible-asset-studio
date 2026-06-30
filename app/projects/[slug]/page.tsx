@@ -31,7 +31,7 @@ export default async function ProjectDetailPage({
   const isGame = project.kind === "game";
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-8 px-6 pb-12 lg:max-w-5xl xl:max-w-6xl min-[1440px]:max-w-7xl">
+    <main className="mx-auto flex min-h-dvh w-full max-w-[110rem] flex-col gap-8 px-6 pb-12">
       <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-3xl font-semibold text-foreground">{project.name}</h1>

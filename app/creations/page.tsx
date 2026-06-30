@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/config";
 import { listProjects } from "@/lib/db/projects";
+import { parseRepoUrl } from "@/lib/github/repo";
+import { fetchReadmeExcerpt } from "@/lib/github/readme";
 import { statusBadgeClass } from "@/lib/projects/status";
 import { timeAgo } from "@/lib/util/time";
 
@@ -11,10 +13,21 @@ export const dynamic = "force-dynamic";
 export default async function CreationsPage() {
   const configured = isSupabaseConfigured();
   let projects: Awaited<ReturnType<typeof listProjects>> = [];
+  let excerpts: Record<string, string> = {};
   let loadFailed = false;
   if (configured) {
     try {
       projects = await listProjects();
+      // Synthesize each repo's README into a one-line blurb (cached 30 min, best-effort).
+      const entries = await Promise.all(
+        projects.map(async (p): Promise<[string, string] | null> => {
+          const ref = p.repo_url ? parseRepoUrl(p.repo_url) : null;
+          if (!ref) return null;
+          const text = await fetchReadmeExcerpt(ref.owner, ref.repo);
+          return text ? [p.id, text] : null;
+        }),
+      );
+      excerpts = Object.fromEntries(entries.filter((e): e is [string, string] => e !== null));
     } catch (err) {
       loadFailed = true;
       console.error("CreationsPage: listProjects failed:", err);
@@ -22,7 +35,7 @@ export default async function CreationsPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-8 px-6 py-12 lg:max-w-5xl xl:max-w-6xl min-[1440px]:max-w-7xl">
+    <main className="mx-auto flex min-h-dvh w-full max-w-[110rem] flex-col gap-8 px-6 py-12">
       <header className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">Creations</h1>
         <p className="text-sm text-muted-foreground">
@@ -39,12 +52,12 @@ export default async function CreationsPage() {
       ) : (
         <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border">
           {projects.map((p) => (
-            <li key={p.id} className="flex items-center gap-4 p-3">
+            <li key={p.id} className="flex items-center gap-5 p-4">
               <Link
                 href={`/projects/${p.slug}`}
-                className="group flex min-w-0 flex-1 items-center gap-4 focus-visible:outline-none"
+                className="group flex min-w-0 flex-1 items-center gap-5 focus-visible:outline-none"
               >
-                <div className="h-12 w-20 shrink-0 overflow-hidden rounded bg-muted">
+                <div className="aspect-video h-24 shrink-0 overflow-hidden rounded-md bg-muted sm:h-28">
                   {p.screenshot && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -57,9 +70,9 @@ export default async function CreationsPage() {
                     />
                   )}
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate font-medium text-foreground group-hover:text-primary">
+                    <span className="truncate text-base font-semibold text-foreground group-hover:text-primary">
                       {p.name}
                     </span>
                     <span className="rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -71,6 +84,11 @@ export default async function CreationsPage() {
                       {p.status}
                     </span>
                   </div>
+                  {(excerpts[p.id] || p.description) && (
+                    <p className="line-clamp-2 text-sm text-muted-foreground">
+                      {excerpts[p.id] || p.description}
+                    </p>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     Updated {timeAgo(p.updated_at) || "—"}
                   </span>

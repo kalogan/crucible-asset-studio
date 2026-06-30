@@ -73,7 +73,7 @@ export function GamesGrid({
           {projects.length === 0 ? "No projects yet." : "Nothing matches your filter."}
         </p>
       ) : (
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1700px]:grid-cols-6">
           {filtered.map((p) => (
             <li
               key={p.id}

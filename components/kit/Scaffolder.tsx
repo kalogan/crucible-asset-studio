@@ -241,7 +241,7 @@ export function Scaffolder({
                   <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {TIER_LABELS[group.tier]}
                   </span>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                     {group.items.map((sys) => {
                       const checked = selected.has(sys.id);
                       return (
