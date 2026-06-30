@@ -67,6 +67,8 @@ export const Project = z.object({
   github_pushed_at: z.string().nullable().catch(null),
   // Synthesized README blurb (stored by refresh-github) — shown on Creations.
   summary: z.string().nullable().catch(null),
+  // Total commits on the repo's default branch (stored by refresh-github) — dashboard stat.
+  commit_count: z.number().nullable().catch(null),
   // generation face
   context_ref: z.string().nullable(),
   cdn_endpoint: z.string().nullable(),
@@ -104,6 +106,7 @@ export const ProjectUpdate = z.object({
   genres: z.array(z.string()).optional(),
   github_pushed_at: z.string().nullable().optional(),
   summary: z.string().nullable().optional(),
+  commit_count: z.number().nullable().optional(),
 });
 export type ProjectUpdate = z.infer<typeof ProjectUpdate>;
 

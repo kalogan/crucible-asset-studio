@@ -9,8 +9,10 @@ export function computeStats(projects: Project[], assetCounts: Record<string, nu
     paused: 0,
   };
   for (const p of projects) byStatus[p.status] += 1;
-  const totalAssets = Object.values(assetCounts).reduce((a, b) => a + b, 0);
-  const playable = projects.filter((p) => p.url).length;
+  // Prompts = AI generation runs: each generated asset is one prompt from the executor agent.
+  const prompts = Object.values(assetCounts).reduce((a, b) => a + b, 0);
+  // Commits = total across repos (stored per-project by refresh-github, read from the DB).
+  const commits = projects.reduce((sum, p) => sum + (p.commit_count ?? 0), 0);
   const games = projects.filter((p) => p.kind === "game").length;
   const apps = projects.filter((p) => p.kind === "app").length;
   return {
@@ -18,8 +20,8 @@ export function computeStats(projects: Project[], assetCounts: Record<string, nu
     games,
     apps,
     byStatus,
-    totalAssets,
-    playable,
+    prompts,
+    commits,
   };
 }
 
@@ -44,8 +46,8 @@ export function StatRow({
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <Stat label="Games" value={stats.games} hint={statusHint} />
       <Stat label="Apps" value={stats.apps} />
-      <Stat label="Assets generated" value={stats.totalAssets} />
-      <Stat label="Playable" value={stats.playable} hint="have a live URL" />
+      <Stat label="Commits" value={stats.commits} hint="across linked repos" />
+      <Stat label="Prompts" value={stats.prompts} hint="agent generations" />
     </div>
   );
 }

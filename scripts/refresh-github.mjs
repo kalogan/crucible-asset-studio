@@ -44,6 +44,25 @@ async function ghReadmeBlurb(owner, repo) {
   return synthesize(await res.text());
 }
 
+// Total commits on the default branch. We request 1 commit/page and read the `last` page
+// number from the Link header — that page number IS the commit count (one extra API call).
+async function ghCommitCount(owner, repo, branch) {
+  const q = `per_page=1${branch ? `&sha=${encodeURIComponent(branch)}` : ""}`;
+  const url = `https://api.github.com/repos/${owner}/${repo}/commits?${q}`;
+  let res = await fetch(url, { headers });
+  if (!res.ok && [401, 403, 404].includes(res.status)) {
+    const pub = await fetch(url, { headers: base });
+    if (pub.ok) res = pub;
+  }
+  if (!res.ok) return null;
+  const link = res.headers.get("link");
+  const m = link?.match(/[?&]page=(\d+)>;\s*rel="last"/);
+  if (m) return Number(m[1]);
+  // No "last" link → a single page: 1 commit if the array is non-empty, else 0 (empty repo).
+  const arr = await res.json().catch(() => []);
+  return Array.isArray(arr) ? arr.length : null;
+}
+
 function synthesize(md) {
   const out = [];
   let started = false;
@@ -138,6 +157,7 @@ for (const p of rows) {
   const repo = await res.json();
   const { tech, genres } = deriveTags(repo);
   const blurb = await ghReadmeBlurb(m[1], m[2]);
+  const commits = await ghCommitCount(m[1], m[2], repo.default_branch);
   await c.query(
     `update projects set
        github_pushed_at = $1,
@@ -145,11 +165,12 @@ for (const p of rows) {
        genres = case when coalesce(array_length(genres, 1), 0) = 0 then $3::text[] else genres end,
        description = coalesce(nullif(description, ''), $4),
        url = coalesce(nullif(url, ''), $5),
-       summary = coalesce($6, summary)
-     where id = $7`,
-    [repo.pushed_at || null, tech, genres, repo.description || null, repo.homepage || null, blurb, p.id],
+       summary = coalesce($6, summary),
+       commit_count = coalesce($7, commit_count)
+     where id = $8`,
+    [repo.pushed_at || null, tech, genres, repo.description || null, repo.homepage || null, blurb, commits, p.id],
   );
-  console.log(`ok     ${p.slug.padEnd(28)} ${[...tech, ...genres].join(", ") || "(no tags)"}${blurb ? " +readme" : ""}`);
+  console.log(`ok     ${p.slug.padEnd(28)} ${commits ?? "?"} commits · ${[...tech, ...genres].join(", ") || "(no tags)"}${blurb ? " +readme" : ""}`);
   ok++;
 }
 await c.end();
