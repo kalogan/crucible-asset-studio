@@ -35,6 +35,14 @@ export default async function HomePage() {
   if (configured) {
     try {
       projects = await listProjects();
+      // Newest GitHub activity first; projects with no GitHub date fall to the bottom
+      // (tie-broken by the local record's updated_at).
+      projects = [...projects].sort((a, b) => {
+        const ta = a.github_pushed_at ? Date.parse(a.github_pushed_at) : 0;
+        const tb = b.github_pushed_at ? Date.parse(b.github_pushed_at) : 0;
+        if (tb !== ta) return tb - ta;
+        return Date.parse(b.updated_at) - Date.parse(a.updated_at);
+      });
       assetCounts = await assetCountsByProject();
     } catch (err) {
       loadFailed = true;
