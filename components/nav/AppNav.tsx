@@ -12,6 +12,7 @@ const ITEMS: NavItem[] = [
   { href: "/canon", label: "Canon" },
   { href: "/library", label: "Library" },
   { href: "/editor", label: "Editor" },
+  { href: "/biome", label: "Biome" },
   { href: "/systems", label: "Systems" },
   { href: "/roblox", label: "Roblox" },
   { href: "/kit", label: "Kit" },
