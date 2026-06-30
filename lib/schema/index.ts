@@ -62,6 +62,9 @@ export const Project = z.object({
   type: z.string().nullable().catch(null),
   tech: z.array(z.string()).catch([]),
   genres: z.array(z.string()).catch([]),
+  // GitHub repo last-update, stored (by the import script) so the dashboard reads it
+  // from the DB instead of live-fetching GitHub on every render.
+  github_pushed_at: z.string().nullable().catch(null),
   // generation face
   context_ref: z.string().nullable(),
   cdn_endpoint: z.string().nullable(),
@@ -97,6 +100,7 @@ export const ProjectUpdate = z.object({
   type: z.string().nullable().optional(),
   tech: z.array(z.string()).optional(),
   genres: z.array(z.string()).optional(),
+  github_pushed_at: z.string().nullable().optional(),
 });
 export type ProjectUpdate = z.infer<typeof ProjectUpdate>;
 

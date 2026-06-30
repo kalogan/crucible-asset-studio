@@ -14,17 +14,7 @@ function typeLabel(p: Project): string {
   return p.type?.trim() || (p.kind === "app" ? "Web App" : "Game");
 }
 
-export function GamesGrid({
-  projects,
-  repoUpdated = {},
-  derivedTags = {},
-}: {
-  projects: Project[];
-  /** projectId → GitHub repo pushed_at (ISO). */
-  repoUpdated?: Record<string, string>;
-  /** projectId → tech/genres auto-derived from the GitHub repo (used when not set manually). */
-  derivedTags?: Record<string, { tech: string[]; genres: string[] }>;
-}) {
+export function GamesGrid({ projects }: { projects: Project[] }) {
   const [q, setQ] = useState("");
   const [kind, setKind] = useState<KindFilter>("all");
   const query = q.trim().toLowerCase();
@@ -108,7 +98,7 @@ export function GamesGrid({
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                       {typeLabel(p)}
                     </span>
-                    {(p.tech.length ? p.tech : derivedTags[p.id]?.tech ?? []).map((t) => (
+                    {p.tech.map((t) => (
                       <span
                         key={`tech-${t}`}
                         className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
@@ -116,7 +106,7 @@ export function GamesGrid({
                         {t}
                       </span>
                     ))}
-                    {(p.genres.length ? p.genres : derivedTags[p.id]?.genres ?? []).map((g) => (
+                    {p.genres.map((g) => (
                       <span
                         key={`genre-${g}`}
                         className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
@@ -127,7 +117,7 @@ export function GamesGrid({
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {(() => {
-                      const when = timeAgo(repoUpdated[p.id] ?? "");
+                      const when = timeAgo(p.github_pushed_at ?? "");
                       return when ? `Updated ${when}` : p.repo_url ? "—" : "No repo linked";
                     })()}
                   </p>

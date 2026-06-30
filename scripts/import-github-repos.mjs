@@ -46,6 +46,43 @@ function inferKind(repo) {
   return "app";
 }
 
+// Topic → clean Tech / Genre labels (kept in sync with lib/github/repo-info.ts).
+const TECH_TOPIC = {
+  threejs: "Three.js", "three-js": "Three.js", three: "Three.js",
+  "react-three-fiber": "React Three Fiber", r3f: "React Three Fiber",
+  react: "React", nextjs: "Next.js", "next-js": "Next.js", next: "Next.js",
+  typescript: "TypeScript", javascript: "JavaScript", roblox: "Roblox",
+  "roblox-studio": "Roblox", luau: "Luau", lua: "Lua", webgl: "WebGL",
+  vite: "Vite", supabase: "Supabase", nodejs: "Node.js", node: "Node.js",
+  python: "Python", tailwind: "Tailwind", tailwindcss: "Tailwind",
+  godot: "Godot", unity: "Unity", svelte: "Svelte", vue: "Vue",
+  postgres: "Postgres", postgresql: "Postgres", colyseus: "Colyseus",
+};
+const GENRE_TOPIC = {
+  mmo: "MMO", mmorpg: "MMORPG", rpg: "RPG", fps: "FPS", adventure: "Adventure",
+  puzzle: "Puzzle", platformer: "Platformer", strategy: "Strategy",
+  roguelike: "Roguelike", simulation: "Simulation", sandbox: "Sandbox",
+  social: "Social", multiplayer: "Multiplayer", finance: "Finance",
+  fintech: "Finance", health: "Health", healthcare: "Health",
+  education: "Education", visualizer: "Visualizer", visualization: "Visualizer",
+  dataviz: "Visualizer", "data-visualization": "Visualizer",
+  productivity: "Productivity", hockey: "Sports", sports: "Sports",
+};
+function deriveTags(repo) {
+  const tech = [];
+  const genres = [];
+  const add = (l, v) => {
+    if (v && !l.includes(v)) l.push(v);
+  };
+  if (repo.language) add(tech, repo.language);
+  for (const t of repo.topics ?? []) {
+    const k = t.toLowerCase();
+    if (GENRE_TOPIC[k]) add(genres, GENRE_TOPIC[k]);
+    else if (TECH_TOPIC[k]) add(tech, TECH_TOPIC[k]);
+  }
+  return { tech, genres };
+}
+
 async function fetchAllRepos() {
   const out = [];
   for (let page = 1; page <= 20; page++) {
@@ -101,15 +138,20 @@ if (dry) {
   process.exit(0);
 }
 
-// Enrich existing projects (fill blanks only) — always safe.
+// Enrich existing projects: always refresh the GitHub last-update; fill repo/desc/url/tags
+// only when empty (never overwrite your values).
 for (const { match, repo } of enrichTasks) {
+  const { tech, genres } = deriveTags(repo);
   await c.query(
     `update projects set
        repo_url = coalesce(repo_url, $1),
        description = coalesce(nullif(description, ''), $2),
-       url = coalesce(nullif(url, ''), $3)
-     where id = $4`,
-    [repo.html_url, repo.description || null, repo.homepage || null, match.id],
+       url = coalesce(nullif(url, ''), $3),
+       github_pushed_at = $4,
+       tech = case when coalesce(array_length(tech, 1), 0) = 0 then $5::text[] else tech end,
+       genres = case when coalesce(array_length(genres, 1), 0) = 0 then $6::text[] else genres end
+     where id = $7`,
+    [repo.html_url, repo.description || null, repo.homepage || null, repo.pushed_at || null, tech, genres, match.id],
   );
   console.log(`enriched   ${match.slug}`);
 }
@@ -146,10 +188,11 @@ if (addCandidates.length === 0) {
 }
 
 for (const { slug, repo } of chosen) {
+  const { tech, genres } = deriveTags(repo);
   await c.query(
-    `insert into projects (slug, name, kind, status, repo_url, url, description)
-     values ($1,$2,$3,'prototype',$4,$5,$6) on conflict (slug) do nothing`,
-    [slug, titleCase(repo.name), inferKind(repo), repo.html_url, repo.homepage || null, repo.description || null],
+    `insert into projects (slug, name, kind, status, repo_url, url, description, tech, genres, github_pushed_at)
+     values ($1,$2,$3,'prototype',$4,$5,$6,$7,$8,$9) on conflict (slug) do nothing`,
+    [slug, titleCase(repo.name), inferKind(repo), repo.html_url, repo.homepage || null, repo.description || null, tech, genres, repo.pushed_at || null],
   );
   console.log(`added      ${titleCase(repo.name)}`);
 }
