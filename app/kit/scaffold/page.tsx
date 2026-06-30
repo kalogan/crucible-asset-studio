@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SYSTEMS, type KitSystem, type Tier } from "@/lib/kit/catalog";
+import { SYSTEMS, SYSTEM_DESCRIPTIONS, type KitSystem, type Tier } from "@/lib/kit/catalog";
 import { Scaffolder, type ScaffoldSystem } from "@/components/kit/Scaffolder";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,12 @@ function builtByTier(): ScaffoldSystem[] {
     const tb = TIER_ORDER.indexOf(b.tier);
     if (ta !== tb) return ta - tb;
     return a.name.localeCompare(b.name);
-  }).map((s) => ({ id: s.id, name: s.name, tier: s.tier }));
+  }).map((s) => ({
+    id: s.id,
+    name: s.name,
+    tier: s.tier,
+    description: SYSTEM_DESCRIPTIONS[s.id] ?? "",
+  }));
 }
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;

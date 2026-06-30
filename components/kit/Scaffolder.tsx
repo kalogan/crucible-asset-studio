@@ -15,7 +15,7 @@ import {
 } from "@/lib/scaffold/generate";
 import type { Tier } from "@/lib/kit/catalog";
 
-export type ScaffoldSystem = { id: string; name: string; tier: Tier };
+export type ScaffoldSystem = { id: string; name: string; tier: Tier; description: string };
 
 const TIER_LABELS: Record<Tier, string> = {
   atom: "Atoms",
@@ -247,15 +247,19 @@ export function Scaffolder({
                       return (
                         <label
                           key={sys.id}
-                          className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
+                          title={sys.description}
+                          className="grid cursor-help grid-cols-[auto_1fr] items-start gap-x-2 gap-y-0.5 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground transition-colors hover:border-primary/50"
                         >
                           <input
                             type="checkbox"
                             checked={checked}
                             onChange={() => toggle(sys.id)}
-                            className="h-4 w-4 accent-primary"
+                            className="row-span-2 mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
                           />
-                          {sys.name}
+                          <span className="font-medium">{sys.name}</span>
+                          <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">
+                            {sys.description}
+                          </span>
                         </label>
                       );
                     })}

@@ -69,6 +69,33 @@ export const SYSTEMS: readonly KitSystem[] = [
   { id: "npc-behavior", name: "NPC Behavior", tier: "system", status: "built", module: "behavior" },
 ] as const;
 
+/** One-line explainer per system (shown on hover in the scaffolder). */
+export const SYSTEM_DESCRIPTIONS: Record<string, string> = {
+  prng: "Seeded PRNG (mulberry32) — deterministic, reproducible randomness from a seed.",
+  settings: "Versioned settings store with migrations + persistence.",
+  "scene-state": "A scene/screen state machine (menu → playing → paused).",
+  lighting: "Three-point + image-based lighting rig presets, distilled from shipped games.",
+  postfx: "Post-processing pipeline (bloom) with sane, tone-mapped defaults.",
+  audio: "Audio manager — buses, master/category volumes, effective-gain clamping.",
+  hud: "HUD layer registry for stacking overlay UI.",
+  anim: "Procedural animator — drive transforms/values over time.",
+  geo: "Low-poly geometry helpers (hard flat normals, deterministic vertex jitter).",
+  palette: "Named colour palette + flat / emissive material factories.",
+  artkit: "Art-kit registry — id → (rng) → Object3D, the data-driven render seam.",
+  input: "Input map with rebinding + conflict-swap.",
+  save: "Save store with a stable content hash (fnv1a).",
+  math: "Math utilities — clamp, lerp, frame-rate-independent damp, vec3.",
+  "render-bootstrap": "WebGL renderer + scene + fixed-timestep loop with shipped-game defaults.",
+  "camera-rigs": "Camera controllers — orbit-follow, chase, first-person.",
+  netcode: "Transport-agnostic netcode seam (local loopback room now; Colyseus adapter later).",
+  "fx-particles": "Pooled particle system (free-list, zero per-frame allocation).",
+  "skeletal-anim": "Skeletal / glTF clip player + procedural-clip baking.",
+  "deploy-presets": "Deploy config presets (Vite base, Fly.io, Vercel, Dockerfile).",
+  "npc-reasoning": "Server-side NPC brain — firewalled LLM reasoning + memory (Grok/Claude).",
+  nav: "Grid + A* pathfinding behind a Pathfinder seam.",
+  "npc-behavior": "Deterministic NPC behaviour (wander/patrol) + follow steering + utility-AI.",
+};
+
 /**
  * ADOPTION[systemId][gameId] — the audit matrix.
  * Rows follow column order PM, WT, SB, CV, DD.
