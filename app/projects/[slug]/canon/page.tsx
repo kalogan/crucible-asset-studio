@@ -18,7 +18,7 @@ export default async function CanonPage() {
   const trainingImages = active && canon ? await listTrainingImages(active.slug) : [];
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-8 px-6 py-12 lg:max-w-4xl xl:max-w-5xl">
+    <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-8 px-6 py-12 lg:max-w-5xl xl:max-w-6xl min-[1440px]:max-w-7xl">
       <header className="flex flex-col gap-2">
         <Link
           href="/"

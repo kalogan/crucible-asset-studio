@@ -2,7 +2,8 @@ export type NavItem = { href: string; label: string };
 
 // Global studio tools only. Per-game asset-gen tabs live in the project WorkspaceNav.
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Dashboard" },
+  { href: "/", label: "Home" },
+  { href: "/creations", label: "Creations" },
   { href: "/assets", label: "Library" },
   { href: "/editor", label: "Editor" },
   { href: "/biome", label: "Biome" },
