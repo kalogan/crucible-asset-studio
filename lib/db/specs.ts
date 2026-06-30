@@ -29,6 +29,26 @@ export async function getAssetSpec(id: string): Promise<AssetSpec | null> {
   return data ? AssetSpec.parse(data) : null;
 }
 
+export interface SpecListItem {
+  id: string;
+  title: string;
+  prompt: string;
+  created_at: string;
+}
+
+/** Lean spec list (id/title/prompt, newest first) — the batch producer's pick list. */
+export async function listSpecsByProject(projectId: string): Promise<SpecListItem[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("asset_specs")
+    .select("id,title,prompt,created_at")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) throw new Error(`listSpecsByProject: ${error.message}`);
+  return (data ?? []) as SpecListItem[];
+}
+
 export interface SpecWithAsset {
   id: string;
   title: string;

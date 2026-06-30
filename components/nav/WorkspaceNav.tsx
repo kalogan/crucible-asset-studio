@@ -12,6 +12,7 @@ const GAME_TABS = [
   { seg: "/canon", label: "Canon" },
   { seg: "/library", label: "Library" },
   { seg: "/prompts", label: "Prompts" },
+  { seg: "/batch", label: "Batches" },
 ];
 const APP_TABS = [{ seg: "", label: "Overview" }];
 
