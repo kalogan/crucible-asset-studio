@@ -10,6 +10,7 @@ type NavItem = { href: string; label: string };
 // a game — so you can never land on "Library" with no game selected.
 const ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard" },
+  { href: "/assets", label: "Library" },
   { href: "/editor", label: "Editor" },
   { href: "/biome", label: "Biome" },
   { href: "/systems", label: "Systems" },

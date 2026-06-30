@@ -53,3 +53,15 @@ export async function listReferenceAssetsByProject(
   if (error) throw new Error(`listReferenceAssetsByProject: ${error.message}`);
   return (data ?? []).map((r) => ReferenceAsset.parse(r));
 }
+
+/** All reference (procgen/imported) assets across every project — for the global library. */
+export async function listAllReferenceAssets(limit = 500): Promise<ReferenceAsset[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("reference_assets")
+    .select()
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`listAllReferenceAssets: ${error.message}`);
+  return (data ?? []).map((r) => ReferenceAsset.parse(r));
+}

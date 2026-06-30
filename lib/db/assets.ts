@@ -64,6 +64,18 @@ export async function listAssetsByProject(
   return (data ?? []).map((row) => Asset.parse(row));
 }
 
+/** All assets across every project (newest first, capped) — for the global library. */
+export async function listAllAssets(limit = 500): Promise<Asset[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("assets")
+    .select()
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`listAllAssets: ${error.message}`);
+  return (data ?? []).map((row) => Asset.parse(row));
+}
+
 /**
  * Count assets grouped by project, in one query (for the dashboard). Tolerant — returns an
  * empty map on error so the dashboard renders even if the assets table is unavailable.
