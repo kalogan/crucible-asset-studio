@@ -1,5 +1,31 @@
 import "server-only";
 
+/**
+ * The repo's last-activity timestamp (GitHub `pushed_at`) — when the repo was last
+ * updated upstream, NOT anything saved locally. Cached 30 min, best-effort (null on
+ * failure). GITHUB_TOKEN lifts rate limits.
+ */
+export async function fetchRepoPushedAt(owner: string, repo: string): Promise<string | null> {
+  const headers: Record<string, string> = {
+    accept: "application/vnd.github+json",
+    "user-agent": "crucible-asset-studio",
+    "x-github-api-version": "2022-11-28",
+  };
+  const token = process.env.GITHUB_TOKEN;
+  if (token) headers.authorization = `Bearer ${token}`;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+      headers,
+      next: { revalidate: 1800 },
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { pushed_at?: string };
+    return j.pushed_at ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export interface LatestCommit {
   /** First line of the latest commit message. */
   message: string;

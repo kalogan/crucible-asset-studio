@@ -58,6 +58,23 @@ export function ProjectOverviewForm({ project }: { project: Project }) {
         <Input id="repo_url" name="repo_url" defaultValue={project.repo_url ?? ""} placeholder="https://github.com/…" />
       </div>
 
+      <div className="flex flex-wrap gap-3">
+        <div className="flex flex-1 flex-col gap-1.5">
+          <Label htmlFor="type">Type</Label>
+          <Input id="type" name="type" defaultValue={project.type ?? ""} placeholder="Game / Web App / Tool" />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="tech">Tech (comma-separated)</Label>
+        <Input id="tech" name="tech" defaultValue={project.tech.join(", ")} placeholder="Three.js, React, Roblox…" />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="genres">Genres (comma-separated)</Label>
+        <Input id="genres" name="genres" defaultValue={project.genres.join(", ")} placeholder="MMO, Visualizer, Finance…" />
+      </div>
+
       <Button type="submit" disabled={pending} className="w-fit">
         {pending ? "Saving…" : "Save overview"}
       </Button>

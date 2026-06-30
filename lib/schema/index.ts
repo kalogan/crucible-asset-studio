@@ -58,6 +58,10 @@ export const Project = z.object({
   // non-destructive hero focal point (0..1); the card/hero frame around it.
   screenshot_focal_x: z.number().catch(0.5),
   screenshot_focal_y: z.number().catch(0.5),
+  // display tags (dashboard cards): a granular type label + tech + genre lists.
+  type: z.string().nullable().catch(null),
+  tech: z.array(z.string()).catch([]),
+  genres: z.array(z.string()).catch([]),
   // generation face
   context_ref: z.string().nullable(),
   cdn_endpoint: z.string().nullable(),
@@ -90,6 +94,9 @@ export const ProjectUpdate = z.object({
   screenshot: z.string().nullable().optional(),
   screenshot_focal_x: z.number().optional(),
   screenshot_focal_y: z.number().optional(),
+  type: z.string().nullable().optional(),
+  tech: z.array(z.string()).optional(),
+  genres: z.array(z.string()).optional(),
 });
 export type ProjectUpdate = z.infer<typeof ProjectUpdate>;
 

@@ -3,19 +3,24 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Project } from "@/lib/schema";
-import type { LatestCommit } from "@/lib/github/commits";
 import { timeAgo } from "@/lib/util/time";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 type KindFilter = "all" | "game" | "app";
 
+/** Default Type label when the project has no explicit `type` set. */
+function typeLabel(p: Project): string {
+  return p.type?.trim() || (p.kind === "app" ? "Web App" : "Game");
+}
+
 export function GamesGrid({
   projects,
-  commits = {},
+  repoUpdated = {},
 }: {
   projects: Project[];
-  commits?: Record<string, LatestCommit>;
+  /** projectId → GitHub repo pushed_at (ISO). */
+  repoUpdated?: Record<string, string>;
 }) {
   const [q, setQ] = useState("");
   const [kind, setKind] = useState<KindFilter>("all");
@@ -91,21 +96,36 @@ export function GamesGrid({
                       No screenshot
                     </div>
                   )}
-                  <span className="absolute left-2 top-2 rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground backdrop-blur">
-                    {p.kind}
-                  </span>
                 </div>
-                <div className="flex flex-col gap-1 p-4">
+                <div className="flex flex-col gap-2 p-4">
                   <h2 className="font-serif text-lg font-semibold text-foreground group-hover:text-primary">
                     {p.name}
                   </h2>
-                  <p className="line-clamp-1 text-sm text-muted-foreground">
-                    {commits[p.id]?.message ?? (p.repo_url ? "—" : "No repo linked")}
-                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                      {typeLabel(p)}
+                    </span>
+                    {p.tech.map((t) => (
+                      <span
+                        key={`tech-${t}`}
+                        className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                    {p.genres.map((g) => (
+                      <span
+                        key={`genre-${g}`}
+                        className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                      >
+                        {g}
+                      </span>
+                    ))}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {(() => {
-                      const when = timeAgo(commits[p.id]?.date ?? p.updated_at);
-                      return when ? `Updated ${when}` : "—";
+                      const when = timeAgo(repoUpdated[p.id] ?? "");
+                      return when ? `Updated ${when}` : p.repo_url ? "—" : "No repo linked";
                     })()}
                   </p>
                 </div>

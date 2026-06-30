@@ -133,6 +133,11 @@ export async function updateProjectAction(
     return v.length > 0 ? v : null;
   };
   const statusParsed = ProjectStatus.safeParse(String(formData.get("status") ?? ""));
+  const csv = (k: string): string[] =>
+    String(formData.get(k) ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   try {
     // NOTE: `screenshot` is intentionally NOT written here — it's owned by the screenshot
     // picker (uploadScreenshotAction / setScreenshotUrlAction). Saving the Overview must
@@ -141,6 +146,9 @@ export async function updateProjectAction(
       description: orNull("description"),
       url: orNull("url"),
       repo_url: orNull("repo_url"),
+      type: orNull("type"),
+      tech: csv("tech"),
+      genres: csv("genres"),
       ...(statusParsed.success ? { status: statusParsed.data } : {}),
     });
     revalidatePath("/");
