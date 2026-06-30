@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { DEFAULT_WORLD, type WorldDescriptor } from "game-kit";
 import { Button } from "@/components/ui/button";
@@ -105,8 +105,19 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+type Mode = "tune" | "place";
+type PlaceTool = "prop" | "landmark" | "spawn" | "trail";
+const LANDMARKS = ["village-longhouse"] as const;
+
 export function BiomeEditor() {
-  const [descriptor, setDescriptor] = useState<WorldDescriptor>(() => deepClone(DEFAULT_WORLD));
+  const [descriptor, setDescriptor] = useState<WorldDescriptor>(() => ({
+    ...deepClone(DEFAULT_WORLD),
+    placements: [],
+    trail: [],
+  }));
+  const [mode, setMode] = useState<Mode>("tune");
+  const [tool, setTool] = useState<PlaceTool>("prop");
+  const [placeId, setPlaceId] = useState<string>("conifer-tree");
   const [variantNames, setVariantNames] = useState<string[]>([]);
   const [variantName, setVariantName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -197,7 +208,38 @@ export function BiomeEditor() {
     }
   }, []);
 
-  const view = useMemo(() => <WorldView descriptor={descriptor} />, [descriptor]);
+  // Place tab: click the terrain to drop a placement or extend the trail.
+  const onPlace = useCallback(
+    (point: [number, number]) => {
+      const [x, z] = point;
+      setDescriptor((d) => {
+        if (tool === "trail") {
+          return { ...d, trail: [...(d.trail ?? []), [x, z] as [number, number]] };
+        }
+        const placement = {
+          kind: tool,
+          id: tool === "spawn" ? "" : placeId,
+          x,
+          z,
+        };
+        return { ...d, placements: [...(d.placements ?? []), placement] };
+      });
+    },
+    [tool, placeId],
+  );
+
+  const undoPlacement = useCallback(() => {
+    setDescriptor((d) => ({ ...d, placements: (d.placements ?? []).slice(0, -1) }));
+  }, []);
+  const clearPlacements = useCallback(() => {
+    setDescriptor((d) => ({ ...d, placements: [] }));
+  }, []);
+  const clearTrail = useCallback(() => {
+    setDescriptor((d) => ({ ...d, trail: [] }));
+  }, []);
+
+  const placementCount = descriptor.placements?.length ?? 0;
+  const trailCount = descriptor.trail?.length ?? 0;
 
   return (
     <div className="flex min-h-[70vh] flex-col gap-4 lg:h-[78vh] lg:flex-row">
@@ -210,7 +252,74 @@ export function BiomeEditor() {
           </Button>
         </div>
 
-        <Section title="Terrain">
+        <div className="flex gap-1 rounded-md border border-border p-1">
+          {(["tune", "place"] as Mode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+              }`}
+            >
+              {m === "tune" ? "Tune knobs" : "Place"}
+            </button>
+          ))}
+        </div>
+
+        {mode === "place" && (
+          <Section title="Place">
+            <div className="grid grid-cols-4 gap-1">
+              {(["prop", "landmark", "spawn", "trail"] as PlaceTool[]).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTool(t)}
+                  className={`rounded border px-1.5 py-1 text-xs capitalize ${
+                    tool === t ? "border-primary text-primary" : "border-border text-muted-foreground"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            {(tool === "prop" || tool === "landmark") && (
+              <select
+                value={placeId}
+                onChange={(e) => setPlaceId(e.target.value)}
+                className="rounded border border-border bg-background px-2 py-1 text-xs"
+              >
+                {(tool === "prop" ? KNOWN_PROPS : LANDMARKS).map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <p className="text-xs text-muted-foreground">
+              Click the terrain to {tool === "trail" ? "extend the trail" : `place a ${tool}`}.
+              Drag to orbit. {placementCount} placed · {trailCount} trail points.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={undoPlacement}>
+                Undo placement
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={clearPlacements}>
+                Clear placed
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={clearTrail}>
+                Clear trail
+              </Button>
+            </div>
+          </Section>
+        )}
+
+        {mode === "tune" && (
+          <>
+            <Section title="Terrain">
           {TERRAIN_KNOBS.map((k) => (
             <SliderRow
               key={k.key}
@@ -286,6 +395,9 @@ export function BiomeEditor() {
           />
         </Section>
 
+          </>
+        )}
+
         <Section title="Variants (localStorage)">
           <div className="flex gap-2">
             <Input
@@ -336,7 +448,7 @@ export function BiomeEditor() {
 
       {/* Live world */}
       <div className="min-h-[50vh] flex-1 overflow-hidden rounded-lg border border-border bg-black/40">
-        {view}
+        <WorldView descriptor={descriptor} onPlace={mode === "place" ? onPlace : undefined} />
       </div>
     </div>
   );

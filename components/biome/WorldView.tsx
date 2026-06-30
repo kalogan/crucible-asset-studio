@@ -23,7 +23,13 @@ function SceneEnv({ env }: { env: WorldDescriptor["environment"] }) {
 }
 
 /** Rebuild the world group when the descriptor changes; dispose the previous one. */
-function World({ descriptor }: { descriptor: WorldDescriptor }) {
+function World({
+  descriptor,
+  onPlace,
+}: {
+  descriptor: WorldDescriptor;
+  onPlace?: (point: [number, number]) => void;
+}) {
   const group = useMemo(() => buildWorld(descriptor), [descriptor]);
   useEffect(() => {
     return () => {
@@ -36,10 +42,28 @@ function World({ descriptor }: { descriptor: WorldDescriptor }) {
       });
     };
   }, [group]);
-  return <primitive object={group} />;
+  return (
+    <primitive
+      object={group}
+      onClick={
+        onPlace
+          ? (e: { stopPropagation: () => void; point: THREE.Vector3 }) => {
+              e.stopPropagation();
+              onPlace([e.point.x, e.point.z]);
+            }
+          : undefined
+      }
+    />
+  );
 }
 
-export function WorldView({ descriptor }: { descriptor: WorldDescriptor }) {
+export function WorldView({
+  descriptor,
+  onPlace,
+}: {
+  descriptor: WorldDescriptor;
+  onPlace?: (point: [number, number]) => void;
+}) {
   const env = descriptor.environment;
   const ambient = new THREE.Color(env.ambientTint);
   const zone = descriptor.terrain.zoneSize;
@@ -54,8 +78,8 @@ export function WorldView({ descriptor }: { descriptor: WorldDescriptor }) {
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
       />
-      <World descriptor={descriptor} />
-      <OrbitControls target={[0, 0, 0]} enableDamping />
+      <World descriptor={descriptor} onPlace={onPlace} />
+      <OrbitControls target={[0, 0, 0]} enableDamping makeDefault />
     </Canvas>
   );
 }
