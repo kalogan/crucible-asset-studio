@@ -63,3 +63,22 @@ export async function listAssetsByProject(
   if (error) throw new Error(`listAssetsByProject: ${error.message}`);
   return (data ?? []).map((row) => Asset.parse(row));
 }
+
+/**
+ * Count assets grouped by project, in one query (for the dashboard). Tolerant — returns an
+ * empty map on error so the dashboard renders even if the assets table is unavailable.
+ */
+export async function assetCountsByProject(): Promise<Record<string, number>> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.from("assets").select("project_id");
+  if (error) {
+    console.warn("assetCountsByProject failed:", error.message);
+    return {};
+  }
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const pid = (row as { project_id?: string }).project_id;
+    if (typeof pid === "string") counts[pid] = (counts[pid] ?? 0) + 1;
+  }
+  return counts;
+}

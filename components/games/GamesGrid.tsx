@@ -6,7 +6,13 @@ import type { Project } from "@/lib/schema";
 import { statusBadgeClass } from "@/lib/projects/status";
 import { Input } from "@/components/ui/input";
 
-export function GamesGrid({ projects }: { projects: Project[] }) {
+export function GamesGrid({
+  projects,
+  assetCounts = {},
+}: {
+  projects: Project[];
+  assetCounts?: Record<string, number>;
+}) {
   const [q, setQ] = useState("");
   const query = q.trim().toLowerCase();
   const filtered = query
@@ -76,6 +82,9 @@ export function GamesGrid({ projects }: { projects: Project[] }) {
                   {p.description && (
                     <p className="line-clamp-2 text-sm text-muted-foreground">{p.description}</p>
                   )}
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {assetCounts[p.id] ?? 0} asset{(assetCounts[p.id] ?? 0) === 1 ? "" : "s"}
+                  </span>
                 </div>
               </Link>
               {p.url && (

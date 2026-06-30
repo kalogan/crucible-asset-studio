@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/config";
 import { listProjects } from "@/lib/db/projects";
+import { assetCountsByProject } from "@/lib/db/assets";
 import { GamesGrid } from "@/components/games/GamesGrid";
+import { StatRow, computeStats } from "@/components/games/StatRow";
 import { Button } from "@/components/ui/button";
 
 // Games gallery — the front door. Reads the PORTFOLIO face only.
@@ -28,15 +30,18 @@ export default async function HomePage() {
   // Never let a transient DB/parse error take down the front door — degrade to an
   // empty gallery (the SetupNotice covers the not-configured case).
   let projects: Awaited<ReturnType<typeof listProjects>> = [];
+  let assetCounts: Record<string, number> = {};
   let loadFailed = false;
   if (configured) {
     try {
       projects = await listProjects();
+      assetCounts = await assetCountsByProject();
     } catch (err) {
       loadFailed = true;
       console.error("HomePage: listProjects failed:", err);
     }
   }
+  const stats = computeStats(projects, assetCounts);
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-8 px-6 py-12 lg:max-w-5xl xl:max-w-6xl min-[1440px]:max-w-7xl">
@@ -51,7 +56,7 @@ export default async function HomePage() {
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Every game is a project — see them all here, then generate assets for each.
+          Your studio at a glance — the numbers up top, the games below.
         </p>
       </header>
 
@@ -65,7 +70,10 @@ export default async function HomePage() {
           Couldn&apos;t load games right now. Check the database connection and refresh.
         </section>
       ) : (
-        <GamesGrid projects={projects} />
+        <>
+          <StatRow stats={stats} />
+          <GamesGrid projects={projects} assetCounts={assetCounts} />
+        </>
       )}
     </main>
   );
