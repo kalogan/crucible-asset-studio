@@ -13,12 +13,23 @@ if (!token) {
   console.error("Set GITHUB_TOKEN (a PAT with repo read) in .env.local first.");
   process.exit(1);
 }
-const headers = {
-  authorization: `Bearer ${token}`,
+const base = {
   accept: "application/vnd.github+json",
   "user-agent": "crucible-asset-studio",
   "x-github-api-version": "2022-11-28",
 };
+const headers = { ...base, authorization: `Bearer ${token}` };
+
+// Try authenticated (reaches your private repos), then fall back to unauthenticated for
+// PUBLIC repos the token can't use (e.g. a different account's repo → 401 with your token).
+async function ghRepo(owner, repo) {
+  let res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
+  if (!res.ok && [401, 403, 404].includes(res.status)) {
+    const pub = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: base });
+    if (pub.ok) return pub;
+  }
+  return res;
+}
 
 const TECH_TOPIC = {
   threejs: "Three.js", "three-js": "Three.js", three: "Three.js",
@@ -71,9 +82,15 @@ for (const p of rows) {
     failed++;
     continue;
   }
-  const res = await fetch(`https://api.github.com/repos/${m[1]}/${m[2]}`, { headers });
+  const res = await ghRepo(m[1], m[2]);
   if (!res.ok) {
-    console.log(`skip   ${p.slug} (HTTP ${res.status} — ${m[1]}/${m[2]})`);
+    const hint =
+      res.status === 404
+        ? "private + token has no access — widen the token to ALL repos"
+        : res.status === 401
+          ? "bad credentials for this owner"
+          : "";
+    console.log(`skip   ${p.slug.padEnd(28)} HTTP ${res.status} ${m[1]}/${m[2]} ${hint && `(${hint})`}`);
     failed++;
     continue;
   }
