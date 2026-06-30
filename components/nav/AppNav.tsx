@@ -5,12 +5,11 @@ import { usePathname } from "next/navigation";
 
 type NavItem = { href: string; label: string };
 
+// Global studio tools only. The per-GAME asset-gen tabs (generate/review/canon/
+// library/prompts) live in the workspace sub-nav (WorkspaceNav), reached by opening
+// a game — so you can never land on "Library" with no game selected.
 const ITEMS: NavItem[] = [
-  { href: "/", label: "Home" },
-  { href: "/generate", label: "Generate" },
-  { href: "/review", label: "Review" },
-  { href: "/canon", label: "Canon" },
-  { href: "/library", label: "Library" },
+  { href: "/", label: "Dashboard" },
   { href: "/editor", label: "Editor" },
   { href: "/biome", label: "Biome" },
   { href: "/systems", label: "Systems" },
@@ -19,7 +18,6 @@ const ITEMS: NavItem[] = [
   { href: "/brief", label: "Brief" },
   { href: "/npc", label: "NPC" },
   { href: "/sample", label: "Sample" },
-  { href: "/prompts", label: "Prompts" },
 ];
 
 function isActive(pathname: string, href: string): boolean {
