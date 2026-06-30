@@ -345,10 +345,11 @@ preserve: the LLM never moves an NPC.** Movement is pure, seeded, deterministic;
 - **B2 — Deterministic behavior runtime** ✓ SHIPPED (game-kit `749b1ff`): `createNpcBehavior` — seeded
   deterministic walking over a `Pathfinder`; bounds wander/region/patrol (pick goal → route → walk →
   idle). Three-free; the LLM never drives it.
-- **B3 — Steering / follow** (from `tickCompanionFollow`): follow a moving target + arrive + separation —
-  powers companions and "walk beside the player" NPCs.
-- **B4 — Action / utility layer:** a small utility-AI (or tiny behavior tree) selecting among deterministic
-  actions (idle/wander/patrol/goToStation/interact/flee). This is the "actions" ask.
+- **B3 — Steering / follow** ✓ SHIPPED (game-kit `439950d`): `createFollower` — reactive steering toward a
+  moving target (arrive + peer separation), distilled from `tickCompanionFollow`. Compose with a Pathfinder
+  for obstacle routing.
+- **B4 — Action / utility layer** ✓ SHIPPED (game-kit `439950d`): `createUtilitySelector` — deterministic
+  score-and-pick over game-defined actions (stable tie-break + optional stickiness). The "actions" ask.
 - **B5 — Reasoning↔behavior bridge (the careful boundary widening):** OPTIONALLY let the brain *suggest* a
   high-level goal via a NEW bounded intent (`goTo`/`emote`/`setGoal`) added to the firewall as an explicit,
   reviewed widening. The deterministic layer validates + plans + executes; the LLM still never sets a
@@ -356,6 +357,23 @@ preserve: the LLM never moves an NPC.** Movement is pure, seeded, deterministic;
 
 Sequencing: A1→A2→A3 and B1→B2→B3 are independent and parallelizable; B5 is gated behind a firewall-widening
 review. Relates to [[project-game-kit-frontier]].
+
+**SHIPPED so far:** A1·A2·A3 + B1·B2·B3·B4 all landed (game-kit `7a52cf2`·`749b1ff`·`439950d`). Remaining:
+the real local-MODEL embedder (transformers.js — dep call still open), and the GATED **B5** reasoning→behavior
+bridge (firewall-widening `goTo`/`emote` intent — stop-and-confirm before building).
+
+### Roadmap — game-kit "make a real game" gaps + design-brief generator (added 2026-06-29)
+The kit now has 25 systems (incl. nav/behavior/npc). To stand up a SAMPLE GAME end-to-end, the gaps are:
+- **A composition/glue layer** — the kit ships seams; a sample needs a thin "wire render+input+camera+
+  behavior+nav into a loop" example. The scaffolder's procgen-world template is the seed; extend it.
+- **Collision/physics-lite** (movement vs. world), an **entity/ECS-lite** registry, **assets/loading**
+  (GLB via the existing viewer), and a **game-state/objective** loop — none are in the kit yet.
+- **Design-brief generator (NEW, recommended):** a kit/Crucible piece that calls **Anthropic** with an
+  Architect persona (grill → disjoint slices → design brief) → a structured brief that FEEDS the scaffolder
+  (brief → systems to pick → starter). This is the upstream of the scaffolder: idea → brief → code. It
+  reuses the provider-seam idea from `npc` but with a real Anthropic adapter (Messages API; default a current
+  Claude model). "A scaffold for the design brief that behaves as the Architect." Pairs with the LoRA/canon
+  brief work already in the repo.
 
 ### Later phases
 - **Phase 3 — bulk + finish + publish:** resumable, cost-capped **batch worker** (sync gen is
@@ -388,6 +406,18 @@ review. Relates to [[project-game-kit-frontier]].
 - **LoRA Stage 1**: training-set assembly — upload/list/remove turntable renders per project at
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
+
+### Shipped 2026-06-29 (NPC memory v2 + behavior + deploy fix)
+- **game-kit NPC expansion** — full Track A (memory) + Track B (behavior) minus the two gated items:
+  A1 durable KV store, A2 summarization, A3 embeddings/semantic recall; B1 nav/A*, B2 behavior runtime,
+  B3 follow/steering, B4 utility-AI. game-kit at **256 tests**; commits `7a52cf2`·`749b1ff`·`439950d`.
+  `/kit` shows **25 built systems** (added npc-reasoning, nav, npc-behavior).
+- **Deploy fix** (Crucible `a664286`): raised Server Action `bodySizeLimit` to 12mb (full-res screenshot
+  uploads were blowing the 1MB default → server-side exception); `listProjects` now safeParses + skips a
+  malformed row instead of 500ing the gallery; HomePage try/catches the load. NOTE: the prod root error is
+  most likely a **Vercel Supabase env var** (local SSR is green) — verify env + redeploy.
+- **Open:** transformers.js local-model embedder (dep call), B5 reasoning→behavior bridge (gated), and the
+  **design-brief generator** (Anthropic-backed Architect → brief → scaffolder) — see the roadmap above.
 
 ### Shipped 2026-06-29 (scaffolder v2 — templates: multiplayer + procgen-world)
 - **Scaffolder v2** (`lib/scaffold/generate.ts`, `/kit/scaffold`) — the picker now sits under a **template**
