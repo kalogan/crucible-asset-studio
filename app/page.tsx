@@ -2,6 +2,8 @@ import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/config";
 import { listProjects } from "@/lib/db/projects";
 import { assetCountsByProject } from "@/lib/db/assets";
+import { parseRepoUrl } from "@/lib/github/repo";
+import { fetchLatestCommit, type LatestCommit } from "@/lib/github/commits";
 import { GamesGrid } from "@/components/games/GamesGrid";
 import { StatRow, computeStats } from "@/components/games/StatRow";
 import { Button } from "@/components/ui/button";
@@ -31,11 +33,22 @@ export default async function HomePage() {
   // empty gallery (the SetupNotice covers the not-configured case).
   let projects: Awaited<ReturnType<typeof listProjects>> = [];
   let assetCounts: Record<string, number> = {};
+  let commits: Record<string, LatestCommit> = {};
   let loadFailed = false;
   if (configured) {
     try {
       projects = await listProjects();
       assetCounts = await assetCountsByProject();
+      // Latest commit per repo (cached 30 min, parallel, best-effort).
+      const entries = await Promise.all(
+        projects.map(async (p): Promise<[string, LatestCommit] | null> => {
+          const ref = p.repo_url ? parseRepoUrl(p.repo_url) : null;
+          if (!ref) return null;
+          const c = await fetchLatestCommit(ref.owner, ref.repo);
+          return c ? [p.id, c] : null;
+        }),
+      );
+      commits = Object.fromEntries(entries.filter((e): e is [string, LatestCommit] => e !== null));
     } catch (err) {
       loadFailed = true;
       console.error("HomePage: listProjects failed:", err);
@@ -72,7 +85,7 @@ export default async function HomePage() {
       ) : (
         <>
           <StatRow stats={stats} />
-          <GamesGrid projects={projects} assetCounts={assetCounts} />
+          <GamesGrid projects={projects} commits={commits} />
         </>
       )}
     </main>

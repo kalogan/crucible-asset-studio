@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Fraunces } from "next/font/google";
 import "./globals.css";
 import { AppNav } from "@/components/nav/AppNav";
+import { AppSidebar } from "@/components/nav/AppSidebar";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-serif", display: "swap" });
@@ -26,8 +27,13 @@ export default function RootLayout({
         <a href="#main-content" className="skip-link">
           Skip to content
         </a>
-        <AppNav />
-        <div id="main-content">{children}</div>
+        <div className="flex min-h-dvh">
+          <AppSidebar />
+          <div id="main-content" className="flex min-w-0 flex-1 flex-col">
+            <AppNav />
+            {children}
+          </div>
+        </div>
       </body>
     </html>
   );

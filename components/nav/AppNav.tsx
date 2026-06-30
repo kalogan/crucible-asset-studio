@@ -2,29 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-type NavItem = { href: string; label: string };
-
-// Global studio tools only. The per-GAME asset-gen tabs (generate/review/canon/
-// library/prompts) live in the workspace sub-nav (WorkspaceNav), reached by opening
-// a game — so you can never land on "Library" with no game selected.
-const ITEMS: NavItem[] = [
-  { href: "/", label: "Dashboard" },
-  { href: "/assets", label: "Library" },
-  { href: "/editor", label: "Editor" },
-  { href: "/biome", label: "Biome" },
-  { href: "/systems", label: "Systems" },
-  { href: "/roblox", label: "Roblox" },
-  { href: "/kit", label: "Kit" },
-  { href: "/brief", label: "Brief" },
-  { href: "/npc", label: "NPC" },
-  { href: "/sample", label: "Sample" },
-];
-
-function isActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
+import { NAV_ITEMS, isNavActive } from "@/lib/nav-items";
 
 const linkBase =
   "inline-flex min-h-11 items-center whitespace-nowrap border-b-2 px-3 text-sm font-medium " +
@@ -34,24 +12,25 @@ const linkActive = "border-primary text-primary";
 const linkInactive =
   "border-transparent text-muted-foreground hover:text-foreground hover:border-border";
 
+/** Mobile top bar (md:hidden). On desktop the AppSidebar is shown instead. */
 export function AppNav() {
   const pathname = usePathname();
 
   return (
     <nav
       aria-label="Primary"
-      className="border-b border-border bg-background/95 backdrop-blur"
+      className="border-b border-border bg-background/95 backdrop-blur md:hidden"
     >
-      <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 xl:max-w-6xl min-[1440px]:max-w-7xl">
+      <div className="flex items-center gap-2 px-4">
         <Link
           href="/"
-          className="mr-1 inline-flex min-h-11 items-center font-serif text-base font-semibold tracking-wide text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="mr-1 inline-flex min-h-11 items-center font-serif text-base font-semibold tracking-wide text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Crucible
         </Link>
         <ul className="flex flex-1 items-center gap-1 overflow-x-auto">
-          {ITEMS.map((item) => {
-            const active = isActive(pathname, item.href);
+          {NAV_ITEMS.map((item) => {
+            const active = isNavActive(pathname, item.href);
             return (
               <li key={item.href}>
                 <Link

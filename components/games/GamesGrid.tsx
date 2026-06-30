@@ -3,17 +3,19 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Project } from "@/lib/schema";
-import { statusBadgeClass } from "@/lib/projects/status";
+import type { LatestCommit } from "@/lib/github/commits";
+import { timeAgo } from "@/lib/util/time";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 type KindFilter = "all" | "game" | "app";
 
 export function GamesGrid({
   projects,
-  assetCounts = {},
+  commits = {},
 }: {
   projects: Project[];
-  assetCounts?: Record<string, number>;
+  commits?: Record<string, LatestCommit>;
 }) {
   const [q, setQ] = useState("");
   const [kind, setKind] = useState<KindFilter>("all");
@@ -93,39 +95,34 @@ export function GamesGrid({
                     {p.kind}
                   </span>
                 </div>
-                <div className="flex flex-col gap-2 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <h2 className="font-serif text-lg font-semibold text-foreground group-hover:text-primary">
-                      {p.name}
-                    </h2>
-                    <span
-                      className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(p.status)}`}
-                    >
-                      {p.status}
-                    </span>
-                  </div>
-                  {p.description && (
-                    <p className="line-clamp-2 text-sm text-muted-foreground">{p.description}</p>
-                  )}
-                  {p.kind === "game" && (
-                    <span className="text-xs tabular-nums text-muted-foreground">
-                      {assetCounts[p.id] ?? 0} asset{(assetCounts[p.id] ?? 0) === 1 ? "" : "s"}
-                    </span>
-                  )}
+                <div className="flex flex-col gap-1 p-4">
+                  <h2 className="font-serif text-lg font-semibold text-foreground group-hover:text-primary">
+                    {p.name}
+                  </h2>
+                  <p className="line-clamp-1 text-sm text-muted-foreground">
+                    {commits[p.id]?.message ?? (p.repo_url ? "—" : "No repo linked")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {(() => {
+                      const when = timeAgo(commits[p.id]?.date ?? p.updated_at);
+                      return when ? `Updated ${when}` : "—";
+                    })()}
+                  </p>
                 </div>
               </Link>
-              {p.url && (
-                <div className="px-4 pb-4">
-                  <a
-                    href={p.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm text-primary underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    Play ↗
-                  </a>
-                </div>
-              )}
+              <div className="px-4 pb-4">
+                {p.url ? (
+                  <Button asChild className="w-full">
+                    <a href={p.url} target="_blank" rel="noreferrer">
+                      {p.kind === "app" ? "Open" : "Play"} ↗
+                    </a>
+                  </Button>
+                ) : (
+                  <Button variant="outline" disabled className="w-full">
+                    No live URL
+                  </Button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
