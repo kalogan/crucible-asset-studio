@@ -76,6 +76,27 @@ export function createHashingEmbedder(opts: HashingEmbedderOptions = {}): Embedd
   };
 }
 
+/**
+ * OPT-IN adapter point for a REAL embedding model (e.g. transformers.js all-MiniLM, or an
+ * embeddings API). Wrap any async `text → number[]` function as an `Embedder` so the game
+ * drops it into `createNpcBrain({ embedder })` exactly like the hashing default — same seam.
+ *
+ * ★ DEPENDENCY DECISION IS THE GAME'S. The kit ships ZERO model deps (the hashing embedder
+ * is lexical-only). Pulling a neural model (~25MB for all-MiniLM via transformers.js) is a
+ * deliberate, reviewed choice the game makes — never an implicit kit dependency. Example:
+ *
+ *   // game-owned, after `pnpm add @xenova/transformers`:
+ *   import { pipeline } from '@xenova/transformers';
+ *   const extract = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+ *   const embedder = createModelEmbedder(async (text) => {
+ *     const out = await extract(text, { pooling: 'mean', normalize: true });
+ *     return Array.from(out.data as Float32Array);
+ *   });
+ */
+export function createModelEmbedder(embed: (text: string) => Promise<number[]>): Embedder {
+  return { embed };
+}
+
 /** Cosine similarity of two vectors in [-1, 1] (0 if either is empty/zero). */
 export function cosineSimilarity(a: readonly number[], b: readonly number[]): number {
   const n = Math.min(a.length, b.length);

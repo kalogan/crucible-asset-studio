@@ -300,6 +300,72 @@ describe("generateScaffold — render bootstrap (real API)", () => {
   });
 });
 
+describe("generateScaffold — npc / nav / behavior wiring", () => {
+  it("wires nav (createGridNav) from the main game-kit entry (vanilla)", () => {
+    const main = fileMap(
+      generateScaffold({
+        name: "G",
+        target: "vanilla",
+        systemIds: ["render-bootstrap", "nav"],
+      }),
+    ).get("src/main.ts") as string;
+    expect(main).toContain('import { createGridNav, type Vec2 } from "game-kit"');
+    expect(main).toContain("createGridNav({");
+    expect(main).toContain("nav.findPath");
+  });
+
+  it("wires npc-behavior (createNpcBehavior + createRng) self-contained (vanilla)", () => {
+    const main = fileMap(
+      generateScaffold({
+        name: "G",
+        target: "vanilla",
+        systemIds: ["render-bootstrap", "npc-behavior"],
+      }),
+    ).get("src/main.ts") as string;
+    expect(main).toContain("createNpcBehavior");
+    // imports createRng itself so it works without the prng system selected.
+    expect(main).toContain("createRng");
+    expect(main).toContain('kind: "wander"');
+    expect(main).toContain("npc.tick(dt)");
+  });
+
+  it("npc-reasoning is server-side only — never imports game-kit/npc into the client", () => {
+    for (const target of ["vanilla", "r3f"] as const) {
+      const path = target === "r3f" ? "src/main.tsx" : "src/main.ts";
+      const main = fileMap(
+        generateScaffold({
+          name: "G",
+          target,
+          systemIds: ["render-bootstrap", "npc-reasoning"],
+        }),
+      ).get(path) as string;
+      // No LIVE import of the server-only entry — every mention of "game-kit/npc"
+      // must be on a commented line (the reference block), never a real import
+      // statement that would pull zod + a keyed provider into the client bundle.
+      for (const line of main.split("\n")) {
+        if (line.includes("game-kit/npc")) {
+          expect(line.trimStart().startsWith("//")).toBe(true);
+        }
+      }
+      expect(main).toContain("SERVER-SIDE ONLY");
+      expect(main).toContain("createNpcBrain");
+      expect(main).toContain("createHashingEmbedder");
+    }
+  });
+
+  it("nav r3f wiring goes to module scope (no <Canvas> JSX/hook needed)", () => {
+    const main = fileMap(
+      generateScaffold({
+        name: "G",
+        target: "r3f",
+        systemIds: ["nav"],
+      }),
+    ).get("src/main.tsx") as string;
+    expect(main).toContain("createGridNav({");
+    expect(main).not.toContain("${slug}");
+  });
+});
+
 describe("generateScaffold — multiplayer template", () => {
   const files = generateScaffold({
     name: "Arena Game",

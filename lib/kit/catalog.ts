@@ -103,9 +103,9 @@ export const SYSTEM_DESCRIPTIONS: Record<string, string> = {
   "fx-particles": "Pooled particle system (free-list, zero per-frame allocation).",
   "skeletal-anim": "Skeletal / glTF clip player + procedural-clip baking.",
   "deploy-presets": "Deploy config presets (Vite base, Fly.io, Vercel, Dockerfile).",
-  "npc-reasoning": "Server-side NPC brain — firewalled LLM reasoning + memory (Grok/Claude).",
-  nav: "Grid + A* pathfinding behind a Pathfinder seam.",
-  "npc-behavior": "Deterministic NPC behaviour (wander/patrol) + follow steering + utility-AI.",
+  "npc-reasoning": "Server-side NPC brain — firewalled LLM reasoning + memory + local semantic recall (Grok/Claude). Scaffolds a server-only reference wiring (never bundled client-side).",
+  nav: "Grid + A* pathfinding behind a Pathfinder seam. Scaffolds a walkable grid you path over with findPath.",
+  "npc-behavior": "Deterministic NPC behaviour (wander/patrol) + follow steering + utility-AI. Scaffolds a wandering NPC you tick(dt) over the nav grid.",
 };
 
 // ── app-kit family (kind: "app") ─────────────────────────────────────────────
@@ -117,11 +117,15 @@ export const SYSTEM_DESCRIPTIONS: Record<string, string> = {
 // three.js games only). Sources live under vendor/app-kit/src/<module>.
 export const APP_SYSTEMS: readonly KitSystem[] = [
   { id: "app-auth", name: "Auth / Session", tier: "system", status: "built", kind: "app", module: "auth" },
+  { id: "app-layout", name: "App Shell / Layout", tier: "system", status: "built", kind: "app", module: "layout" },
+  { id: "app-deploy", name: "Deploy Config", tier: "kit", status: "built", kind: "app", module: "deploy" },
 ] as const;
 
 /** One-line explainer per app-kit system (shown on hover in the scaffolder). */
 export const APP_SYSTEM_DESCRIPTIONS: Record<string, string> = {
   "app-auth": "Supabase-style auth/session seam — sign-in, sign-out, and a reactive session store behind one provider-agnostic interface.",
+  "app-layout": "App-Router root layout as data — nav model, metadata, and a reactive light/dark theme controller behind a framework-free seam.",
+  "app-deploy": "Env schema + deploy descriptors — parseEnv validation, .env.example, vercel.json (Next.js), and a local supabase config.toml.",
 };
 
 /**

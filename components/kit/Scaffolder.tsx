@@ -13,6 +13,7 @@ import {
   type ScaffoldTarget,
   type ScaffoldTemplate,
 } from "@/lib/scaffold/generate";
+import { generateAppScaffold } from "@/lib/scaffold/generate-app";
 import type { Tier } from "@/lib/kit/catalog";
 import type { ProjectKind } from "@/lib/schema";
 
@@ -63,8 +64,8 @@ export function Scaffolder({
   initialTarget?: ScaffoldTarget;
   initialSystemIds?: readonly string[];
 }) {
-  // Kit family. Game-kit drives the runnable Vite generator; app-kit is the new
-  // family (auth/layout/deploy) — catalogued + filterable now, generator next slice.
+  // Kit family. Game-kit drives the runnable Vite generator; app-kit drives the
+  // Next.js/Supabase app-starter generator (auth/layout/deploy).
   const [kind, setKind] = useState<ProjectKind>("game");
   const [name, setName] = useState(initialName || "My Game");
   const [target, setTarget] = useState<ScaffoldTarget>(initialTarget ?? "r3f");
@@ -131,6 +132,12 @@ export function Scaffolder({
   );
 
   const onGenerate = useCallback(() => {
+    if (kind === "app") {
+      setFiles(
+        generateAppScaffold({ name: name.trim() || "My App", moduleIds: [...selected] }),
+      );
+      return;
+    }
     setFiles(
       generateScaffold({
         name: name.trim() || "My Game",
@@ -139,7 +146,7 @@ export function Scaffolder({
         systemIds: [...selected],
       }),
     );
-  }, [name, target, template, selected]);
+  }, [kind, name, target, template, selected]);
 
   const onCopy = useCallback(async (file: ScaffoldFile) => {
     try {
@@ -153,16 +160,16 @@ export function Scaffolder({
 
   const onDownloadZip = useCallback(async () => {
     if (!files) return;
-    // Server builds the zip so it can include the vendored game-kit source (private kit).
-    const res = await fetch("/api/scaffold", {
+    const isApp = kind === "app";
+    // Server builds the zip so it can include the vendored kit source (private kits).
+    const res = await fetch(isApp ? "/api/scaffold-app" : "/api/scaffold", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name: name.trim() || "My Game",
-        target,
-        template,
-        systemIds: [...selected],
-      }),
+      body: JSON.stringify(
+        isApp
+          ? { name: name.trim() || "My App", moduleIds: [...selected] }
+          : { name: name.trim() || "My Game", target, template, systemIds: [...selected] },
+      ),
     });
     if (!res.ok) return;
     const blob = await res.blob();
@@ -171,7 +178,7 @@ export function Scaffolder({
       name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "") || "game";
+        .replace(/^-+|-+$/g, "") || (isApp ? "app" : "game");
     const a = document.createElement("a");
     a.href = url;
     a.download = `${slug}.zip`;
@@ -179,7 +186,7 @@ export function Scaffolder({
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-  }, [files, name, target, template, selected]);
+  }, [files, kind, name, target, template, selected]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -338,26 +345,16 @@ export function Scaffolder({
             </div>
           </fieldset>
 
-          {kind === "game" ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="button" onClick={onGenerate}>
-                Generate scaffold
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" onClick={onGenerate}>
+              Generate scaffold
+            </Button>
+            {files && (
+              <Button type="button" variant="outline" onClick={onDownloadZip}>
+                Download .zip
               </Button>
-              {files && (
-                <Button type="button" variant="outline" onClick={onDownloadZip}>
-                  Download .zip
-                </Button>
-              )}
-            </div>
-          ) : (
-            // App-kit is catalogued + browsable now; the runnable generator (a
-            // Next.js/Supabase starter) is the next slice. See vendor/app-kit/src.
-            <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-              App-kit pieces are catalogued and browsable here — hover for what
-              each provides. The runnable app starter (a Next.js project wired to
-              these modules) lands in the next slice.
-            </p>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
 

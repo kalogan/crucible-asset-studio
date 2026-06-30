@@ -370,6 +370,151 @@ export const WIRING: Record<string, WiringEntry> = {
       ],
     },
   },
+  nav: {
+    label: "Nav / Pathfinding",
+    // THREE-free + deterministic — exported from the main "game-kit" entry. A
+    // walkable grid + A* behind the Pathfinder seam the behavior layer consumes.
+    vanilla: {
+      imports: [`import { createGridNav, type Vec2 } from "game-kit";`],
+      setup: [
+        `// A 32×32 walkable grid over the XZ plane (every cell walkable here).`,
+        `// Provide your own isWalkable(cx, cy) to carve out blocked tiles.`,
+        `const nav = createGridNav({`,
+        `  width: 32,`,
+        `  height: 32,`,
+        `  cellSize: 1,`,
+        `  isWalkable: () => true,`,
+        `});`,
+        `// findPath takes/returns world XZ points: const route = nav.findPath([0, 0], [10, 6]);`,
+        `const _navStart: Vec2 = [0, 0];`,
+        `void _navStart;`,
+      ],
+    },
+    r3f: {
+      imports: [`import { createGridNav, type Vec2 } from "game-kit";`],
+      setup: [
+        `const nav = createGridNav({`,
+        `  width: 32,`,
+        `  height: 32,`,
+        `  cellSize: 1,`,
+        `  isWalkable: () => true,`,
+        `});`,
+        `// findPath takes/returns world XZ points: const route = nav.findPath([0, 0], [10, 6]);`,
+        `const _navStart: Vec2 = [0, 0];`,
+        `void _navStart;`,
+      ],
+    },
+  },
+  "npc-behavior": {
+    label: "NPC Behavior",
+    // THREE-free + deterministic — exported from the main "game-kit" entry. Walks
+    // an NPC over the nav grid; tick(dt) each frame and render the synced position.
+    // The LLM never drives this — movement stays pure + authoritative.
+    vanilla: {
+      imports: [
+        `import { createGridNav, createNpcBehavior, createRng } from "game-kit";`,
+      ],
+      setup: [
+        `// A wandering NPC over a walkable grid. Compose with the Nav system's grid;`,
+        `// a standalone grid is created here so this system works on its own.`,
+        `const npcNav = createGridNav({ width: 32, height: 32, isWalkable: () => true });`,
+        `const npc = createNpcBehavior({`,
+        `  pathfinder: npcNav,`,
+        `  bounds: { kind: "wander", anchor: [0, 0], radius: 10 },`,
+        `  rng: createRng(1),`,
+        `  speed: 2,`,
+        `});`,
+        `// Tick it inside your loop and render the synced position:`,
+        `//   const { position } = npc.tick(dt); mesh.position.set(position[0], 0, position[1]);`,
+      ],
+    },
+    r3f: {
+      imports: [
+        `import { createGridNav, createNpcBehavior, createRng } from "game-kit";`,
+      ],
+      setup: [
+        `const npcNav = createGridNav({ width: 32, height: 32, isWalkable: () => true });`,
+        `const npc = createNpcBehavior({`,
+        `  pathfinder: npcNav,`,
+        `  bounds: { kind: "wander", anchor: [0, 0], radius: 10 },`,
+        `  rng: createRng(1),`,
+        `  speed: 2,`,
+        `});`,
+        `// Tick npc.tick(dt) in a useFrame and sync position to a mesh.`,
+      ],
+    },
+  },
+  "npc-reasoning": {
+    label: "NPC Reasoning",
+    // ★ SERVER-SIDE ONLY. The brain holds a (keyed) provider and pulls in zod via
+    // the "game-kit/npc" entry — it must NEVER be imported into this client/three
+    // bundle. So we DO NOT import it here; we emit a documented reference block
+    // pointing at where the wiring belongs (an API route / server module). The
+    // firewall (parseReasoningResponse) is the security boundary: a model can only
+    // ever emit the bounded say/setMood/wait/endConversation/recall vocabulary.
+    vanilla: {
+      imports: [],
+      setup: [
+        `// NPC Reasoning is SERVER-SIDE ONLY — do NOT import "game-kit/npc" into this`,
+        `// client bundle (it holds an API key + pulls in zod). Wire it in a server`,
+        `// module / API route instead. Reference wiring (mirrors the kit's demo):`,
+        `//`,
+        `//   // server-only module, e.g. src/server/npcBrain.ts`,
+        `//   import {`,
+        `//     createNpcBrain,`,
+        `//     createBudgetedProvider,`,
+        `//     createMockProvider,        // swap for a real keyed provider on the server`,
+        `//     createInMemoryNpcStore,`,
+        `//     createHashingEmbedder,     // local, zero-dep semantic-recall embedder`,
+        `//     type NpcInfo,`,
+        `//   } from "game-kit/npc";`,
+        `//`,
+        `//   const MIRA: NpcInfo = {`,
+        `//     name: "Mira",`,
+        `//     persona: { role: "a weary herbalist", knowledgeScope: "herbs, the trails",`,
+        `//       goals: ["keep the garden alive"], voice: "warm but tired" },`,
+        `//     fallbackLines: ["Mm. Cold out, isn't it?"],`,
+        `//   };`,
+        `//   const brain = createNpcBrain({`,
+        `//     provider: createBudgetedProvider(createMockProvider()),`,
+        `//     store: createInMemoryNpcStore(),`,
+        `//     getNpcInfo: (id) => (id === "mira" ? MIRA : undefined),`,
+        `//     embedder: createHashingEmbedder(),`,
+        `//   });`,
+        `//   // const reply = await brain.say({ npcId: "mira", playerKey, characterId, text });`,
+        `//`,
+        `// The client sends the player's line to that server endpoint and renders reply.text.`,
+      ],
+    },
+    r3f: {
+      imports: [],
+      setup: [
+        `// NPC Reasoning is SERVER-SIDE ONLY — do NOT import "game-kit/npc" into this`,
+        `// client bundle (it holds an API key + pulls in zod). Wire it in a server`,
+        `// module / API route instead. Reference wiring (mirrors the kit's demo):`,
+        `//`,
+        `//   // server-only module, e.g. src/server/npcBrain.ts`,
+        `//   import {`,
+        `//     createNpcBrain,`,
+        `//     createBudgetedProvider,`,
+        `//     createMockProvider,        // swap for a real keyed provider on the server`,
+        `//     createInMemoryNpcStore,`,
+        `//     createHashingEmbedder,     // local, zero-dep semantic-recall embedder`,
+        `//     type NpcInfo,`,
+        `//   } from "game-kit/npc";`,
+        `//`,
+        `//   const brain = createNpcBrain({`,
+        `//     provider: createBudgetedProvider(createMockProvider()),`,
+        `//     store: createInMemoryNpcStore(),`,
+        `//     getNpcInfo: (id) => (id === "mira" ? MIRA : undefined),`,
+        `//     embedder: createHashingEmbedder(),`,
+        `//   });`,
+        `//   // const reply = await brain.say({ npcId: "mira", playerKey, characterId, text });`,
+        `//`,
+        `// The client sends the player's line to that server endpoint and renders reply.text.`,
+      ],
+    },
+  },
   artkit: {
     label: "Art Kit",
     vanilla: {
