@@ -407,6 +407,19 @@ The kit now has 25 systems (incl. nav/behavior/npc). To stand up a SAMPLE GAME e
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
 
+### Shipped 2026-06-29 (design-brief generator + biome editor + kit adoption)
+- **Design-brief generator** (`/brief`, game-kit `brief` entry `aae1c9a` + Crucible `6cf5aae`): idea →
+  Architect agent (Claude `claude-sonnet-4-6`) → structured `DesignBrief` (pillars, core loop, first slice,
+  kit systems, NPCs, art direction, risks) → **"Scaffold this →"** prefills `/kit/scaffold`. The reusable
+  brain (schema + persona + firewall) lives in `game-kit/brief`; Crucible injects the Anthropic call.
+- **Crucible now CONSUMES game-kit** (the "adopt in a real app" proof): added game-kit as a dep +
+  `transpilePackages` + a `.js`→`.ts` webpack `extensionAlias`. Needs `ANTHROPIC_API_KEY` on Vercel to run.
+- **Biome editor** (`/biome`, game-kit `world` entry `d962e57` + Crucible `a27a1c0`): the Wayfinders-style
+  "Tune knobs" tab — terrain noise knobs / prop fields / palette / environment FX, live r3f render of
+  game-kit's new `buildWorld(descriptor)`, variants in localStorage, export/import JSON descriptor.
+  **Slice 2 deferred:** the "Place" tab (click-to-place props, landmark/spawn/trail tools).
+- game-kit at **271 tests** (added brief + world modules). 25→27 kit systems conceptually (brief, world).
+
 ### Shipped 2026-06-29 (NPC memory v2 + behavior + deploy fix)
 - **game-kit NPC expansion** — full Track A (memory) + Track B (behavior) minus the two gated items:
   A1 durable KV store, A2 summarization, A3 embeddings/semantic recall; B1 nav/A*, B2 behavior runtime,
