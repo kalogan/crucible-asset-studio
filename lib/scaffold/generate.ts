@@ -795,8 +795,10 @@ function buildPackageJson(
   target: ScaffoldTarget,
   contrib: TemplateContribution,
 ): string {
+  // game-kit is VENDORED into the starter (under vendor/game-kit) rather than a
+  // dependency — the kit repo is private, so a `github:` dep wouldn't install. It's
+  // aliased in vite.config + tsconfig. Only its runtime deps (three, r3f) are listed.
   const deps: Record<string, string> = {
-    "game-kit": "github:kalogan/game-kit",
     three: "^0.171.0",
     ...contrib.deps,
   };
@@ -836,23 +838,33 @@ function sortKeys(record: Record<string, string>): Record<string, string> {
 }
 
 function buildViteConfig(target: ScaffoldTarget): string {
-  if (target === "r3f") {
-    return [
-      `import { defineConfig } from "vite";`,
-      `import react from "@vitejs/plugin-react";`,
-      ``,
-      `export default defineConfig({`,
-      `  plugins: [react()],`,
-      `});`,
-      ``,
-    ].join("\n");
-  }
-  return [
+  const lines: string[] = [
     `import { defineConfig } from "vite";`,
+    `import { fileURLToPath } from "node:url";`,
+  ];
+  if (target === "r3f") lines.push(`import react from "@vitejs/plugin-react";`);
+  lines.push(
     ``,
-    `export default defineConfig({});`,
+    `// game-kit is vendored under vendor/game-kit (the kit repo is private). Alias`,
+    `// each entry to its source; Vite resolves the kit's ".js" specifiers to ".ts".`,
+    `const kit = (p) => fileURLToPath(new URL(p, import.meta.url));`,
     ``,
-  ].join("\n");
+    `export default defineConfig({`,
+  );
+  if (target === "r3f") lines.push(`  plugins: [react()],`);
+  lines.push(
+    `  resolve: {`,
+    `    alias: [`,
+    `      { find: /^game-kit\\/r3f$/, replacement: kit("./vendor/game-kit/src/r3f.ts") },`,
+    `      { find: /^game-kit\\/npc$/, replacement: kit("./vendor/game-kit/src/npc.ts") },`,
+    `      { find: /^game-kit\\/brief$/, replacement: kit("./vendor/game-kit/src/brief.ts") },`,
+    `      { find: /^game-kit$/, replacement: kit("./vendor/game-kit/src/index.ts") },`,
+    `    ],`,
+    `  },`,
+    `});`,
+    ``,
+  );
+  return lines.join("\n");
 }
 
 function buildIndexHtml(name: string, target: ScaffoldTarget): string {
@@ -899,6 +911,12 @@ function buildTsconfig(target: ScaffoldTarget): string {
       skipLibCheck: true,
       noEmit: true,
       ...(target === "r3f" ? { jsx: "react-jsx" } : {}),
+      paths: {
+        "game-kit": ["./vendor/game-kit/src/index.ts"],
+        "game-kit/r3f": ["./vendor/game-kit/src/r3f.ts"],
+        "game-kit/npc": ["./vendor/game-kit/src/npc.ts"],
+        "game-kit/brief": ["./vendor/game-kit/src/brief.ts"],
+      },
     },
     include: ["src"],
   };
@@ -1187,8 +1205,8 @@ function buildReadme(
     `It runs \`git init\` + a first commit + \`gh repo create --source --push\` using`,
     `your own \`gh\` auth — no tokens stored anywhere.`,
     ``,
-    `The starter depends on \`game-kit\` (\`github:kalogan/game-kit\`). Each picked`,
-    `system imports + initializes its piece in \`${entryFile}\`.`,
+    `\`game-kit\` is **vendored** under \`vendor/game-kit\` (aliased in vite.config +`,
+    `tsconfig) — no install needed. Each picked system imports + initializes its piece in \`${entryFile}\`.`,
     `Some are stubbed with \`// TODO: game-specific wiring\` — fill those in.`,
     ``,
   );

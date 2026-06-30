@@ -113,10 +113,19 @@ export function Scaffolder({
 
   const onDownloadZip = useCallback(async () => {
     if (!files) return;
-    const { default: JSZip } = await import("jszip");
-    const zip = new JSZip();
-    for (const file of files) zip.file(file.path, file.content);
-    const blob = await zip.generateAsync({ type: "blob" });
+    // Server builds the zip so it can include the vendored game-kit source (private kit).
+    const res = await fetch("/api/scaffold", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: name.trim() || "My Game",
+        target,
+        template,
+        systemIds: [...selected],
+      }),
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const slug =
       name
@@ -130,7 +139,7 @@ export function Scaffolder({
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-  }, [files, name]);
+  }, [files, name, target, template, selected]);
 
   return (
     <div className="flex flex-col gap-8">

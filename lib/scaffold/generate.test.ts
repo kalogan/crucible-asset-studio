@@ -54,17 +54,22 @@ describe("generateScaffold — package.json", () => {
     expect(pkg.scripts).toEqual({ dev: "vite", build: "vite build" });
   });
 
-  it("always depends on game-kit + three", () => {
+  it("depends on three and VENDORS game-kit (no github dep)", () => {
     const files = generateScaffold({
       name: "G",
       target: "vanilla",
       systemIds: [],
     });
-    const pkg = JSON.parse(
-      fileMap(files).get("package.json") as string,
-    ) as { dependencies: Record<string, string> };
-    expect(pkg.dependencies["game-kit"]).toBe("github:kalogan/game-kit");
+    const map = fileMap(files);
+    const pkg = JSON.parse(map.get("package.json") as string) as {
+      dependencies: Record<string, string>;
+    };
     expect(pkg.dependencies["three"]).toBeDefined();
+    // game-kit is vendored, not a dependency.
+    expect(pkg.dependencies["game-kit"]).toBeUndefined();
+    // vite.config aliases the bare specifier to the vendored source.
+    expect(map.get("vite.config.ts")).toContain("game-kit");
+    expect(map.get("vite.config.ts")).toContain("vendor/game-kit/src/index.ts");
   });
 
   it("includes react + r3f deps ONLY for target r3f", () => {
