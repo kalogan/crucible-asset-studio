@@ -24,12 +24,11 @@ export function computeStats(projects: Project[], assetCounts: Record<string, nu
   };
 }
 
-function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="flex flex-col gap-0.5 rounded-lg border border-border bg-card px-4 py-3">
       <span className="text-2xl font-semibold tabular-nums text-foreground">{value}</span>
       <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
-      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </div>
   );
 }
@@ -39,14 +38,12 @@ export function StatRow({
 }: {
   stats: ReturnType<typeof computeStats>;
 }) {
-  const { byStatus } = stats;
-  const statusHint = `${byStatus.active} active · ${byStatus.shipped} shipped · ${byStatus.prototype} proto`;
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <Stat label="Games" value={stats.games} hint={statusHint} />
+      <Stat label="Games" value={stats.games} />
       <Stat label="Apps" value={stats.apps} />
-      <Stat label="Commits" value={stats.commits} hint="across linked repos" />
-      <Stat label="Assets" value={stats.totalAssets} hint="generated in Crucible" />
+      <Stat label="Commits" value={stats.commits} />
+      <Stat label="Assets" value={stats.totalAssets} />
     </div>
   );
 }
