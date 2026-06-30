@@ -1,8 +1,18 @@
 // Kit health-check seed dataset — the systems audit.
 //
-// This is a director-editable snapshot of which reusable game-kit systems exist
-// and how they map onto the five games. It is hand-maintained (estimates), not
-// computed from the codebases. Edit the tables below to keep the audit current.
+// This is a director-editable snapshot of which reusable systems exist and how
+// they map onto the projects. It is hand-maintained (estimates), not computed
+// from the codebases. Edit the tables below to keep the audit current.
+//
+// Two kit families live here, keyed by `kind` (the shared ProjectKind enum):
+//   - "game" — the game-kit systems (three.js) audited against the five games.
+//   - "app"  — the app-kit systems (Next.js/React/Supabase) shared across the
+//              studio's web apps (Glerb, Metagenomics Visualizer, Project
+//              Baseline, …). New family — see APP_SYSTEMS below.
+// The game health-check (GAMES / ADOPTION / lib/kit/derive) is game-only; the
+// app family is a flat catalog the scaffolder filters to via its kind selector.
+
+import type { ProjectKind } from "@/lib/schema";
 
 export type Tier = "atom" | "system" | "kit";
 export type SystemStatus = "built" | "planned";
@@ -12,7 +22,9 @@ export type KitSystem = {
   name: string;
   tier: Tier;
   status: SystemStatus;
-  /** Game-kit folder this system lives in (or would live in). */
+  /** Kit family this system belongs to. Defaults to "game" when omitted. */
+  kind?: ProjectKind;
+  /** Kit folder this system lives in (or would live in). */
   module?: string;
 };
 
@@ -94,6 +106,22 @@ export const SYSTEM_DESCRIPTIONS: Record<string, string> = {
   "npc-reasoning": "Server-side NPC brain — firewalled LLM reasoning + memory (Grok/Claude).",
   nav: "Grid + A* pathfinding behind a Pathfinder seam.",
   "npc-behavior": "Deterministic NPC behaviour (wander/patrol) + follow steering + utility-AI.",
+};
+
+// ── app-kit family (kind: "app") ─────────────────────────────────────────────
+//
+// The first slice of an app-kit / web-kit family: reusable Next.js/React/Supabase
+// patterns shared across the studio's web apps. Modeled exactly like the game-kit
+// systems above (same Tier/status shape) but tagged `kind: "app"` so the scaffolder
+// can filter to it, and kept OUT of the game GAMES/ADOPTION audit (that matrix is
+// three.js games only). Sources live under vendor/app-kit/src/<module>.
+export const APP_SYSTEMS: readonly KitSystem[] = [
+  { id: "app-auth", name: "Auth / Session", tier: "system", status: "built", kind: "app", module: "auth" },
+] as const;
+
+/** One-line explainer per app-kit system (shown on hover in the scaffolder). */
+export const APP_SYSTEM_DESCRIPTIONS: Record<string, string> = {
+  "app-auth": "Supabase-style auth/session seam — sign-in, sign-out, and a reactive session store behind one provider-agnostic interface.",
 };
 
 /**

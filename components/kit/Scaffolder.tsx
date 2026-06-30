@@ -14,8 +14,21 @@ import {
   type ScaffoldTemplate,
 } from "@/lib/scaffold/generate";
 import type { Tier } from "@/lib/kit/catalog";
+import type { ProjectKind } from "@/lib/schema";
 
-export type ScaffoldSystem = { id: string; name: string; tier: Tier; description: string };
+export type ScaffoldSystem = {
+  id: string;
+  name: string;
+  tier: Tier;
+  description: string;
+  /** Kit family this piece belongs to — drives the kind filter. Defaults to "game". */
+  kind?: ProjectKind;
+};
+
+const KIND_OPTIONS: readonly { value: ProjectKind; label: string }[] = [
+  { value: "game", label: "Game kit" },
+  { value: "app", label: "App kit" },
+];
 
 const TIER_LABELS: Record<Tier, string> = {
   atom: "Atoms",
@@ -50,21 +63,32 @@ export function Scaffolder({
   initialTarget?: ScaffoldTarget;
   initialSystemIds?: readonly string[];
 }) {
+  // Kit family. Game-kit drives the runnable Vite generator; app-kit is the new
+  // family (auth/layout/deploy) — catalogued + filterable now, generator next slice.
+  const [kind, setKind] = useState<ProjectKind>("game");
   const [name, setName] = useState(initialName || "My Game");
   const [target, setTarget] = useState<ScaffoldTarget>(initialTarget ?? "r3f");
   const [template, setTemplate] = useState<ScaffoldTemplate>("blank");
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => {
-    // Prefilled picks (intersected with known systems) win; otherwise select all.
+    // Prefilled picks (intersected with known systems) win; otherwise select all
+    // of the initial family (game-kit) — app-kit pieces are added on family switch.
     if (initialSystemIds && initialSystemIds.length > 0) {
       const known = new Set(systems.map((s) => s.id));
       return new Set(initialSystemIds.filter((id) => known.has(id)));
     }
-    return new Set(systems.map((s) => s.id));
+    return new Set(
+      systems.filter((s) => (s.kind ?? "game") === "game").map((s) => s.id),
+    );
   });
   const [files, setFiles] = useState<ScaffoldFile[] | null>(null);
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
 
-  const groups = useMemo(() => groupByTier(systems), [systems]);
+  // The pieces visible for the active family (a piece with no kind is game-kit).
+  const familySystems = useMemo(
+    () => systems.filter((s) => (s.kind ?? "game") === kind),
+    [systems, kind],
+  );
+  const groups = useMemo(() => groupByTier(familySystems), [familySystems]);
 
   const toggle = useCallback((id: string) => {
     setSelected((prev) => {
@@ -75,6 +99,22 @@ export function Scaffolder({
     });
   }, []);
 
+  // Switching family resets to a free pick (all of that family's pieces) and
+  // clears any prior output, since templates/targets are game-kit-only.
+  const onKind = useCallback(
+    (next: ProjectKind) => {
+      setKind(next);
+      setTemplate("blank");
+      setFiles(null);
+      setSelected(
+        new Set(
+          systems.filter((s) => (s.kind ?? "game") === next).map((s) => s.id),
+        ),
+      );
+    },
+    [systems],
+  );
+
   // Picking a template (other than blank) narrows the selection to exactly the
   // pieces it needs, so the preview matches what the template wires. "Blank"
   // restores the full set so you're back to a free pick.
@@ -83,11 +123,11 @@ export function Scaffolder({
       setTemplate(next);
       setSelected(
         next === "blank"
-          ? new Set(systems.map((s) => s.id))
+          ? new Set(familySystems.map((s) => s.id))
           : templateSystemIds(next),
       );
     },
-    [systems],
+    [familySystems],
   );
 
   const onGenerate = useCallback(() => {
@@ -151,6 +191,31 @@ export function Scaffolder({
           </p>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
+          {/* Kit family — game-kit (three.js) vs app-kit (Next.js/React/Supabase). */}
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-sm font-medium text-foreground">
+              Kit family
+            </legend>
+            <div className="flex flex-wrap gap-4">
+              {KIND_OPTIONS.map((opt) => (
+                <label
+                  key={opt.value}
+                  className="flex cursor-pointer items-center gap-2 text-sm text-foreground"
+                >
+                  <input
+                    type="radio"
+                    name="scaffold-kind"
+                    value={opt.value}
+                    checked={kind === opt.value}
+                    onChange={() => onKind(opt.value)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
           {/* Name */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="scaffold-name">Project name</Label>
@@ -163,7 +228,8 @@ export function Scaffolder({
             />
           </div>
 
-          {/* Template */}
+          {/* Template — game-kit only (the runnable Vite generator). */}
+          {kind === "game" && (
           <fieldset className="flex flex-col gap-2">
             <legend className="text-sm font-medium text-foreground">
               Template
@@ -199,8 +265,10 @@ export function Scaffolder({
               })}
             </div>
           </fieldset>
+          )}
 
-          {/* Target */}
+          {/* Target — game-kit only. */}
+          {kind === "game" && (
           <fieldset className="flex flex-col gap-2">
             <legend className="text-sm font-medium text-foreground">
               Starter target
@@ -229,6 +297,7 @@ export function Scaffolder({
               ))}
             </div>
           </fieldset>
+          )}
 
           {/* Systems */}
           <fieldset className="flex flex-col gap-3">
@@ -269,16 +338,26 @@ export function Scaffolder({
             </div>
           </fieldset>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="button" onClick={onGenerate}>
-              Generate scaffold
-            </Button>
-            {files && (
-              <Button type="button" variant="outline" onClick={onDownloadZip}>
-                Download .zip
+          {kind === "game" ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" onClick={onGenerate}>
+                Generate scaffold
               </Button>
-            )}
-          </div>
+              {files && (
+                <Button type="button" variant="outline" onClick={onDownloadZip}>
+                  Download .zip
+                </Button>
+              )}
+            </div>
+          ) : (
+            // App-kit is catalogued + browsable now; the runnable generator (a
+            // Next.js/Supabase starter) is the next slice. See vendor/app-kit/src.
+            <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              App-kit pieces are catalogued and browsable here — hover for what
+              each provides. The runnable app starter (a Next.js project wired to
+              these modules) lands in the next slice.
+            </p>
+          )}
         </CardContent>
       </Card>
 
