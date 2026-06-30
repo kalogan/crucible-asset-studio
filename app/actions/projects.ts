@@ -132,11 +132,13 @@ export async function updateProjectAction(
   };
   const statusParsed = ProjectStatus.safeParse(String(formData.get("status") ?? ""));
   try {
+    // NOTE: `screenshot` is intentionally NOT written here — it's owned by the screenshot
+    // picker (uploadScreenshotAction / setScreenshotUrlAction). Saving the Overview must
+    // never clobber a freshly-uploaded hero with a stale form value.
     await updateProject(id, {
       description: orNull("description"),
       url: orNull("url"),
       repo_url: orNull("repo_url"),
-      screenshot: orNull("screenshot"),
       ...(statusParsed.success ? { status: statusParsed.data } : {}),
     });
     revalidatePath("/");
@@ -144,6 +146,26 @@ export async function updateProjectAction(
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to save." };
+  }
+}
+
+/** Set the portfolio hero from a pasted image URL (the no-upload path). */
+export async function setScreenshotUrlAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const id = String(formData.get("projectId") ?? "");
+  const slug = String(formData.get("slug") ?? "");
+  const url = String(formData.get("screenshotUrl") ?? "").trim();
+  if (!id) return { ok: false, error: "Missing project." };
+  if (!url) return { ok: false, error: "Paste an image URL first." };
+  try {
+    await updateProject(id, { screenshot: url });
+    revalidatePath("/");
+    if (slug) revalidatePath(`/projects/${slug}`);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to set image." };
   }
 }
 

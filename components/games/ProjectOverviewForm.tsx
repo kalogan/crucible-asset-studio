@@ -58,11 +58,6 @@ export function ProjectOverviewForm({ project }: { project: Project }) {
         <Input id="repo_url" name="repo_url" defaultValue={project.repo_url ?? ""} placeholder="https://github.com/…" />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="screenshot">Screenshot URL</Label>
-        <Input id="screenshot" name="screenshot" defaultValue={project.screenshot ?? ""} placeholder="https://… (hero image)" />
-      </div>
-
       <Button type="submit" disabled={pending} className="w-fit">
         {pending ? "Saving…" : "Save overview"}
       </Button>
