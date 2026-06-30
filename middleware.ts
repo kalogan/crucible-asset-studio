@@ -7,8 +7,21 @@ import type { NextRequest } from "next/server";
  * Fails CLOSED in prod: if CRUCIBLE_ACCESS_PASSWORD is unset, the site is blocked
  * rather than accidentally public.
  */
+/**
+ * Forward the project slug from `/projects/[slug]/...` as a request header so server
+ * code (getActiveProject) resolves the workspace's project from the URL — making the
+ * URL the source of truth for the nested workspace, not just the active-project cookie.
+ */
+function pass(req: NextRequest): NextResponse {
+  const m = req.nextUrl.pathname.match(/^\/projects\/([^/]+)/);
+  if (!m) return NextResponse.next();
+  const headers = new Headers(req.headers);
+  headers.set("x-active-project-slug", decodeURIComponent(m[1] as string));
+  return NextResponse.next({ request: { headers } });
+}
+
 export function middleware(req: NextRequest): NextResponse {
-  if (!process.env.VERCEL) return NextResponse.next();
+  if (!process.env.VERCEL) return pass(req);
 
   const password = process.env.CRUCIBLE_ACCESS_PASSWORD;
   if (!password) {
@@ -22,10 +35,10 @@ export function middleware(req: NextRequest): NextResponse {
     const decoded = atob(header.slice(6));
     const sep = decoded.indexOf(":");
     const user = decoded.slice(0, sep);
-    const pass = decoded.slice(sep + 1);
+    const passwd = decoded.slice(sep + 1);
     const expectedUser = process.env.CRUCIBLE_ACCESS_USER ?? "crucible";
-    if (pass === password && user === expectedUser) {
-      return NextResponse.next();
+    if (passwd === password && user === expectedUser) {
+      return pass(req);
     }
   }
 

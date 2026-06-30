@@ -1,14 +1,10 @@
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/config";
 import { getProjectBySlug } from "@/lib/db/projects";
-import { getCanonByProject } from "@/lib/db/canons";
-import { canonReadiness } from "@/lib/canon/precision";
 import { statusBadgeClass } from "@/lib/projects/status";
-import { openWorkspaceAction } from "@/app/actions/projects";
 import { ProjectOverviewForm } from "@/components/games/ProjectOverviewForm";
 import { ScreenshotUpload } from "@/components/games/ScreenshotUpload";
 import { FocalPointPicker } from "@/components/games/FocalPointPicker";
-import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -32,16 +28,10 @@ export default async function ProjectDetailPage({
   }
 
   const isGame = project.kind === "game";
-  // Only games have a canon / asset-gen workspace.
-  const canon = isGame ? await getCanonByProject(project.id) : null;
-  const canonState = canon ? (canonReadiness(canon).ready ? "ready" : "incomplete") : "none";
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-6 py-12 lg:max-w-5xl xl:max-w-6xl">
+    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-6 pb-12 lg:max-w-5xl xl:max-w-6xl">
       <header className="flex flex-col gap-3">
-        <Link href="/" className="w-fit text-sm text-primary underline underline-offset-2 hover:opacity-80">
-          ← All projects
-        </Link>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-3xl font-semibold text-foreground">{project.name}</h1>
           <span className="rounded border border-border px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -80,35 +70,7 @@ export default async function ProjectDetailPage({
         )}
       </header>
 
-      {/* Generation workspace — games only. */}
-      {isGame && (
-        <section aria-label="Generation workspace" className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold text-foreground">Generation workspace</h2>
-            <span className="text-xs text-muted-foreground">
-              canon: <span className="text-foreground">{canonState}</span>
-            </span>
-          </div>
-          <form action={openWorkspaceAction} className="flex flex-wrap gap-2">
-            <input type="hidden" name="projectId" value={project.id} />
-            <Button type="submit" name="target" value="/generate">
-              Generate
-            </Button>
-            <Button type="submit" name="target" value="/review" variant="outline">
-              Review
-            </Button>
-            <Button type="submit" name="target" value="/canon" variant="outline">
-              Canon
-            </Button>
-            <Button type="submit" name="target" value="/library" variant="outline">
-              Library
-            </Button>
-            <Button type="submit" name="target" value="/prompts" variant="outline">
-              Prompts
-            </Button>
-          </form>
-        </section>
-      )}
+      {/* The asset-gen tabs (games) live in the WorkspaceNav above. */}
 
       {/* Overview — the portfolio face (both kinds). */}
       <section aria-label="Overview" className="flex flex-col gap-4">
