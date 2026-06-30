@@ -11,8 +11,12 @@ export function computeStats(projects: Project[], assetCounts: Record<string, nu
   for (const p of projects) byStatus[p.status] += 1;
   const totalAssets = Object.values(assetCounts).reduce((a, b) => a + b, 0);
   const playable = projects.filter((p) => p.url).length;
+  const games = projects.filter((p) => p.kind === "game").length;
+  const apps = projects.filter((p) => p.kind === "app").length;
   return {
-    games: projects.length,
+    total: projects.length,
+    games,
+    apps,
     byStatus,
     totalAssets,
     playable,
@@ -35,13 +39,13 @@ export function StatRow({
   stats: ReturnType<typeof computeStats>;
 }) {
   const { byStatus } = stats;
-  const statusHint = `${byStatus.active} active · ${byStatus.shipped} shipped · ${byStatus.prototype} proto · ${byStatus.paused} paused`;
+  const statusHint = `${byStatus.active} active · ${byStatus.shipped} shipped · ${byStatus.prototype} proto`;
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <Stat label="Games" value={stats.games} hint={statusHint} />
+      <Stat label="Apps" value={stats.apps} />
       <Stat label="Assets generated" value={stats.totalAssets} />
-      <Stat label="Playable" value={stats.playable} hint="have a play URL" />
-      <Stat label="Shipped" value={byStatus.shipped} hint="status: shipped" />
+      <Stat label="Playable" value={stats.playable} hint="have a live URL" />
     </div>
   );
 }

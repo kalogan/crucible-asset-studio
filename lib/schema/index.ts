@@ -38,17 +38,26 @@ export const slugSchema = z
 export const ProjectStatus = z.enum(["prototype", "active", "shipped", "paused"]);
 export type ProjectStatus = z.infer<typeof ProjectStatus>;
 
+/** A project is a game (asset-gen workspace) or an app (portfolio + lighter tooling). */
+export const ProjectKind = z.enum(["game", "app"]);
+export type ProjectKind = z.infer<typeof ProjectKind>;
+
 export const Project = z.object({
   // identity
   id: uuid,
   slug: slugSchema,
   name: z.string().min(1),
+  // catch keeps an unexpected value from 500ing the gallery (defaults to game).
+  kind: ProjectKind.catch("game"),
   // portfolio face (presentation only)
   description: z.string().nullable(),
   status: ProjectStatus,
   url: z.string().nullable(),
   repo_url: z.string().nullable(),
   screenshot: z.string().nullable(),
+  // non-destructive hero focal point (0..1); the card/hero frame around it.
+  screenshot_focal_x: z.number().catch(0.5),
+  screenshot_focal_y: z.number().catch(0.5),
   // generation face
   context_ref: z.string().nullable(),
   cdn_endpoint: z.string().nullable(),
@@ -60,6 +69,7 @@ export type Project = z.infer<typeof Project>;
 export const ProjectInsert = z.object({
   slug: slugSchema,
   name: z.string().min(1),
+  kind: ProjectKind.optional(),
   description: z.string().nullable().optional(),
   status: ProjectStatus.optional(),
   url: z.string().nullable().optional(),
@@ -74,9 +84,12 @@ export type ProjectInsert = z.infer<typeof ProjectInsert>;
 export const ProjectUpdate = z.object({
   description: z.string().nullable().optional(),
   status: ProjectStatus.optional(),
+  kind: ProjectKind.optional(),
   url: z.string().nullable().optional(),
   repo_url: z.string().nullable().optional(),
   screenshot: z.string().nullable().optional(),
+  screenshot_focal_x: z.number().optional(),
+  screenshot_focal_y: z.number().optional(),
 });
 export type ProjectUpdate = z.infer<typeof ProjectUpdate>;
 

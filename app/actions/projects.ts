@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createProject, getProject, getProjectBySlug, updateProject } from "@/lib/db/projects";
 import { parseCreateProjectForm } from "@/lib/projects/createInput";
-import { ProjectStatus } from "@/lib/schema";
+import { ProjectStatus, ProjectKind } from "@/lib/schema";
 import { uploadProjectScreenshot } from "@/lib/projects/screenshot";
 import { ACTIVE_PROJECT_COOKIE } from "@/lib/active-project";
 import { parseRepoUrl, mapRepoToProject } from "@/lib/github/repo";
@@ -79,6 +79,7 @@ export async function createProjectAction(
       return { ok: false, error: `A project with slug "${slug}" already exists.` };
     }
     const status = ProjectStatus.safeParse(String(formData.get("status") ?? ""));
+    const kind = ProjectKind.safeParse(String(formData.get("kind") ?? ""));
     const project = await createProject({
       name: parsed.name,
       slug,
@@ -87,6 +88,7 @@ export async function createProjectAction(
       repo_url: formStr(formData, "repo_url"),
       screenshot: formStr(formData, "screenshot"),
       ...(status.success ? { status: status.data } : {}),
+      ...(kind.success ? { kind: kind.data } : {}),
     });
     await setActiveCookie(project.id);
   } catch (err) {
@@ -146,6 +148,33 @@ export async function updateProjectAction(
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to save." };
+  }
+}
+
+/** Set the non-destructive hero focal point (0..1 each axis) — frames the card/hero. */
+export async function setScreenshotFocalAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const id = String(formData.get("projectId") ?? "");
+  const slug = String(formData.get("slug") ?? "");
+  const x = Number(formData.get("focalX"));
+  const y = Number(formData.get("focalY"));
+  if (!id) return { ok: false, error: "Missing project." };
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return { ok: false, error: "Invalid focal point." };
+  }
+  const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
+  try {
+    await updateProject(id, {
+      screenshot_focal_x: clamp01(x),
+      screenshot_focal_y: clamp01(y),
+    });
+    revalidatePath("/");
+    if (slug) revalidatePath(`/projects/${slug}`);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to set focus." };
   }
 }
 

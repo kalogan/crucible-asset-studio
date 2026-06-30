@@ -35,6 +35,13 @@ export function CreateGameForm() {
 
       <div className="flex flex-wrap gap-3">
         <div className="flex flex-col gap-1.5">
+          <Label htmlFor="kind">Kind</Label>
+          <select id="kind" name="kind" defaultValue="game" className={selectControl}>
+            <option value="game">Game</option>
+            <option value="app">App</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-1.5">
           <Label htmlFor="status">Status</Label>
           <select id="status" name="status" defaultValue="prototype" className={selectControl}>
             {ProjectStatus.options.map((s) => (
@@ -60,7 +67,7 @@ export function CreateGameForm() {
       </div>
 
       <Button type="submit" disabled={pending} className="w-fit">
-        {pending ? "Creating…" : "Create game"}
+        {pending ? "Creating…" : "Create project"}
       </Button>
       {state?.error && (
         <p role="alert" className="text-sm text-destructive">
