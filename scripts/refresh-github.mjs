@@ -31,6 +31,47 @@ async function ghRepo(owner, repo) {
   return res;
 }
 
+// Fetch + synthesize the README into a one-paragraph blurb (first prose, markdown stripped).
+async function ghReadmeBlurb(owner, repo) {
+  const raw = { ...headers, accept: "application/vnd.github.raw" };
+  let res = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, { headers: raw });
+  if (!res.ok && [401, 403, 404].includes(res.status)) {
+    res = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
+      headers: { ...base, accept: "application/vnd.github.raw" },
+    });
+  }
+  if (!res.ok) return null;
+  return synthesize(await res.text());
+}
+
+function synthesize(md) {
+  const out = [];
+  let started = false;
+  for (const r of md.split(/\r?\n/)) {
+    let line = r.trim();
+    if (!line) {
+      if (started) break;
+      continue;
+    }
+    if (/^(#|```|>|<|!\[|\[!\[|\||---)/.test(line)) {
+      if (started) break;
+      continue;
+    }
+    line = line
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/[*_`]/g, "")
+      .trim();
+    if (!line) continue;
+    out.push(line);
+    started = true;
+    if (out.join(" ").length > 280) break;
+  }
+  const text = out.join(" ").replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  return text.length > 280 ? `${text.slice(0, 277).trimEnd()}…` : text;
+}
+
 const TECH_TOPIC = {
   threejs: "Three.js", "three-js": "Three.js", three: "Three.js",
   "react-three-fiber": "React Three Fiber", r3f: "React Three Fiber",
@@ -96,17 +137,19 @@ for (const p of rows) {
   }
   const repo = await res.json();
   const { tech, genres } = deriveTags(repo);
+  const blurb = await ghReadmeBlurb(m[1], m[2]);
   await c.query(
     `update projects set
        github_pushed_at = $1,
        tech = case when coalesce(array_length(tech, 1), 0) = 0 then $2::text[] else tech end,
        genres = case when coalesce(array_length(genres, 1), 0) = 0 then $3::text[] else genres end,
        description = coalesce(nullif(description, ''), $4),
-       url = coalesce(nullif(url, ''), $5)
-     where id = $6`,
-    [repo.pushed_at || null, tech, genres, repo.description || null, repo.homepage || null, p.id],
+       url = coalesce(nullif(url, ''), $5),
+       summary = coalesce($6, summary)
+     where id = $7`,
+    [repo.pushed_at || null, tech, genres, repo.description || null, repo.homepage || null, blurb, p.id],
   );
-  console.log(`ok     ${p.slug.padEnd(28)} ${[...tech, ...genres].join(", ") || "(no tags)"}`);
+  console.log(`ok     ${p.slug.padEnd(28)} ${[...tech, ...genres].join(", ") || "(no tags)"}${blurb ? " +readme" : ""}`);
   ok++;
 }
 await c.end();

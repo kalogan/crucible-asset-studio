@@ -1,33 +1,21 @@
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/config";
 import { listProjects } from "@/lib/db/projects";
-import { parseRepoUrl } from "@/lib/github/repo";
-import { fetchReadmeExcerpt } from "@/lib/github/readme";
 import { statusBadgeClass } from "@/lib/projects/status";
 import { timeAgo } from "@/lib/util/time";
 
 export const dynamic = "force-dynamic";
 
 // A flat, scannable list of every experience (games + apps) — distinct from the Home
-// dashboard's stats + cards.
+// dashboard's stats + cards. README blurbs are STORED in the DB (by `pnpm refresh-github`),
+// so this reads them without a live GitHub fetch.
 export default async function CreationsPage() {
   const configured = isSupabaseConfigured();
   let projects: Awaited<ReturnType<typeof listProjects>> = [];
-  let excerpts: Record<string, string> = {};
   let loadFailed = false;
   if (configured) {
     try {
       projects = await listProjects();
-      // Synthesize each repo's README into a one-line blurb (cached 30 min, best-effort).
-      const entries = await Promise.all(
-        projects.map(async (p): Promise<[string, string] | null> => {
-          const ref = p.repo_url ? parseRepoUrl(p.repo_url) : null;
-          if (!ref) return null;
-          const text = await fetchReadmeExcerpt(ref.owner, ref.repo);
-          return text ? [p.id, text] : null;
-        }),
-      );
-      excerpts = Object.fromEntries(entries.filter((e): e is [string, string] => e !== null));
     } catch (err) {
       loadFailed = true;
       console.error("CreationsPage: listProjects failed:", err);
@@ -84,9 +72,9 @@ export default async function CreationsPage() {
                       {p.status}
                     </span>
                   </div>
-                  {(excerpts[p.id] || p.description) && (
+                  {(p.summary || p.description) && (
                     <p className="line-clamp-2 text-sm text-muted-foreground">
-                      {excerpts[p.id] || p.description}
+                      {p.summary || p.description}
                     </p>
                   )}
                   <span className="text-xs text-muted-foreground">
