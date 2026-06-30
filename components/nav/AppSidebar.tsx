@@ -15,11 +15,11 @@ export function AppSidebar() {
       >
         Crucible
       </Link>
-      <nav aria-label="Primary" className="flex flex-col gap-4">
+      <nav aria-label="Primary" className="flex flex-col gap-7">
         {NAV_GROUPS.map((group, gi) => (
           <div key={group.label ?? `group-${gi}`} className="flex flex-col gap-0.5">
             {group.label && (
-              <span className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              <span className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
                 {group.label}
               </span>
             )}
