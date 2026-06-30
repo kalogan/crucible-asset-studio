@@ -55,7 +55,7 @@ async function expandSubject(canon: Canon | null, prompt: string): Promise<strin
     : enrichPrompt(prompt);
 }
 
-function baseRecipe(input: PipelineInput, canon: Canon | null, finalPrompt: string) {
+export function baseRecipe(input: PipelineInput, canon: Canon | null, finalPrompt: string) {
   return {
     title: input.title,
     prompt: finalPrompt,
@@ -68,7 +68,7 @@ function baseRecipe(input: PipelineInput, canon: Canon | null, finalPrompt: stri
 }
 
 /** FLUX text->image, persisted. Sets job phase 'image'. */
-async function generate2D(
+export async function generate2D(
   jobId: string,
   input: PipelineInput,
   canon: Canon | null,
@@ -108,7 +108,7 @@ async function generate2D(
 }
 
 /** Background cutout (fail-soft) -> TRELLIS -> persisted GLB. Phases cutout/model/saving. */
-async function generate3D(
+export async function generate3D(
   jobId: string,
   projectSlug: string,
   catalogKey: string,

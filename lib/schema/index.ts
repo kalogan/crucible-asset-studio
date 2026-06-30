@@ -204,6 +204,30 @@ export const ReferenceAssetInsert = z.object({
 });
 export type ReferenceAssetInsert = z.infer<typeof ReferenceAssetInsert>;
 
+// ── batches (a queued set of jobs the worker drains) ─────────────────────────
+export const Batch = z.object({
+  id: uuid,
+  project_id: uuid,
+  name: z.string().min(1),
+  status: BatchStatus,
+  cost_estimate: z.number().catch(0),
+  cost_actual: z.number().catch(0),
+  // true ⇒ the batch was run in mock mode (no external spend); never trust its cost as real.
+  dry_run: z.boolean().catch(false),
+  created_at: ts,
+  updated_at: ts,
+});
+export type Batch = z.infer<typeof Batch>;
+
+export const BatchInsert = z.object({
+  project_id: uuid,
+  name: z.string().min(1),
+  status: BatchStatus.optional(),
+  cost_estimate: z.number().optional(),
+  dry_run: z.boolean().optional(),
+});
+export type BatchInsert = z.infer<typeof BatchInsert>;
+
 // ── jobs ─────────────────────────────────────────────────────────────────────
 export const GenerationPhase = z.enum(["image", "cutout", "model", "saving"]);
 export type GenerationPhase = z.infer<typeof GenerationPhase>;
@@ -220,6 +244,8 @@ export const Job = z.object({
   recipe_snapshot: z.record(z.unknown()),
   error: z.string().nullable(),
   cost: z.number(),
+  // when the job was claimed (queued -> generating); null while still queued.
+  started_at: ts.nullable().catch(null),
   created_at: ts,
   updated_at: ts,
 });
