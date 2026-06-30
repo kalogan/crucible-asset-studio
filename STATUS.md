@@ -4,6 +4,41 @@ _Durable status for the Architect/Builder pipeline (write → persist → notify
 
 ## Where we are
 
+### Current state (2026-06-30)
+Crucible is now a **multi-project studio hub**, not just a game asset studio:
+- **Projects** (games + apps): `kind` discriminator; dashboard = stat row + cards (name, Type/Tech/
+  Genre chips, GitHub last-update, Play CTA), **sorted by last GitHub update**; per-project workspace
+  nested under `/projects/[slug]/*` (generate/review/canon/library/prompts) with a sub-nav + project
+  switcher; **left sidebar** grouped Home·Creations / Assets(Library·Systems) / Tools(Editor·Biome·
+  Roblox) / Framework(Kit·Brief·NPC·Sample). Creations = a scannable list w/ README blurbs. Global
+  Library at `/assets`. Non-destructive hero focal-point picker.
+- **GitHub-synced, token-free dashboard**: tech/genres/`github_pushed_at` are STORED in the DB (migrations
+  0011–0013) by `pnpm import-repos` (pick which repos to add) + `pnpm refresh-github` (refresh all linked
+  repos). The dashboard reads the DB → no per-render GitHub fetch, no server token needed. (A `GITHUB_TOKEN`
+  with **all-repos** access is needed *only by the scripts* to read private repos.)
+- **game-kit** (private, VENDORED into `crucible/vendor/game-kit`): 25 systems incl. **npc** (Grok/Claude
+  reasoning + memory + semantic recall), **nav/behavior** (A* + wander/follow/utility-AI), **world**
+  (procgen `buildWorld`), **brief** (Architect→design brief). Surfaced via `/kit` (scaffolder w/ hover
+  explainers, vendors the kit into generated zips), `/brief`, `/biome`, `/npc`, `/sample`.
+- **Deploy:** Vercel builds (no private git-dep clone — vendored). Outstanding env on Vercel:
+  `ANTHROPIC_API_KEY` (for /brief, /npc live model). The dashboard no longer needs a server GITHUB_TOKEN.
+
+### Next up (pick a thread)
+- **Store the rest of the GitHub data** (token-free everywhere): Creations README blurbs are still
+  live-fetched — store a synthesized `summary` per project (script + DB column) so Creations works without a
+  server token, like the dashboard now does. Optional: auto-screenshots (OG image / first repo image).
+- **Sort/filter polish:** sort options on Creations (it's still `created_at`); make Tech/Genre chips clickable
+  dashboard filters.
+- **game-kit frontier:** scaffolder doesn't yet WIRE npc-reasoning/nav/npc-behavior (shown but inert) — add
+  their generator wiring; the real local-MODEL embedder (transformers.js, dep call open); the GATED **B5**
+  reasoning→behavior bridge (firewall-widening `goTo`/`emote` — stop-and-confirm); B3/B4 follow/utility done.
+- **app-kit / web-kit** (Phase 2 of the apps arc): distil shared auth/login/layout/deploy patterns from the
+  app repos into a kit family, surfaced in `/kit` alongside game-kit; scaffolder/brief gain a kind selector.
+- **The asset-gen core** (the original mission, still valid): the LoRA slice (style-fidelity enforcer),
+  resumable batch worker (Phase 3), Kiln finishing + CDN publish.
+
+---
+
 **Phase 0 — kernel mining:** ✅ done (`KERNEL_LESSONS.md`).
 **Phase 1 — platform spine:** ✅ done. Supabase live; generated real Wooden Barrel + Palm Tree
 GLBs end-to-end. Cost guardrails, live status stepper, GLB viewer (IBL).
@@ -406,6 +441,27 @@ The kit now has 25 systems (incl. nav/behavior/npc). To stand up a SAMPLE GAME e
 - **LoRA Stage 1**: training-set assembly — upload/list/remove turntable renders per project at
   `/canon`, trigger-word captions. **Stage 2 (Replicate train → poll → LoRA inference) still TODO** —
   needs a Replicate destination model (`REPLICATE_LORA_DESTINATION`) + the renders + the paid run.
+
+### Shipped 2026-06-30 (studio-hub redesign: IA + dashboard + GitHub sync)
+The big multi-turn arc. **IA redesign (4 slices done):** hybrid dashboard (stat row + cards); non-destructive
+focal-point hero framing; per-project workspace nested under `/projects/[slug]/*` (middleware forwards the
+slug header so `getActiveProject` resolves from the URL — no per-page refactor) with sub-nav + breadcrumb +
+**project switcher**; global Library at `/assets`. **`kind` discriminator** (game|app, migration 0011) — apps
+are first-class (Glerb/Metagenomics/Baseline/etc. added); project page branches by kind. **Left sidebar**
+(grouped Home·Creations / Assets / Tools / Framework), replacing the top nav (mobile keeps a top bar).
+**Cards** show name + Type/Tech/Genre chips + GitHub last-update + Play CTA, **sorted by last GitHub update**.
+**Creations** = scannable list w/ synthesized README blurbs + larger thumbs. **Responsive pass**: pages fill
+to `max-w-[110rem]`, card grids → 5–6 cols at L/XL.
+**GitHub data is STORED, not live-fetched** (the key fix): `tech`/`genres`/`github_pushed_at` columns
+(migrations 0012–0013), populated by **`pnpm import-repos`** (interactive picker; enriches existing, never
+clobbers) + **`pnpm refresh-github`** (all linked repos; falls back to unauthenticated for public cross-account
+repos). Dashboard reads the DB → token-free, no rate limit, no cache lag. **Per-project "Suggest from GitHub"**
+fills tech/genres. **Auto-derive** tech (language + framework topics) + genres (genre topics) with normalization.
+**Fixes:** screenshot upload no longer clobbered by Save-overview; large screenshots (Server Action 12mb);
+listProjects tolerant of a bad row; scaffolder hover explainers; nav spacing. **Renames:** Games→Projects,
+Dashboard→Home, Library→Assets group.
+**Note:** the scripts need a `GITHUB_TOKEN` with **ALL-repositories** access (fine-grained "select repos" →
+404 on the rest; or use a classic `repo` token).
 
 ### Shipped 2026-06-29 (biome Place tab + NPC demo + sample game)
 - **Biome Place tab** (slice 2, game-kit `85e9b9c` + Crucible `32d5330`): `/biome` Tune/Place toggle;
