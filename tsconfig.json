@@ -20,6 +20,7 @@
       "game-kit": ["./vendor/game-kit/src/index.ts"],
       "game-kit/r3f": ["./vendor/game-kit/src/r3f.ts"],
       "game-kit/npc": ["./vendor/game-kit/src/npc.ts"],
+      "game-kit/npc-transformers": ["./vendor/game-kit/src/npc-transformers/index.ts"],
       "game-kit/brief": ["./vendor/game-kit/src/brief.ts"]
     }
   },
