@@ -29,7 +29,7 @@ export interface LibraryItem {
   label: string;
   type: string;
   source: "procgen" | "generated";
-  format: "image" | "model";
+  format: "image" | "model" | "audio";
   url: string | null;
   tags: string[];
   notes: string;
@@ -202,6 +202,33 @@ export function LibraryGrid({ items }: { items: LibraryItem[] }) {
                 <div className="aspect-square w-full overflow-hidden rounded-md bg-muted">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={i.url} alt={i.label} className="h-full w-full object-contain" />
+                </div>
+              ) : i.format === "audio" && i.url ? (
+                // Baked procgen synth (WAV) — an accessible inline player instead of a
+                // 2D/3D viewer. A waveform glyph fills the square so the tile reads as
+                // audio at a glance; the native controls sit below it.
+                <div className="flex aspect-square w-full flex-col items-center justify-center gap-3 rounded-md bg-muted p-2">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-10 w-10 text-muted-foreground"
+                    aria-hidden="true"
+                  >
+                    <path d="M2 12h2l2-7 4 16 3-11 2 4h7" />
+                  </svg>
+                  <audio
+                    controls
+                    preload="none"
+                    src={i.url}
+                    aria-label={`Audio: ${i.label}`}
+                    className="w-full"
+                  >
+                    <track kind="captions" />
+                  </audio>
                 </div>
               ) : (
                 <div className="flex aspect-square w-full items-center justify-center rounded-md bg-muted">

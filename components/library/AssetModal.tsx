@@ -201,6 +201,12 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
               </Suspense>
               <OrbitControls makeDefault enablePan enableZoom enableDamping />
             </Canvas>
+          ) : item.format === "audio" && item.url ? (
+            <div className="flex h-full items-center justify-center p-8">
+              <audio controls src={item.url} className="w-full max-w-md">
+                <track kind="captions" />
+              </audio>
+            </div>
           ) : item.url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={item.url} alt={item.label} className="h-full w-full object-contain" />
@@ -334,7 +340,7 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
               download
               className="mt-auto w-fit rounded text-sm text-primary underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Download {item.format === "model" ? "GLB" : "image"}
+              Download {item.format === "model" ? "GLB" : item.format === "audio" ? "WAV" : "image"}
             </a>
           )}
         </div>

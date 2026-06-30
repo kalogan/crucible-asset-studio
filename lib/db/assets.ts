@@ -21,7 +21,7 @@ export async function createAsset(input: AssetInsertT): Promise<Asset> {
 
 export interface AssetUpdate {
   stage?: AssetStage;
-  kind?: "image" | "model";
+  kind?: "image" | "model" | "audio";
   raw_path?: string | null;
   finished_path?: string | null;
   cdn_url?: string | null;

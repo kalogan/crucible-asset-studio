@@ -18,7 +18,7 @@ export const JobStatus = z.enum([
 export const AssetStage = z.enum([
   "queued", "generating", "in_review", "approved", "rejected", "finished", "published",
 ]);
-export const AssetKind = z.enum(["image", "model"]);
+export const AssetKind = z.enum(["image", "model", "audio"]);
 export type AssetKind = z.infer<typeof AssetKind>;
 
 export type LoraStatus = z.infer<typeof LoraStatus>;
@@ -183,7 +183,7 @@ export const ReferenceAsset = z.object({
   asset_type: ReferenceAssetType,
   label: z.string().min(1),
   source: z.enum(["procgen", "external"]),
-  format: z.enum(["image", "model"]).default("image"),
+  format: z.enum(["image", "model", "audio"]).default("image"),
   image_path: z.string(),
   art_kit_id: z.string().nullable(),
   tags: z.array(z.string()).default([]),
@@ -197,7 +197,7 @@ export const ReferenceAssetInsert = z.object({
   asset_type: ReferenceAssetType,
   label: z.string().min(1),
   source: z.enum(["procgen", "external"]).optional(),
-  format: z.enum(["image", "model"]).optional(),
+  format: z.enum(["image", "model", "audio"]).optional(),
   image_path: z.string(),
   art_kit_id: z.string().nullable().optional(),
   tags: z.array(z.string()).optional(),
