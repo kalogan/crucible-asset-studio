@@ -65,6 +65,8 @@ export const SYSTEMS: readonly KitSystem[] = [
   { id: "skeletal-anim", name: "Skeletal Anim", tier: "system", status: "built", module: "clip" },
   { id: "deploy-presets", name: "Deploy Presets", tier: "kit", status: "built", module: "presets" },
   { id: "npc-reasoning", name: "NPC Reasoning", tier: "kit", status: "built", module: "npc" },
+  { id: "nav", name: "Nav / Pathfinding", tier: "system", status: "built", module: "nav" },
+  { id: "npc-behavior", name: "NPC Behavior", tier: "system", status: "built", module: "behavior" },
 ] as const;
 
 /**
@@ -95,6 +97,10 @@ export const ADOPTION: Record<string, Record<string, Adoption>> = {
   // Wayfinders (project-mmo) shipped the Grok-backed conversational NPC brain; the
   // other games have no dialogue-NPC system today, so it's n/a to their current design.
   "npc-reasoning": { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na" },
+  // Nav/pathfinding + NPC behavior were distilled from project-mmo's sim-core; the other
+  // games don't drive autonomous grid NPCs, so n/a to their current design.
+  nav: { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na" },
+  "npc-behavior": { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na" },
 };
 
 /** Look up adoption for a (system, game) pair. Returns `na` if unmapped. */

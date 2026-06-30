@@ -328,21 +328,23 @@ preserve: the LLM never moves an NPC.** Movement is pure, seeded, deterministic;
   `createExtractiveSummarizer` (local, deterministic) + `createProviderSummarizer(complete)` +
   `consolidateMemory`; `createNpcBrain` takes an optional `summarizer`/`consolidateKeepRecent` and folds the
   episodic overflow into the summary. Opt-in; verbatim-only default unchanged.
-- **A3 — Local embeddings + semantic recall** (the "local model"): an `Embedder` seam `embed(text)→number[]`
-  with a LOCAL default via transformers.js (e.g. all-MiniLM-L6-v2, in-process, no API cost). Store vectors
-  with episodic turns; `buildMemoryView` upgrades from "last 8" → top-K by cosine + a few most-recent.
-  Pluggable vector index (brute-force in-memory default; pgvector/HNSW = future). **Decision (like zod):**
-  transformers.js is a real dep + ~25MB model download — scope it to the npc/memory entry, opt-in.
+- **A3 — Embeddings + semantic recall** ✓ SHIPPED (game-kit `749b1ff`): `Embedder` seam +
+  `createHashingEmbedder` (LOCAL, zero-dep, deterministic LEXICAL default) + `cosineSimilarity` +
+  `selectRelevantTurns` (top-k relevant + recent). `NpcMemoryTurn` carries an optional embedding;
+  `createNpcBrain` opt-in `embedder`/`recall` feeds the model the most RELEVANT past turns, not recency.
+  **Remaining opt-in:** a real local MODEL (transformers.js all-MiniLM ~25MB) is a one-file `Embedder`
+  adapter — that dep call still stands; the lexical default ships now so the whole recall path works.
 - **A4 — Consolidation / forgetting** (polish): periodic merge of near-duplicate memories + recency×salience
   decay so long-term memory stays small + relevant.
 
 **Track B — Behavior (walking / pathfinding / actions), distilled from sim-core.** Sim-side + deterministic
 (seeded via kit `prng`); the game renders synced state (an optional r3f helper renders it).
-- **B1 — Nav + pathfinding atom** (`game-kit/nav`): a `Pathfinder` seam + an A* grid impl distilled from
-  sim-core's nav engine. Pure, three-free (walkable grid / poly list). Gate: A* correctness.
-- **B2 — Deterministic behavior runtime** (`createNpcBehavior`, from `tickNpcBehavior`): bounds
-  (wander/region/patrol) → pick goal in bounds → request route → walk it → leash home. `tick(dt)`. Gate:
-  same seed → same path.
+- **B1 — Nav + pathfinding** ✓ SHIPPED (game-kit `749b1ff`): `createGridNav` — a walkable grid +
+  deterministic A* (octile/Manhattan, no corner-cutting) behind a `Pathfinder` seam; world↔cell mapping.
+  Three-free.
+- **B2 — Deterministic behavior runtime** ✓ SHIPPED (game-kit `749b1ff`): `createNpcBehavior` — seeded
+  deterministic walking over a `Pathfinder`; bounds wander/region/patrol (pick goal → route → walk →
+  idle). Three-free; the LLM never drives it.
 - **B3 — Steering / follow** (from `tickCompanionFollow`): follow a moving target + arrive + separation —
   powers companions and "walk beside the player" NPCs.
 - **B4 — Action / utility layer:** a small utility-AI (or tiny behavior tree) selecting among deterministic
