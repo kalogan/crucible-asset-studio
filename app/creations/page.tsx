@@ -78,7 +78,11 @@ export default async function CreationsPage() {
                     </p>
                   )}
                   <span className="text-xs text-muted-foreground">
-                    Updated {timeAgo(p.updated_at) || "—"}
+                    {p.github_pushed_at
+                      ? `Updated ${timeAgo(p.github_pushed_at)}`
+                      : p.repo_url
+                        ? "Updated —"
+                        : "No repo linked"}
                   </span>
                 </div>
               </Link>
