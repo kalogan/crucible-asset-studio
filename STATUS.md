@@ -23,19 +23,43 @@ Crucible is now a **multi-project studio hub**, not just a game asset studio:
 - **Deploy:** Vercel builds (no private git-dep clone — vendored). Outstanding env on Vercel:
   `ANTHROPIC_API_KEY` (for /brief, /npc live model). The dashboard no longer needs a server GITHUB_TOKEN.
 
+### Shipped 2026-06-30 (afternoon — dashboard polish + 3 parallel threads)
+- **Token-free everywhere:** Creations README blurbs now STORED as a `summary` per project (migration 0014,
+  synthesized by `pnpm refresh-github`) — Creations reads the DB, no live GitHub fetch. Creations "last
+  updated" uses `github_pushed_at` like the dashboard.
+- **Dashboard stats reworked:** the 4 tiles are now **Games · Apps · Commits · Assets** (dropped Playable +
+  the sub-hint copy). `commit_count` STORED per repo (migration 0015, from GitHub's Link-header page count).
+  **Assets** = the full Library total = `reference_assets` (procgen) + non-rejected generated (`referenceCountsByProject`
+  merged in) — matches the Library header exactly. (Run `pnpm refresh-github` to populate Commits.)
+- **3 parallel agent threads landed** (each its own commit, consolidated build green):
+  - **Resumable batch worker** (`66e7a5b`, Phase 3 slice 1): `enqueueBatch` (1 queued job/spec, no spend at
+    enqueue) + re-entrant `runBatch` (skips succeeded/canceled, retries failed, reclaims stale generating).
+    Reuses the existing FLUX/TRELLIS path. **Dry-run MOCK by default**; paid path double-gated (`dryRun:false`
+    **AND** `CRUCIBLE_ALLOW_PAID_BATCH=1`). New `batches` DAL + `Batch` schema, `claimQueuedJob` guard,
+    `/api/batch` trigger, `pnpm run-batch` script, migration 0016.
+  - **app-kit family** (`8274216`): first module **Auth/Session** (`vendor/app-kit/src/auth`), catalog gains
+    `kind` (game|app), scaffolder gets a **Kit-family toggle**; app-kit is preview-only (runnable app starter
+    is the next slice). Game generator untouched.
+  - **Sort/filter polish** (`2477b83`): Creations **Last-updated / Name** sort (new `CreationsList`); dashboard
+    **Tech/Genre chips are clickable filters** in GamesGrid (aria-pressed + active-tag clear).
+- **Audio asset kind — STARTED then PAUSED (~70%, STASHED):** WAV renderer baking the procgen synth, "audio"
+  added to AssetKind, Library tile, unapplied migration 0017. `git stash list` → `stash@{0}`. Resume: `git
+  stash pop`, finish AssetModal's audio branch, `pnpm migrate`, commit.
+
 ### Next up (pick a thread)
-- **Store the rest of the GitHub data** (token-free everywhere): Creations README blurbs are still
-  live-fetched — store a synthesized `summary` per project (script + DB column) so Creations works without a
-  server token, like the dashboard now does. Optional: auto-screenshots (OG image / first repo image).
-- **Sort/filter polish:** sort options on Creations (it's still `created_at`); make Tech/Genre chips clickable
-  dashboard filters.
+- **Finish audio asset kind** (stashed, ~70%): pop the stash, add the `<audio>` branch in AssetModal, wire a
+  bake invocation path, gate + `pnpm migrate` (0017), commit. Then: where do audio recipes come from (UI /
+  asset-system sounds editor / per-game canon)?
+- **Asset-gen core, rest of Phase 3:** worker **enqueue UI** (producer route/button on review/library — none
+  yet); **LoRA enforcer** (precision gate in the worker — fail canon-free runs when `lora_status: ready`);
+  **Kiln finishing** (`approved → finished`, own `executor: "kiln"` job type); **CDN publish** (`finished →
+  published` via per-project `cdn_endpoint`). Worker is sequential — parallel fan-out deferred.
+- **app-kit Phase 2 cont.:** next modules **App Shell/Layout** + **Deploy Config** (order TBD); the **runnable
+  app starter** (Next.js zip like the game scaffolder, vendors `vendor/app-kit`); maybe an app health-check
+  matrix (kept flat for now).
 - **game-kit frontier:** scaffolder doesn't yet WIRE npc-reasoning/nav/npc-behavior (shown but inert) — add
   their generator wiring; the real local-MODEL embedder (transformers.js, dep call open); the GATED **B5**
   reasoning→behavior bridge (firewall-widening `goTo`/`emote` — stop-and-confirm); B3/B4 follow/utility done.
-- **app-kit / web-kit** (Phase 2 of the apps arc): distil shared auth/login/layout/deploy patterns from the
-  app repos into a kit family, surfaced in `/kit` alongside game-kit; scaffolder/brief gain a kind selector.
-- **The asset-gen core** (the original mission, still valid): the LoRA slice (style-fidelity enforcer),
-  resumable batch worker (Phase 3), Kiln finishing + CDN publish.
 
 ---
 
