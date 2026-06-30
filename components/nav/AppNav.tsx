@@ -15,6 +15,7 @@ const ITEMS: NavItem[] = [
   { href: "/systems", label: "Systems" },
   { href: "/roblox", label: "Roblox" },
   { href: "/kit", label: "Kit" },
+  { href: "/brief", label: "Brief" },
   { href: "/prompts", label: "Prompts" },
 ];
 

@@ -38,13 +38,29 @@ function templateSystemIds(template: ScaffoldTemplate): ReadonlySet<string> {
   return new Set(TEMPLATES.find((t) => t.id === template)?.systemIds ?? []);
 }
 
-export function Scaffolder({ systems }: { systems: readonly ScaffoldSystem[] }) {
-  const [name, setName] = useState("My Game");
-  const [target, setTarget] = useState<ScaffoldTarget>("r3f");
+export function Scaffolder({
+  systems,
+  initialName,
+  initialTarget,
+  initialSystemIds,
+}: {
+  systems: readonly ScaffoldSystem[];
+  /** Prefill from the design brief (/brief → "Scaffold this"). */
+  initialName?: string;
+  initialTarget?: ScaffoldTarget;
+  initialSystemIds?: readonly string[];
+}) {
+  const [name, setName] = useState(initialName || "My Game");
+  const [target, setTarget] = useState<ScaffoldTarget>(initialTarget ?? "r3f");
   const [template, setTemplate] = useState<ScaffoldTemplate>("blank");
-  const [selected, setSelected] = useState<ReadonlySet<string>>(
-    () => new Set(systems.map((s) => s.id)),
-  );
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => {
+    // Prefilled picks (intersected with known systems) win; otherwise select all.
+    if (initialSystemIds && initialSystemIds.length > 0) {
+      const known = new Set(systems.map((s) => s.id));
+      return new Set(initialSystemIds.filter((id) => known.has(id)));
+    }
+    return new Set(systems.map((s) => s.id));
+  });
   const [files, setFiles] = useState<ScaffoldFile[] | null>(null);
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
 

@@ -26,6 +26,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      game-kit:
+        specifier: github:kalogan/game-kit
+        version: git+https://git@github.com:kalogan/game-kit.git#aae1c9ad1623e8cb6b803a657186d6897275deb4(@react-three/drei@10.7.7(@react-three/fiber@9.6.1(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.171.0))(@types/react@19.2.17)(@types/three@0.171.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.171.0))(@react-three/fiber@9.6.1(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.171.0))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
@@ -1839,6 +1842,27 @@ packages:
   functions-have-names@1.2.3:
     resolution: {integrity: sha512-xckBUXyTIqT97tq2x2AMb+g163b5JFysYk0x4qxNFwbfQkmNZoiRHb6sPzI9/QV33WeuvVYBUIiD4NzNIyqaRQ==}
 
+  game-kit@git+https://git@github.com:kalogan/game-kit.git#aae1c9ad1623e8cb6b803a657186d6897275deb4:
+    resolution: {commit: aae1c9ad1623e8cb6b803a657186d6897275deb4, repo: git@github.com:kalogan/game-kit.git, type: git}
+    version: 0.1.0
+    peerDependencies:
+      '@react-three/drei': ^10
+      '@react-three/fiber': ^9
+      '@react-three/postprocessing': ^3
+      react: ^19
+      react-dom: ^19
+    peerDependenciesMeta:
+      '@react-three/drei':
+        optional: true
+      '@react-three/fiber':
+        optional: true
+      '@react-three/postprocessing':
+        optional: true
+      react:
+        optional: true
+      react-dom:
+        optional: true
+
   generator-function@2.0.1:
     resolution: {integrity: sha512-SFdFmIJi+ybC0vjlHN0ZGVGHc3lgE0DxPAT0djjVg+kjOnSqclqmj0KQ7ykTOLP6YxoqOvuAODGdcHJn+43q3g==}
     engines: {node: '>= 0.4'}
@@ -2875,6 +2899,9 @@ packages:
     resolution: {integrity: sha512-XyGQrFmNQ5O/IoKm556ftwKsBg11TIb301MB5dWNicziQBEs2g3gtOYIf7pFiLa0zI2gUwhtCjv9fmjnxKZ1Cg==}
     peerDependencies:
       three: '>=0.128.0'
+
+  three@0.169.0:
+    resolution: {integrity: sha512-Ed906MA3dR4TS5riErd4QBsRGPcx+HBDX2O5yYE5GqJeFQTPU+M56Va/f/Oph9X7uZo3W3o4l2ZhBZ6f6qUv0w==}
 
   three@0.171.0:
     resolution: {integrity: sha512-Y/lAXPaKZPcEdkKjh0JOAHVv8OOnv/NDJqm0wjfCzyQmfKxV7zvkwsnBgPBKTzJHToSOhRGQAGbPJObT59B/PQ==}
@@ -4959,6 +4986,16 @@ snapshots:
 
   functions-have-names@1.2.3: {}
 
+  game-kit@git+https://git@github.com:kalogan/game-kit.git#aae1c9ad1623e8cb6b803a657186d6897275deb4(@react-three/drei@10.7.7(@react-three/fiber@9.6.1(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.171.0))(@types/react@19.2.17)(@types/three@0.171.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.171.0))(@react-three/fiber@9.6.1(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.171.0))(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+    dependencies:
+      three: 0.169.0
+      zod: 3.25.76
+    optionalDependencies:
+      '@react-three/drei': 10.7.7(@react-three/fiber@9.6.1(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.171.0))(@types/react@19.2.17)(@types/three@0.171.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.171.0)
+      '@react-three/fiber': 9.6.1(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.171.0)
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+
   generator-function@2.0.1: {}
 
   gensync@1.0.0-beta.2: {}
@@ -6099,6 +6136,8 @@ snapshots:
       fflate: 0.6.10
       potpack: 1.0.2
       three: 0.171.0
+
+  three@0.169.0: {}
 
   three@0.171.0: {}
 

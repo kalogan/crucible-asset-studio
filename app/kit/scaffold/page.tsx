@@ -17,8 +17,28 @@ function builtByTier(): ScaffoldSystem[] {
   }).map((s) => ({ id: s.id, name: s.name, tier: s.tier }));
 }
 
-export default function ScaffoldPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function firstParam(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
+export default async function ScaffoldPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
   const systems = builtByTier();
+  const sp = (await searchParams) ?? {};
+
+  // Optional prefill from the design brief (/brief → "Scaffold this →").
+  const initialName = firstParam(sp.name);
+  const targetParam = firstParam(sp.target);
+  const initialTarget = targetParam === "vanilla" || targetParam === "r3f" ? targetParam : undefined;
+  const systemsParam = firstParam(sp.systems);
+  const initialSystemIds = systemsParam
+    ? systemsParam.split(",").map((s) => s.trim()).filter(Boolean)
+    : undefined;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-8 px-6 py-12 lg:max-w-5xl xl:max-w-6xl min-[1440px]:max-w-7xl">
@@ -44,7 +64,12 @@ export default function ScaffoldPage() {
         </p>
       </header>
 
-      <Scaffolder systems={systems} />
+      <Scaffolder
+        systems={systems}
+        {...(initialName ? { initialName } : {})}
+        {...(initialTarget ? { initialTarget } : {})}
+        {...(initialSystemIds ? { initialSystemIds } : {})}
+      />
     </main>
   );
 }
