@@ -17,9 +17,12 @@ function typeLabel(p: Project): string {
 export function GamesGrid({ projects }: { projects: Project[] }) {
   const [q, setQ] = useState("");
   const [kind, setKind] = useState<KindFilter>("all");
+  // A tech/genre chip the user clicked; the grid is filtered to projects carrying it.
+  const [tag, setTag] = useState<string | null>(null);
   const query = q.trim().toLowerCase();
   const filtered = projects.filter((p) => {
     if (kind !== "all" && p.kind !== kind) return false;
+    if (tag && !p.tech.includes(tag) && !p.genres.includes(tag)) return false;
     if (!query) return true;
     return (
       p.name.toLowerCase().includes(query) ||
@@ -27,6 +30,9 @@ export function GamesGrid({ projects }: { projects: Project[] }) {
       p.slug.includes(query)
     );
   });
+
+  // Toggle a tag filter: clicking the active tag clears it.
+  const toggleTag = (t: string) => setTag((cur) => (cur === t ? null : t));
 
   return (
     <div className="flex flex-col gap-4">
@@ -57,6 +63,21 @@ export function GamesGrid({ projects }: { projects: Project[] }) {
           ))}
         </div>
       </div>
+
+      {tag && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" role="status">
+          <span>Filtering by tag:</span>
+          <button
+            type="button"
+            onClick={() => setTag(null)}
+            aria-label={`Clear tag filter ${tag}`}
+            className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary transition-colors hover:bg-primary/20"
+          >
+            {tag}
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground" role="status">
@@ -90,40 +111,60 @@ export function GamesGrid({ projects }: { projects: Project[] }) {
                     </div>
                   )}
                 </div>
-                <div className="flex flex-col gap-2 p-4">
+                <div className="flex flex-col gap-2 px-4 pb-2 pt-4">
                   <h2 className="font-serif text-lg font-semibold text-foreground group-hover:text-primary">
                     {p.name}
                   </h2>
-                  <div className="flex flex-wrap gap-1">
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                      {typeLabel(p)}
-                    </span>
-                    {p.tech.map((t) => (
-                      <span
-                        key={`tech-${t}`}
-                        className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                    {p.genres.map((g) => (
-                      <span
-                        key={`genre-${g}`}
-                        className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-                      >
-                        {g}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {(() => {
-                      const when = timeAgo(p.github_pushed_at ?? "");
-                      return when ? `Updated ${when}` : p.repo_url ? "—" : "No repo linked";
-                    })()}
-                  </p>
                 </div>
               </Link>
-              <div className="px-4 pb-4">
+              {/* Tag row sits outside the Link so the chips are real buttons (an anchor
+                  can't contain interactive buttons). Clicking a chip filters the grid. */}
+              <div className="flex flex-1 flex-col gap-2 px-4 pb-2">
+                <div className="flex flex-wrap gap-1">
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                    {typeLabel(p)}
+                  </span>
+                  {p.tech.map((t) => (
+                    <button
+                      key={`tech-${t}`}
+                      type="button"
+                      onClick={() => toggleTag(t)}
+                      aria-pressed={tag === t}
+                      aria-label={`Filter by ${t}`}
+                      className={`rounded-full border px-2 py-0.5 text-xs transition-colors hover:border-primary hover:text-foreground ${
+                        tag === t
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                  {p.genres.map((g) => (
+                    <button
+                      key={`genre-${g}`}
+                      type="button"
+                      onClick={() => toggleTag(g)}
+                      aria-pressed={tag === g}
+                      aria-label={`Filter by ${g}`}
+                      className={`rounded-full px-2 py-0.5 text-xs transition-colors hover:text-foreground ${
+                        tag === g
+                          ? "bg-primary/10 text-primary"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {(() => {
+                    const when = timeAgo(p.github_pushed_at ?? "");
+                    return when ? `Updated ${when}` : p.repo_url ? "—" : "No repo linked";
+                  })()}
+                </p>
+              </div>
+              <div className="mt-auto px-4 pb-4">
                 {p.url ? (
                   <Button asChild className="w-full">
                     <a href={p.url} target="_blank" rel="noreferrer">
