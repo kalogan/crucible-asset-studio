@@ -2,6 +2,7 @@ import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/config";
 import { listProjects } from "@/lib/db/projects";
 import { assetCountsByProject } from "@/lib/db/assets";
+import { referenceCountsByProject } from "@/lib/db/reference-assets";
 import { GamesGrid } from "@/components/games/GamesGrid";
 import { StatRow, computeStats } from "@/components/games/StatRow";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,16 @@ export default async function HomePage() {
         if (tb !== ta) return tb - ta;
         return Date.parse(b.updated_at) - Date.parse(a.updated_at);
       });
-      assetCounts = await assetCountsByProject();
+      // Library total = procgen/imported (reference_assets) + non-rejected generated assets.
+      // Merge both per-project counts so the dashboard "Assets" matches the Library's total.
+      const [generated, refs] = await Promise.all([
+        assetCountsByProject(),
+        referenceCountsByProject(),
+      ]);
+      assetCounts = { ...generated };
+      for (const [pid, n] of Object.entries(refs)) {
+        assetCounts[pid] = (assetCounts[pid] ?? 0) + n;
+      }
     } catch (err) {
       loadFailed = true;
       console.error("HomePage: listProjects failed:", err);

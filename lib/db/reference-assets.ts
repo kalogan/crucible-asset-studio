@@ -54,6 +54,25 @@ export async function listReferenceAssetsByProject(
   return (data ?? []).map((r) => ReferenceAsset.parse(r));
 }
 
+/**
+ * Count reference (procgen/imported) assets grouped by project, in one query. Tolerant —
+ * returns an empty map on error so the dashboard renders even if the table is unavailable.
+ */
+export async function referenceCountsByProject(): Promise<Record<string, number>> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.from("reference_assets").select("project_id");
+  if (error) {
+    console.warn("referenceCountsByProject failed:", error.message);
+    return {};
+  }
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const pid = (row as { project_id?: string }).project_id;
+    if (typeof pid === "string") counts[pid] = (counts[pid] ?? 0) + 1;
+  }
+  return counts;
+}
+
 /** All reference (procgen/imported) assets across every project — for the global library. */
 export async function listAllReferenceAssets(limit = 500): Promise<ReferenceAsset[]> {
   const supabase = createServiceClient();
