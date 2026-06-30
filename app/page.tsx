@@ -68,15 +68,15 @@ export default async function HomePage() {
       <header className="flex flex-col gap-3">
         <p className="text-sm font-medium uppercase tracking-widest text-primary">Crucible</p>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-3xl font-semibold sm:text-4xl">Games</h1>
+          <h1 className="text-3xl font-semibold sm:text-4xl">Projects</h1>
           {configured && (
             <Button asChild>
-              <Link href="/projects/new">+ New game</Link>
+              <Link href="/projects/new">+ New Project</Link>
             </Button>
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Your studio at a glance — the numbers up top, the games below.
+          Your studio at a glance — the numbers up top, the projects below.
         </p>
       </header>
 

@@ -30,7 +30,7 @@ export function CreateGameForm() {
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="description">Description</Label>
-        <Textarea id="description" name="description" rows={2} placeholder="What is this game?" className="resize-y" />
+        <Textarea id="description" name="description" rows={2} placeholder="What is this?" className="resize-y" />
       </div>
 
       <div className="flex flex-wrap gap-3">

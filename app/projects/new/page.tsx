@@ -14,11 +14,11 @@ export default function NewProjectPage() {
           href="/"
           className="w-fit rounded text-sm text-primary underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          ← Games
+          ← Projects
         </Link>
-        <h1 className="text-3xl font-semibold text-foreground">New game</h1>
+        <h1 className="text-3xl font-semibold text-foreground">New project</h1>
         <p className="text-sm text-muted-foreground">
-          Register a game — fill in what you have; you can edit it all later on its page.
+          Register a project — fill in what you have; you can edit it all later on its page.
         </p>
       </header>
       {configured ? (
