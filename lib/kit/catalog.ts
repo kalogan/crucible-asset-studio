@@ -79,6 +79,11 @@ export const SYSTEMS: readonly KitSystem[] = [
   { id: "npc-reasoning", name: "NPC Reasoning", tier: "kit", status: "built", module: "npc" },
   { id: "nav", name: "Nav / Pathfinding", tier: "system", status: "built", module: "nav" },
   { id: "npc-behavior", name: "NPC Behavior", tier: "system", status: "built", module: "behavior" },
+  // ★ GATED, default-OFF widening of the reasoning firewall (Track B5). Its own flag so it
+  // is NEVER an accident of just selecting npc-reasoning — it lets the model REQUEST NPC
+  // movement (a clamped goal the pathfinder still owns). See Scaffolder's MOVEMENT-GATED
+  // opt-out: this id is never pre-selected.
+  { id: "npc-reasoning-movement", name: "NPC Reasoning — Movement (gated)", tier: "kit", status: "built", module: "npc" },
 ] as const;
 
 /** One-line explainer per system (shown on hover in the scaffolder). */
@@ -106,6 +111,7 @@ export const SYSTEM_DESCRIPTIONS: Record<string, string> = {
   "npc-reasoning": "Server-side NPC brain — firewalled LLM reasoning + memory + local semantic recall (Grok/Claude). Scaffolds a server-only reference wiring (never bundled client-side).",
   nav: "Grid + A* pathfinding behind a Pathfinder seam. Scaffolds a walkable grid you path over with findPath.",
   "npc-behavior": "Deterministic NPC behaviour (wander/patrol) + follow steering + utility-AI. Scaffolds a wandering NPC you tick(dt) over the nav grid.",
+  "npc-reasoning-movement": "⚠ GATED, default-OFF firewall widening — lets the model drive NPC movement by REQUESTING a destination (goTo) or a bounded gesture (emote). The pathfinder still owns actual movement; goTo is clamped to walkable bounds. Review the firewall before shipping. Add on top of NPC Reasoning.",
 };
 
 // ── app-kit family (kind: "app") ─────────────────────────────────────────────
@@ -160,6 +166,8 @@ export const ADOPTION: Record<string, Record<string, Adoption>> = {
   // games don't drive autonomous grid NPCs, so n/a to their current design.
   nav: { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na" },
   "npc-behavior": { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na" },
+  // Gated reasoning→movement bridge — a brand-new opt-in widening; no game ships it yet.
+  "npc-reasoning-movement": { "project-mmo": "na", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na" },
 };
 
 /** Look up adoption for a (system, game) pair. Returns `na` if unmapped. */

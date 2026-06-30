@@ -353,6 +353,33 @@ describe("generateScaffold — npc / nav / behavior wiring", () => {
     }
   });
 
+  it("npc-reasoning-movement is GATED + server-side: warns + never live-imports game-kit/npc", () => {
+    for (const target of ["vanilla", "r3f"] as const) {
+      const path = target === "r3f" ? "src/main.tsx" : "src/main.ts";
+      const main = fileMap(
+        generateScaffold({
+          name: "G",
+          target,
+          systemIds: ["render-bootstrap", "npc-reasoning-movement"],
+        }),
+      ).get(path) as string;
+      // Every mention of the server-only entry must be commented (no client-bundle import).
+      for (const line of main.split("\n")) {
+        if (line.includes("game-kit/npc")) {
+          expect(line.trimStart().startsWith("//")).toBe(true);
+        }
+      }
+      // The gate + its warning copy are surfaced in the wiring.
+      expect(main).toContain("allowMovement: true");
+      expect(main).toContain("DEFAULT-OFF");
+      expect(main).toContain("review the");
+      expect(main).toContain("navBoundsFromGrid");
+      expect(main).toContain("parseReasoningResponse");
+      // It documents that movement stays a request the pathfinder owns.
+      expect(main).toContain("NEVER writes an NPC position");
+    }
+  });
+
   it("nav r3f wiring goes to module scope (no <Canvas> JSX/hook needed)", () => {
     const main = fileMap(
       generateScaffold({

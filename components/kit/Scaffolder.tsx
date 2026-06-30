@@ -31,6 +31,26 @@ const KIND_OPTIONS: readonly { value: ProjectKind; label: string }[] = [
   { value: "app", label: "App kit" },
 ];
 
+/**
+ * MOVEMENT-GATED, default-OFF pieces (Track B5). These widen a safety firewall (they let
+ * the model drive NPC movement), so they must NEVER be pre-selected — opting in has to be a
+ * deliberate click, never an accident of "select all". Excluded from every default/select-all
+ * set below; the user can still tick them on manually.
+ */
+const DEFAULT_OFF_SYSTEM_IDS: ReadonlySet<string> = new Set([
+  "npc-reasoning-movement",
+]);
+
+/** All ids in `systems` for `kind`, minus the default-OFF (gated) pieces. */
+function defaultSelectableIds(
+  systems: readonly ScaffoldSystem[],
+  kind: ProjectKind,
+): string[] {
+  return systems
+    .filter((s) => (s.kind ?? "game") === kind && !DEFAULT_OFF_SYSTEM_IDS.has(s.id))
+    .map((s) => s.id);
+}
+
 const TIER_LABELS: Record<Tier, string> = {
   atom: "Atoms",
   system: "Systems",
@@ -74,12 +94,12 @@ export function Scaffolder({
     // Prefilled picks (intersected with known systems) win; otherwise select all
     // of the initial family (game-kit) — app-kit pieces are added on family switch.
     if (initialSystemIds && initialSystemIds.length > 0) {
+      // Honour an explicit prefill verbatim (the user/brief asked for these) — but a
+      // gated piece is opt-in even here only if explicitly named.
       const known = new Set(systems.map((s) => s.id));
       return new Set(initialSystemIds.filter((id) => known.has(id)));
     }
-    return new Set(
-      systems.filter((s) => (s.kind ?? "game") === "game").map((s) => s.id),
-    );
+    return new Set(defaultSelectableIds(systems, "game"));
   });
   const [files, setFiles] = useState<ScaffoldFile[] | null>(null);
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
@@ -107,11 +127,7 @@ export function Scaffolder({
       setKind(next);
       setTemplate("blank");
       setFiles(null);
-      setSelected(
-        new Set(
-          systems.filter((s) => (s.kind ?? "game") === next).map((s) => s.id),
-        ),
-      );
+      setSelected(new Set(defaultSelectableIds(systems, next)));
     },
     [systems],
   );
@@ -124,7 +140,11 @@ export function Scaffolder({
       setTemplate(next);
       setSelected(
         next === "blank"
-          ? new Set(familySystems.map((s) => s.id))
+          ? new Set(
+              familySystems
+                .filter((s) => !DEFAULT_OFF_SYSTEM_IDS.has(s.id))
+                .map((s) => s.id),
+            )
           : templateSystemIds(next),
       );
     },

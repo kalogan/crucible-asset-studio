@@ -22,6 +22,20 @@ export const REASONING_SYSTEM_GUARDRAILS = [
 ].join('\n');
 
 /**
+ * OPT-IN guardrail addendum for the GATED movement track (B5). Append this to the system
+ * prompt ONLY when the caller has enabled `allowMovement` in the firewall — it tells the
+ * model the two extra intents it may now emit. It is NOT part of the default guardrails, so
+ * the default prompt is byte-for-byte unchanged; and even with it, the firewall (clamp to
+ * walkable bounds + bounded emote enum) remains the authority — the prompt only advises.
+ */
+export const REASONING_MOVEMENT_GUARDRAILS = [
+  'You may ALSO request to move or gesture, but you do NOT control your own body directly:',
+  '  • {"kind":"goTo","target":[x,z]} — REQUEST to walk toward world point [x, z]. It is only a request: the game clamps it to walkable ground and the pathfinder decides the route. You never teleport.',
+  '  • {"kind":"emote","name":"..."} — play one gesture; "name" must be one of: "wave", "nod", "point", "shrug". Any other gesture is ignored.',
+  'Move or gesture sparingly and only when it fits the moment. You still mostly speak.',
+].join('\n');
+
+/**
  * Render the persona + transcript into a single USER-prompt string fed to the model
  * under the system guardrails. Pure + serializable (no engine types).
  */

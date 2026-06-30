@@ -12,9 +12,17 @@
  * explicitly allows.
  *
  * ★ THE VOCABULARY IS DELIBERATELY SMALL + SAFE: `say`, `setMood`, `wait`,
- * `endConversation`, `recall`. NO movement / combat / economy intents — adding one
- * is an explicit, reviewed widening of the firewall, never an accident of a clever
- * model reply.
+ * `endConversation`, `recall`. NO movement / combat / economy intents BY DEFAULT —
+ * adding one is an explicit, reviewed widening of the firewall, never an accident of
+ * a clever model reply.
+ *
+ * ★ GATED MOVEMENT (Track B5): two movement intents — `goTo` (request a destination)
+ * and `emote` (a bounded gesture) — exist but are ADMITTED ONLY when the caller passes
+ * `{ allowMovement: true }` into `parseReasoningResponse`. The default (`false`) drops
+ * them EXACTLY like an unknown `kind`, so the default build is byte-for-byte as safe as
+ * before this track. Even when admitted, the model only PROPOSES a goal: `goTo.target`
+ * is validated finite + CLAMPED to the nav grid's walkable bounds, and the authoritative
+ * behavior/pathfinder still owns actual movement — the model never writes a position.
  *
  * Engine-agnostic + serializable: plain Zod shapes, no three / colyseus / DB import.
  */
@@ -105,6 +113,48 @@ export const RecallIntentSchema = z
   })
   .strict();
 
+// ── Gated MOVEMENT intents (Track B5) — admitted ONLY with allowMovement: true ──
+//
+// These two widen the firewall in a strictly opt-in way. They are NOT part of the
+// default `NpcIntentSchema` union below — so with the flag OFF the discriminated union
+// has no `goTo`/`emote` member and they are dropped exactly like an unknown kind.
+
+/**
+ * The bounded set of gestures the model may request. An `emote` whose `name` is not in
+ * this enum FAILS validation and is dropped — the model can never invent a new gesture.
+ */
+export const NPC_EMOTE_NAMES = ['wave', 'nod', 'point', 'shrug'] as const;
+export type NpcEmoteName = (typeof NPC_EMOTE_NAMES)[number];
+
+/**
+ * A FINITE world coordinate. `z.number()` admits ±Infinity (it only rejects NaN), so we
+ * refine with `Number.isFinite` — a non-finite target then fails validation and the whole
+ * `goTo` is dropped (the model can never request an unbounded / NaN destination).
+ */
+const FiniteCoordSchema = z.number().refine((n) => Number.isFinite(n), { message: 'must be finite' });
+
+/**
+ * `goTo` — REQUEST a destination in world XZ. The model only proposes a goal; the target
+ * is validated finite (above) + clamped to the nav grid's walkable bounds, and the
+ * authoritative pathfinder/behavior still owns the actual movement (it never writes a
+ * position from the model). A non-finite component drops the intent.
+ */
+export const GoToIntentSchema = z
+  .object({
+    kind: z.literal('goTo'),
+    target: z.tuple([FiniteCoordSchema, FiniteCoordSchema]),
+  })
+  .strict();
+
+/** `emote` — play one bounded gesture. Out-of-enum names are dropped (see NPC_EMOTE_NAMES). */
+export const EmoteIntentSchema = z
+  .object({
+    kind: z.literal('emote'),
+    name: z.enum(NPC_EMOTE_NAMES),
+  })
+  .strict();
+
+/** The DEFAULT (movement-firewalled) vocabulary — identical to before Track B5. */
 export const NpcIntentSchema = z.discriminatedUnion('kind', [
   SayIntentSchema,
   SetMoodIntentSchema,
@@ -114,7 +164,19 @@ export const NpcIntentSchema = z.discriminatedUnion('kind', [
 ]);
 export type NpcIntent = z.infer<typeof NpcIntentSchema>;
 
-/** The exact set of intent kinds the firewall admits (for tests + diagnostics). */
+/** The WIDENED vocabulary — the default set PLUS the gated movement intents. */
+export const NpcMovementIntentSchema = z.discriminatedUnion('kind', [
+  SayIntentSchema,
+  SetMoodIntentSchema,
+  WaitIntentSchema,
+  EndConversationIntentSchema,
+  RecallIntentSchema,
+  GoToIntentSchema,
+  EmoteIntentSchema,
+]);
+export type NpcMovementIntent = z.infer<typeof NpcMovementIntentSchema>;
+
+/** The exact set of intent kinds the DEFAULT firewall admits (for tests + diagnostics). */
 export const NPC_INTENT_KINDS = [
   'say',
   'setMood',
@@ -124,6 +186,10 @@ export const NPC_INTENT_KINDS = [
 ] as const;
 export type NpcIntentKind = (typeof NPC_INTENT_KINDS)[number];
 
+/** The kinds admitted ONLY when allowMovement is on (the widening surface). */
+export const NPC_MOVEMENT_INTENT_KINDS = ['goTo', 'emote'] as const;
+export type NpcMovementIntentKind = (typeof NPC_MOVEMENT_INTENT_KINDS)[number];
+
 // ── ReasoningResponse — the provider's OUTPUT shape (the wire form) ──────────
 
 export const ReasoningResponseSchema = z
@@ -131,10 +197,74 @@ export const ReasoningResponseSchema = z
   .strict();
 export type ReasoningResponse = z.infer<typeof ReasoningResponseSchema>;
 
-// ── THE FIREWALL — `parseReasoningResponse` ─────────────────────────────────
+// ── Nav bounds (Track B5) — the walkable rectangle a `goTo` is clamped into ──
 
 /**
- * Validate-and-drop: parse a raw provider reply into the list of LEGAL `NpcIntent`s.
+ * The world-XZ AABB the reasoning layer may target. A `goTo` outside it is CLAMPED back
+ * to the nearest in-bounds point — the model can only request a destination the
+ * pathfinder would accept. Plain numbers (no nav/three import): build it from a grid via
+ * {@link navBoundsFromGrid}, or hand-author it.
+ */
+export interface NavBounds {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
+/** The minimal grid surface we read to derive walkable world bounds (a `createGridNav`). */
+export interface NavBoundsGridLike {
+  readonly width: number;
+  readonly height: number;
+  /** Map a cell `[col, row]` to its world-XZ centre. */
+  cellToWorld(cell: [number, number]): [number, number];
+}
+
+/**
+ * Derive the walkable world-XZ AABB from a grid: the bounding box of cell (0,0)'s centre
+ * and cell (width-1, height-1)'s centre. Order-independent (min/max), so a flipped axis
+ * still yields a valid box.
+ */
+export function navBoundsFromGrid(grid: NavBoundsGridLike): NavBounds {
+  const lo = grid.cellToWorld([0, 0]);
+  const hi = grid.cellToWorld([Math.max(0, grid.width - 1), Math.max(0, grid.height - 1)]);
+  return {
+    minX: Math.min(lo[0], hi[0]),
+    maxX: Math.max(lo[0], hi[0]),
+    minZ: Math.min(lo[1], hi[1]),
+    maxZ: Math.max(lo[1], hi[1]),
+  };
+}
+
+/** Clamp a world-XZ point into the bounds (component-wise). Inputs are already finite. */
+export function clampToNavBounds(target: [number, number], bounds: NavBounds): [number, number] {
+  const x = Math.min(Math.max(target[0], bounds.minX), bounds.maxX);
+  const z = Math.min(Math.max(target[1], bounds.minZ), bounds.maxZ);
+  return [x, z];
+}
+
+// ── THE FIREWALL — `parseReasoningResponse` ─────────────────────────────────
+
+/** Options that GATE the firewall's widening. Omitted ⇒ the default, movement-firewalled. */
+export interface ParseReasoningOptions {
+  /**
+   * Admit the gated movement intents (`goTo`, `emote`). DEFAULT `false` — with it off the
+   * movement intents are dropped EXACTLY like an unknown `kind`, so the default build is
+   * byte-for-byte as safe as before Track B5. ★ Turning this on lets the model drive NPC
+   * movement (as a clamped goal request) — review the firewall before enabling.
+   */
+  allowMovement?: boolean;
+  /**
+   * The walkable world-XZ bounds a `goTo.target` is clamped into. Used ONLY when
+   * `allowMovement` is true. Omit to admit `goTo` WITHOUT clamping (only finite-checked) —
+   * pass bounds (e.g. {@link navBoundsFromGrid}) so the model can never request a point
+   * the pathfinder would reject.
+   */
+  navBounds?: NavBounds;
+}
+
+/**
+ * Validate-and-drop: parse a raw provider reply into the list of LEGAL intents.
  *
  * Accepts a JSON string (fenced ```json blocks tolerated) or an already-parsed value.
  * Drops anything that is not a legal intent (unknown `kind`, oversized text/mood,
@@ -142,15 +272,37 @@ export type ReasoningResponse = z.infer<typeof ReasoningResponseSchema>;
  * result at `MAX_INTENTS_PER_RESPONSE`. NEVER throws: garbage yields no intents, and
  * the consumer then falls back to scripted lines. This is the only thing standing
  * between a model and the game state.
+ *
+ * By DEFAULT (no options, or `allowMovement` falsy) movement intents (`goTo`/`emote`) are
+ * NOT in the admitted union and are dropped like any unknown kind — the result type is the
+ * unchanged `NpcIntent[]`, so every existing caller is byte-for-byte and type-for-type the
+ * same. With `{ allowMovement: true }` they are admitted (result widened to
+ * `NpcMovementIntent[]`); a `goTo` is finite-validated by the schema and CLAMPED to
+ * `navBounds` (when given), and out-of-enum `emote`s are dropped.
  */
-export function parseReasoningResponse(raw: unknown): NpcIntent[] {
+export function parseReasoningResponse(raw: unknown): NpcIntent[];
+export function parseReasoningResponse(
+  raw: unknown,
+  options: ParseReasoningOptions,
+): NpcMovementIntent[];
+export function parseReasoningResponse(
+  raw: unknown,
+  options?: ParseReasoningOptions,
+): NpcMovementIntent[] {
+  const allowMovement = options?.allowMovement === true;
+  const schema = allowMovement ? NpcMovementIntentSchema : NpcIntentSchema;
   const candidates = extractIntentCandidates(raw);
-  const out: NpcIntent[] = [];
+  const out: NpcMovementIntent[] = [];
   for (const candidate of candidates) {
     if (out.length >= MAX_INTENTS_PER_RESPONSE) break;
-    const parsed = NpcIntentSchema.safeParse(candidate);
-    if (parsed.success) out.push(parsed.data);
-    // else: DROP it — an invalid intent never reaches the consumer.
+    const parsed = schema.safeParse(candidate);
+    if (!parsed.success) continue; // DROP it — an invalid intent never reaches the consumer.
+    // Clamp a (validated, finite) goTo target into the walkable bounds, when provided.
+    if (allowMovement && parsed.data.kind === 'goTo' && options?.navBounds) {
+      out.push({ ...parsed.data, target: clampToNavBounds(parsed.data.target, options.navBounds) });
+    } else {
+      out.push(parsed.data);
+    }
   }
   return out;
 }
