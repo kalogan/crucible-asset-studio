@@ -18,7 +18,27 @@
  * stopped, so we pool nothing).
  */
 
+import type { AudioRecipe, AudioWave } from './recipe.js';
+
+// Re-export the portable recipe contract + pure bake path + preset library so the
+// whole audio surface (recipe type, renderer, playRecipe, presets) lands from one
+// module. All of `recipe.ts` is DOM-free/pure, so this stays client-safe.
+export type { AudioRecipe, AudioEvent, AudioWave, SfxPresetName } from './recipe.js';
+export {
+  renderRecipeSamples,
+  encodeWav,
+  renderRecipeToWav,
+  SFX_PRESETS,
+} from './recipe.js';
+
 export type Channel = string;
+
+export interface PlayRecipeOpts {
+  /** Channel to route the whole recipe through. Defaults to 'sfx'. */
+  channel?: Channel;
+  /** Extra per-play linear gain layered on top of the recipe + channel (0..1). Defaults to 1. */
+  gain?: number;
+}
 
 export interface PlayToneOpts {
   /** Oscillator waveform. Defaults to 'sine'. */
@@ -47,6 +67,15 @@ export interface AudioManager {
   playTone(freq: number, durationSec: number, opts?: PlayToneOpts): void;
   /** Play a burst of white noise for `durationSec`. No-op until resumed. */
   playNoise(durationSec: number, opts?: PlayNoiseOpts): void;
+  /**
+   * Synthesize an AudioRecipe LIVE via Web-Audio: one OscillatorNode per tone
+   * event (its wave/freq) and a noise buffer-source per noise event, each through
+   * a per-event GainNode doing the same attack/release envelope, scheduled at the
+   * event's startSec and routed through the channel→master graph. This is the
+   * runtime twin of `renderRecipeToWav` (the bake path) — same recipe, same math.
+   * No-op until resumed (like the rest of the manager).
+   */
+  playRecipe(recipe: AudioRecipe, opts?: PlayRecipeOpts): void;
   /** Close the AudioContext and release nodes. Safe to call repeatedly. */
   dispose(): void;
 }
@@ -220,6 +249,70 @@ export function createAudioManager(opts: AudioManagerOptions = {}): AudioManager
           /* already gone */
         }
       };
+    },
+
+    playRecipe(recipe: AudioRecipe, recipeOpts: PlayRecipeOpts = {}): void {
+      if (disposed || !ctx || recipe.events.length === 0) return;
+      const bus = gainFor(recipeOpts.channel ?? DEFAULT_CHANNEL);
+      if (!bus) return;
+      const now = ctx.currentTime;
+      // The recipe's own masterGain × an optional per-play gain, layered on each
+      // event — mirrors renderRecipeSamples' master×event product exactly.
+      const recipeMaster = recipe.masterGain === undefined ? 1 : clamp01(recipe.masterGain);
+      const playGain = clamp01(recipeOpts.gain ?? 1);
+      const mix = clamp01(recipeMaster * playGain);
+      if (mix <= 0) return;
+
+      for (const e of recipe.events) {
+        if (e.durationSec <= 0) continue;
+        const peak = clamp01(clamp01(e.gain) * mix);
+        if (peak <= 0) continue;
+        const startAt = now + Math.max(0, e.startSec);
+        const dur = e.durationSec;
+        // Same attack/release the pure renderer's envelope() applies.
+        const ramp = Math.min(0.01, dur / 2);
+        const env = ctx.createGain();
+        env.gain.setValueAtTime(0, startAt);
+        env.gain.linearRampToValueAtTime(peak, startAt + ramp);
+        env.gain.setValueAtTime(peak, startAt + Math.max(ramp, dur - ramp));
+        env.gain.linearRampToValueAtTime(0, startAt + dur);
+        env.connect(bus);
+
+        if (e.type === 'noise') {
+          const frames = Math.max(1, Math.floor(ctx.sampleRate * dur));
+          const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < frames; i++) data[i] = Math.random() * 2 - 1;
+          const src = ctx.createBufferSource();
+          src.buffer = buffer;
+          src.connect(env);
+          src.start(startAt);
+          src.stop(startAt + dur);
+          src.onended = () => {
+            try {
+              src.disconnect();
+              env.disconnect();
+            } catch {
+              /* already gone */
+            }
+          };
+        } else {
+          const osc = ctx.createOscillator();
+          osc.type = (e.wave ?? 'sine') as AudioWave;
+          osc.frequency.value = e.freq ?? 440;
+          osc.connect(env);
+          osc.start(startAt);
+          osc.stop(startAt + dur);
+          osc.onended = () => {
+            try {
+              osc.disconnect();
+              env.disconnect();
+            } catch {
+              /* already gone */
+            }
+          };
+        }
+      }
     },
 
     dispose(): void {
