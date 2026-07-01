@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildFinalPrompt, buildCharacterTposePrompt } from "./prompt";
+import { buildFinalPrompt } from "./prompt";
 import { framingFor } from "./framing";
 import { canonReadiness } from "./precision";
 import { wayfindersCanon } from "./seeds/wayfinders";
@@ -46,7 +46,7 @@ describe("buildFinalPrompt", () => {
   });
 });
 
-describe("buildCharacterTposePrompt (rig-ready character path)", () => {
+describe("character-tpose framing (uses the FULL canon for style)", () => {
   const ldRow = () => {
     const seed = livingDungeonCanon("22222222-2222-4222-8222-222222222222");
     return canonRow({
@@ -54,42 +54,30 @@ describe("buildCharacterTposePrompt (rig-ready character path)", () => {
       prompt_suffix: seed.prompt_suffix,
       negative_prompt: seed.negative_prompt,
       style_guide: seed.style_guide,
-      name: seed.name,
-      lora_trigger: seed.lora_trigger,
     });
   };
 
-  it("uses the 3D-character wrapper + T-pose cues, drops the canon's 2D format", () => {
+  it("keeps the canon's style + guards, adds T-pose framing, and doesn't fight the canon", () => {
     const framing = framingFor("character-tpose");
-    const out = buildCharacterTposePrompt(
+    const out = buildFinalPrompt(
       ldRow(),
       `a hunched flesh-golem, ${framing.formatCues}`,
       framing.nevers,
     );
-    // 3D character wrapper + T-pose framing present
-    expect(out).toContain("full-body 3D game character, clean stylized sculpt, readable silhouette");
+    // FULL canon STYLE applied — this is what gives the Living Dungeon look.
+    expect(out).toContain("2D pixel art"); // prefix (FLUX renders it stylized, not literal pixels)
+    expect(out).toContain("pure black background"); // suffix
+    expect(out).toContain("palette #4e2329, #8a3a41, #4dbbc0, #0a0a12");
+    expect(out).toContain("no photorealistic"); // canon guard — prevents a photoreal creature
+    expect(out).toContain("no human faces");
+    // T-pose FORMAT framing present.
     expect(out).toContain("symmetric T-pose");
     expect(out).toContain("front orthographic view");
-    // Canon STYLE carried: palette hexes + a light north_star mood hint
-    expect(out).toContain("palette #4e2329, #8a3a41, #4dbbc0, #0a0a12");
-    expect(out).toContain("Interior of a living organism");
-    // Format nevers baked as "no X"
-    expect(out).toContain("no 2D");
-    expect(out).toContain("no pixel art");
-    expect(out).toContain("no arms crossed");
-    // The 2D-tile canon format is NOT applied
-    expect(out).not.toContain("2D pixel art"); // prompt_prefix
-    expect(out).not.toContain("game asset pixel art"); // prompt_suffix
-    expect(out).not.toContain("no smooth gradients"); // canon negative_prompt
-    expect(out).not.toContain("no 3d render"); // canon negative would fight a 3D sculpt
-  });
-
-  it("works canon-free (wrapper + nevers, no palette/mood)", () => {
-    const framing = framingFor("character-tpose");
-    const out = buildCharacterTposePrompt(null, `a knight, ${framing.formatCues}`, framing.nevers);
-    expect(out).toContain("full-body 3D game character");
-    expect(out).toContain("no pixel art");
-    expect(out).not.toContain("palette");
+    expect(out).toContain("no multiple figures"); // framing composition guard
+    // The framing does NOT fight the canon with anti-2D nevers or a background override.
+    expect(out).not.toContain("no 2D");
+    expect(out).not.toContain("no pixel art");
+    expect(out).not.toContain("plain solid background");
   });
 });
 

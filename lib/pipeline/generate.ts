@@ -17,7 +17,7 @@ import {
   TRELLIS_DEFAULTS,
 } from "@/lib/executor";
 import type { Asset, Canon } from "@/lib/schema";
-import { buildFinalPrompt, buildCharacterTposePrompt } from "@/lib/canon/prompt";
+import { buildFinalPrompt } from "@/lib/canon/prompt";
 import { framingFor } from "@/lib/canon/framing";
 import { buildStoragePath, catalogKeyFor } from "./paths";
 
@@ -93,20 +93,15 @@ export async function generate2D(
   // Canon supplies style; the asset-type framing supplies format (+ format nevers).
   const framing = framingFor(input.assetType ?? "prop");
   const subject = await expandSubject(canon, input.prompt);
-  // Rig-ready T-pose characters use a dedicated assembly that takes the canon's PALETTE
-  // + MOOD but NOT its 2D-pixel-art format prefix/suffix/negatives.
-  const finalPrompt =
-    input.assetType === CHARACTER_TPOSE_KEY
-      ? buildCharacterTposePrompt(
-          canon,
-          `${subject}, ${framing.formatCues}`,
-          framing.nevers,
-        )
-      : buildFinalPrompt(
-          canon,
-          framing.formatCues ? `${subject}, ${framing.formatCues}` : subject,
-          framing.nevers,
-        );
+  // Every asset type (incl. rig-ready T-pose characters) uses the FULL canon for STYLE —
+  // palette, background, mood, and its "no photorealistic / no human faces" guards — which
+  // is exactly what gives the Living Dungeon look. The framing only supplies FORMAT: the
+  // T-pose framing makes it a single full-body figure that promotes to a riggable mesh.
+  const finalPrompt = buildFinalPrompt(
+    canon,
+    framing.formatCues ? `${subject}, ${framing.formatCues}` : subject,
+    framing.nevers,
+  );
 
   // Nano Banana (Gemini 2.5 Flash Image): text→image + canon reference images as a
   // style anchor. Returns inline base64; persist it. Fail-soft -> null if no key.

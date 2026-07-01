@@ -58,27 +58,30 @@ export const ASSET_TYPE_FRAMINGS: Record<AssetTypeKey, Framing> = {
   "character-tpose": {
     key: "character-tpose",
     label: "Character — rig-ready (T-pose)",
+    // POSE/COMPOSITION only — the canon supplies the STYLE (palette, background, mood,
+    // and its "no photorealistic / no human faces" guards). Do NOT set a background here
+    // (the canon's "pure black background" must win) and do NOT add anti-2D nevers (a
+    // bio-horror pixel-art canon renders as the right stylized dark figure — fighting it
+    // is what produced a photoreal creature on white). This framing ONLY makes it a single
+    // full-body T-pose figure so it promotes to a riggable 3D mesh.
     formatCues:
-      "single full-body character head-to-toe, symmetric T-pose, both arms extended straight " +
-      "out horizontally with a clear gap from the torso, legs shoulder-width apart, standing " +
-      "upright, facing forward, front orthographic view, neutral hands, plain solid background, " +
-      "centered",
-    // Format nevers: these guard the 3D-promotable T-pose framing. Deliberately reject the
-    // 2D/pixel formats so a pixel-art canon can't pull the character back into a sprite.
+      "single full-body character head-to-toe, one figure centered, symmetric T-pose, both " +
+      "arms extended straight out horizontally away from the torso, legs shoulder-width apart, " +
+      "standing upright, facing forward, front orthographic view, neutral hands",
+    // Composition guards FIRST: buildFinalPrompt merges canon negatives BEFORE these and
+    // caps the list, so the "single figure" guards must lead to survive. The T-pose *cues*
+    // already handle standing/arms-out, so pose nevers are secondary.
     nevers: [
-      "2D",
-      "pixel art",
-      "sprite",
-      "tile",
+      "sprite sheet",
+      "multiple figures",
+      "multiple views",
+      "grid of frames",
       "sitting",
       "crouching",
       "arms down",
-      "arms crossed",
       "action pose",
-      "foreshortening",
       "cropped",
       "close-up",
-      "multiple views",
     ],
   },
   sprite: {
