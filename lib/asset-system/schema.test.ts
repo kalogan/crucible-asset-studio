@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { AssetSystem, Manifest, ManifestPart, defaultManifest } from "./schema";
+import { renderWav } from "@/lib/pipeline/audio";
+import { AssetSystem, AudioRecipe, Manifest, ManifestPart, defaultManifest } from "./schema";
 
 describe("asset-system schema", () => {
   it("parses a valid system", () => {
@@ -50,5 +51,39 @@ describe("asset-system schema", () => {
     expect(() => ManifestPart.parse({ assetId: "x", position: [0, 0] })).toThrow();
     // Non-numeric scale.
     expect(() => ManifestPart.parse({ assetId: "x", scale: "big" })).toThrow();
+  });
+});
+
+describe("AudioRecipe schema (sounds editor authoring)", () => {
+  const recipe = {
+    sampleRate: 44100,
+    masterGain: 0.8,
+    events: [
+      { type: "tone", wave: "square", freq: 880, startSec: 0, durationSec: 0.08, gain: 0.5 },
+      { type: "noise", startSec: 0.08, durationSec: 0.05, gain: 0.4 },
+    ],
+  };
+
+  it("parses a recipe authored by the editor", () => {
+    const parsed = AudioRecipe.parse(recipe);
+    expect(parsed.events).toHaveLength(2);
+    expect(parsed.events[0]?.type).toBe("tone");
+    expect(parsed.events[1]?.type).toBe("noise");
+  });
+
+  it("rejects out-of-range gain and a non-integer sample rate", () => {
+    expect(() =>
+      AudioRecipe.parse({ ...recipe, events: [{ ...recipe.events[0], gain: 2 }] }),
+    ).toThrow();
+    expect(() => AudioRecipe.parse({ ...recipe, sampleRate: 44100.5 })).toThrow();
+  });
+
+  it("bakes a parsed recipe to non-empty WAV bytes via the pipeline renderer", () => {
+    // The parsed shape is exactly what bakeAudioAsset feeds renderWav, so a round-trip
+    // proves the authored recipe is a valid input to the bake path.
+    const wav = renderWav(AudioRecipe.parse(recipe));
+    // 44-byte RIFF header + PCM data for a ~0.13s track at 44.1kHz.
+    expect(wav.length).toBeGreaterThan(44);
+    expect(String.fromCharCode(wav[0]!, wav[1]!, wav[2]!, wav[3]!)).toBe("RIFF");
   });
 });

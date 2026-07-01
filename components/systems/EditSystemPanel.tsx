@@ -12,6 +12,12 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  SoundsEditor,
+  soundRowsToManifest,
+  toSoundRows,
+  type SoundRow,
+} from "@/components/systems/SoundsEditor";
 
 type LightType = ManifestLight["type"];
 const LIGHT_TYPES: LightType[] = ["point", "directional", "ambient"];
@@ -27,12 +33,6 @@ interface LightRow {
   x: string;
   y: string;
   z: string;
-}
-
-interface SoundRow {
-  key: string;
-  label: string;
-  url: string;
 }
 
 interface FxRow {
@@ -52,14 +52,6 @@ function toLightRows(lights: ManifestLight[] | undefined, seed: number): LightRo
     x: l.position ? String(l.position[0]) : "0",
     y: l.position ? String(l.position[1]) : "0",
     z: l.position ? String(l.position[2]) : "0",
-  }));
-}
-
-function toSoundRows(sounds: ManifestSound[] | undefined, seed: number): SoundRow[] {
-  return (sounds ?? []).map((s, i) => ({
-    key: `sound-${seed}-${i}`,
-    label: s.label,
-    url: s.url ?? "",
   }));
 }
 
@@ -139,15 +131,17 @@ export function EditSystemPanel({
   }
 
   function addSound() {
-    setSounds((prev) => [...prev, { key: nextKey("sound"), label: "", url: "" }]);
-  }
-
-  function updateSound(key: string, patch: Partial<SoundRow>) {
-    setSounds((prev) => prev.map((s) => (s.key === key ? { ...s, ...patch } : s)));
-  }
-
-  function removeSound(key: string) {
-    setSounds((prev) => prev.filter((s) => s.key !== key));
+    setSounds((prev) => [
+      ...prev,
+      {
+        key: nextKey("sound"),
+        label: "",
+        url: "",
+        sampleRate: "44100",
+        masterGain: "0.8",
+        events: [],
+      },
+    ]);
   }
 
   function addFx() {
@@ -174,12 +168,7 @@ export function EditSystemPanel({
     }
     return base;
   });
-  const nextSounds: ManifestSound[] = sounds.map((s) => {
-    const trimmedUrl = s.url.trim();
-    const base: ManifestSound = { label: s.label.trim() };
-    if (trimmedUrl) base.url = trimmedUrl;
-    return base;
-  });
+  const nextSounds: ManifestSound[] = soundRowsToManifest(sounds);
   const nextFx: ManifestFx[] = fx.map((f) => {
     const base: ManifestFx = { kind: f.kind.trim() };
     if (f.params !== undefined) base.params = f.params;
@@ -331,57 +320,8 @@ export function EditSystemPanel({
           </Button>
         </fieldset>
 
-        {/* Sounds */}
-        <fieldset className="flex flex-col gap-3">
-          <legend className="text-sm font-medium text-foreground">
-            Sounds ({sounds.length})
-          </legend>
-          {sounds.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No sounds.</p>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {sounds.map((s) => (
-                <li
-                  key={s.key}
-                  className="flex flex-wrap items-end gap-3 rounded-md border border-border p-3"
-                >
-                  <div className="flex min-w-40 flex-1 flex-col gap-1.5">
-                    <Label htmlFor={`${s.key}-label`}>Label</Label>
-                    <Input
-                      id={`${s.key}-label`}
-                      value={s.label}
-                      placeholder="e.g. Crackle"
-                      autoComplete="off"
-                      onChange={(e) => updateSound(s.key, { label: e.target.value })}
-                    />
-                  </div>
-                  <div className="flex min-w-40 flex-1 flex-col gap-1.5">
-                    <Label htmlFor={`${s.key}-url`}>URL (optional)</Label>
-                    <Input
-                      id={`${s.key}-url`}
-                      value={s.url}
-                      placeholder="https://…"
-                      autoComplete="off"
-                      onChange={(e) => updateSound(s.key, { url: e.target.value })}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeSound(s.key)}
-                    aria-label="Remove this sound"
-                  >
-                    Remove
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Button type="button" variant="outline" size="sm" className="w-fit" onClick={addSound}>
-            Add sound
-          </Button>
-        </fieldset>
+        {/* Sounds — author + bake AudioRecipes, then attach the baked URL to each sound. */}
+        <SoundsEditor sounds={sounds} onChange={setSounds} onAdd={addSound} />
 
         {/* FX */}
         <fieldset className="flex flex-col gap-3">

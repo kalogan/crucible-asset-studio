@@ -34,12 +34,38 @@ export const ManifestLight = z.object({
 });
 export type ManifestLight = z.infer<typeof ManifestLight>;
 
-/** Optional sound ref (editor UI is a future step). */
+/** Optional sound ref. A `url` points at a baked audio asset (see AudioRecipe below). */
 export const ManifestSound = z.object({
   label: z.string(),
   url: z.string().optional(),
 });
 export type ManifestSound = z.infer<typeof ManifestSound>;
+
+/**
+ * A serializable synth recipe the Director authors in the sounds editor, then bakes to a
+ * stored WAV via lib/pipeline/audio's bakeAudioAsset. Mirrors that module's TS `AudioRecipe`
+ * interface, but re-expressed as Zod so the bake server action can validate what the client
+ * sends at the boundary (the pipeline exports only a TS type, not a runtime validator).
+ */
+export const AudioWave = z.enum(["sine", "square", "sawtooth", "triangle"]);
+export type AudioWave = z.infer<typeof AudioWave>;
+
+export const AudioEvent = z.object({
+  type: z.enum(["tone", "noise"]),
+  freq: z.number().optional(),
+  startSec: z.number().min(0),
+  durationSec: z.number().min(0),
+  gain: z.number().min(0).max(1),
+  wave: AudioWave.optional(),
+});
+export type AudioEvent = z.infer<typeof AudioEvent>;
+
+export const AudioRecipe = z.object({
+  sampleRate: z.number().int().positive(),
+  masterGain: z.number().min(0).max(1).optional(),
+  events: z.array(AudioEvent),
+});
+export type AudioRecipe = z.infer<typeof AudioRecipe>;
 
 /**
  * Optional FX ref — a named effect (e.g. "fire", "smoke") with free-form params.

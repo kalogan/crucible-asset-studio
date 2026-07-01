@@ -3,9 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { getActiveProject } from "@/lib/active-project";
 import { createAssetSystem, updateAssetSystem } from "@/lib/db/asset-systems";
-import { Manifest as ManifestSchema } from "@/lib/asset-system/schema";
+import {
+  AudioRecipe as AudioRecipeSchema,
+  Manifest as ManifestSchema,
+} from "@/lib/asset-system/schema";
 import type { Manifest } from "@/lib/asset-system/schema";
+import { bakeAudioAsset } from "@/lib/pipeline/audio";
 import type { ActionResult } from "./projects";
+
+/** Success shape for a sound bake: the client attaches `url` to a ManifestSound. */
+export interface BakeSoundResult {
+  ok: boolean;
+  error?: string;
+  url?: string;
+}
 
 /**
  * Group the selected library assets into a reusable system. Reads `name` + a
@@ -87,6 +98,55 @@ export async function updateAssetSystemManifestAction(
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Update failed.",
+    };
+  }
+}
+
+/**
+ * Bake an authored synth recipe to a stored WAV audio asset and return its public URL so
+ * the sounds editor can attach it to a ManifestSound. Reads `label` (the audio title) +
+ * `recipeJson` (an AudioRecipe the editor serialized), validates the recipe against the
+ * Zod schema, then delegates to the pipeline's pure `bakeAudioAsset` (no cost gate — baking
+ * is local synthesis). The manifest itself is persisted separately via the update action.
+ */
+export async function bakeSystemSoundAction(
+  _prev: BakeSoundResult | null,
+  formData: FormData,
+): Promise<BakeSoundResult> {
+  const title = String(formData.get("label") ?? "").trim();
+  if (!title) return { ok: false, error: "Enter a sound label before baking." };
+
+  let recipe;
+  try {
+    const raw = String(formData.get("recipeJson") ?? "");
+    const parsed: unknown = JSON.parse(raw);
+    recipe = AudioRecipeSchema.parse(parsed);
+  } catch {
+    return { ok: false, error: "Could not read the authored recipe." };
+  }
+  if (recipe.events.length === 0) {
+    return { ok: false, error: "Add at least one event before baking." };
+  }
+
+  const active = await getActiveProject();
+  if (!active) return { ok: false, error: "No active project." };
+
+  try {
+    const asset = await bakeAudioAsset({
+      projectId: active.id,
+      projectSlug: active.slug,
+      title,
+      recipe,
+    });
+    if (!asset.raw_path) {
+      return { ok: false, error: "Bake produced no audio URL." };
+    }
+    revalidatePath("/systems");
+    return { ok: true, url: asset.raw_path };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Bake failed.",
     };
   }
 }
