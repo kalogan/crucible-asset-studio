@@ -11,9 +11,15 @@
 
 import type { JSX } from 'react';
 import type * as THREE from 'three';
-import { LIGHTING_DEFAULTS } from './index.js';
+import { LIGHTING_DEFAULTS, LIGHTING_PRESETS, type LightingPreset } from './index.js';
 
 export interface LightingRigProps {
+  /**
+   * Named preset to base the rig on. Defaults to "daylight" (the warm
+   * three-point rig); "moody" selects the dark single-source rig. Per-light
+   * props below still override the chosen preset's values.
+   */
+  preset?: LightingPreset;
   /** Ambient hemispheric fill. */
   ambient?: {
     color?: THREE.ColorRepresentation;
@@ -54,30 +60,40 @@ export interface LightingRigProps {
  * shadows, set the canvas's `shadows` prop (and a soft shadow map type).
  */
 export function LightingRig(props: LightingRigProps = {}): JSX.Element {
-  const sun = props.sun ?? {};
-  const extent = sun.shadowCameraExtent ?? LIGHTING_DEFAULTS.sun.shadowCameraExtent;
-  const mapSize = sun.shadowMapSize ?? LIGHTING_DEFAULTS.sun.shadowMapSize;
-  const sunPos = sun.position ?? LIGHTING_DEFAULTS.sun.position;
+  // Resolve which preset seeds the fallback chain. "daylight" default keeps
+  // existing callers unchanged; "moody" seeds from the dark single-source rig.
+  const base = LIGHTING_PRESETS[props.preset ?? 'daylight'];
 
-  const fill = props.fill === false ? null : props.fill ?? {};
-  const rim = props.rim === false ? null : props.rim ?? {};
+  const sun = props.sun ?? {};
+  const extent = sun.shadowCameraExtent ?? base.sun.shadowCameraExtent;
+  const mapSize = sun.shadowMapSize ?? base.sun.shadowMapSize;
+  const sunPos = sun.position ?? base.sun.position;
+
+  // The preset's own `fill` may be `false` (moody). An explicit prop wins.
+  const fillResolved = props.fill ?? base.fill;
+  const fill = fillResolved === false ? null : fillResolved;
+  const fillBase = base.fill !== false ? base.fill : LIGHTING_DEFAULTS.fill;
+
+  const rimResolved = props.rim ?? base.rim;
+  const rim = rimResolved === false ? null : rimResolved;
+  const rimBase = base.rim !== false ? base.rim : LIGHTING_DEFAULTS.rim;
 
   return (
     <>
       <ambientLight
-        color={props.ambient?.color ?? LIGHTING_DEFAULTS.ambient.color}
-        intensity={props.ambient?.intensity ?? LIGHTING_DEFAULTS.ambient.intensity}
+        color={props.ambient?.color ?? base.ambient.color}
+        intensity={props.ambient?.intensity ?? base.ambient.intensity}
       />
 
       <directionalLight
-        color={sun.color ?? LIGHTING_DEFAULTS.sun.color}
-        intensity={sun.intensity ?? LIGHTING_DEFAULTS.sun.intensity}
+        color={sun.color ?? base.sun.color}
+        intensity={sun.intensity ?? base.sun.intensity}
         position={sunPos}
-        castShadow={sun.castShadow ?? LIGHTING_DEFAULTS.sun.castShadow}
+        castShadow={sun.castShadow ?? base.sun.castShadow}
         shadow-mapSize-width={mapSize}
         shadow-mapSize-height={mapSize}
-        shadow-camera-near={sun.shadowCameraNear ?? LIGHTING_DEFAULTS.sun.shadowCameraNear}
-        shadow-camera-far={sun.shadowCameraFar ?? LIGHTING_DEFAULTS.sun.shadowCameraFar}
+        shadow-camera-near={sun.shadowCameraNear ?? base.sun.shadowCameraNear}
+        shadow-camera-far={sun.shadowCameraFar ?? base.sun.shadowCameraFar}
         shadow-camera-left={-extent}
         shadow-camera-right={extent}
         shadow-camera-top={extent}
@@ -86,17 +102,17 @@ export function LightingRig(props: LightingRigProps = {}): JSX.Element {
 
       {fill && (
         <directionalLight
-          color={fill.color ?? LIGHTING_DEFAULTS.fill.color}
-          intensity={fill.intensity ?? LIGHTING_DEFAULTS.fill.intensity}
-          position={fill.position ?? LIGHTING_DEFAULTS.fill.position}
+          color={fill.color ?? fillBase.color}
+          intensity={fill.intensity ?? fillBase.intensity}
+          position={fill.position ?? fillBase.position}
         />
       )}
 
       {rim && (
         <directionalLight
-          color={rim.color ?? LIGHTING_DEFAULTS.rim.color}
-          intensity={rim.intensity ?? LIGHTING_DEFAULTS.rim.intensity}
-          position={rim.position ?? LIGHTING_DEFAULTS.rim.position}
+          color={rim.color ?? rimBase.color}
+          intensity={rim.intensity ?? rimBase.intensity}
+          position={rim.position ?? rimBase.position}
         />
       )}
     </>

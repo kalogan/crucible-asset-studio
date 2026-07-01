@@ -27,7 +27,37 @@ export const BLOOM_DEFAULTS = {
   threshold: 0.4,
 } as const;
 
+/**
+ * "moody" bloom profile — the postfx companion to the lighting `MOODY` preset.
+ *
+ * Distilled from storm-break-hockey's play-scene UnrealBloomPass
+ * (src/render/ThreeSetup.js): strength 0.70 / radius 0.38 / threshold 0.18.
+ * The tight radius keeps the glow close to its source, and the LOW luminance
+ * threshold lets bright emissive surfaces punch through an otherwise dark scene
+ * without washing out the deep shadows the moody lighting rig relies on.
+ */
+export const BLOOM_MOODY = {
+  strength: 0.7,
+  radius: 0.38,
+  threshold: 0.18,
+} as const;
+
+/** Named bloom presets, keyed by name. `default` is the general-purpose look. */
+export const BLOOM_PRESETS = {
+  default: BLOOM_DEFAULTS,
+  moody: BLOOM_MOODY,
+} as const;
+
+export type PostFxPreset = keyof typeof BLOOM_PRESETS;
+
 export interface PostFxOptions {
+  /**
+   * Named bloom preset to seed values from. Defaults to "default" (the
+   * general-purpose look) so existing callers are unaffected. "moody" selects
+   * the tight-radius, low-threshold `BLOOM_MOODY` profile. Explicit `bloom`
+   * fields still override the chosen preset.
+   */
+  preset?: PostFxPreset;
   bloom?: {
     strength?: number;
     radius?: number;
@@ -63,11 +93,12 @@ export function createPostFx(
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
 
+  const base = BLOOM_PRESETS[opts.preset ?? 'default'];
   const bloomPass = new UnrealBloomPass(
     new THREE.Vector2(width, height),
-    opts.bloom?.strength ?? BLOOM_DEFAULTS.strength,
-    opts.bloom?.radius ?? BLOOM_DEFAULTS.radius,
-    opts.bloom?.threshold ?? BLOOM_DEFAULTS.threshold,
+    opts.bloom?.strength ?? base.strength,
+    opts.bloom?.radius ?? base.radius,
+    opts.bloom?.threshold ?? base.threshold,
   );
   composer.addPass(bloomPass);
 
