@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import {
   Environment,
   Lightformer,
@@ -114,6 +114,163 @@ function FocusModel({
   );
 }
 
+// ── Viewer lighting presets (Asset-Forge-style) ──────────────────────────────
+type EnvPreset = "studio" | "night" | "warm";
+type BrightPreset = "dark" | "studio" | "bright";
+
+const ENV_OPTIONS = ["studio", "night", "warm"] as const;
+const BRIGHT_OPTIONS = ["dark", "studio", "bright"] as const;
+
+interface Former {
+  intensity: number;
+  color: string;
+}
+interface EnvConfig {
+  /** Backdrop when "Dark background" is on. */
+  bg: string;
+  ambient: number;
+  keyColor: string;
+  keyIntensity: number;
+  fillIntensity: number;
+  /** In-scene IBL cards: [top, right, left] — no external HDR fetch. */
+  formers: [Former, Former, Former];
+}
+
+const ENV_PRESETS: Record<EnvPreset, EnvConfig> = {
+  studio: {
+    bg: "#18181b",
+    ambient: 0.5,
+    keyColor: "#ffffff",
+    keyIntensity: 1.1,
+    fillIntensity: 0.4,
+    formers: [
+      { intensity: 3, color: "#ffffff" },
+      { intensity: 1.5, color: "#ffffff" },
+      { intensity: 1.5, color: "#ffffff" },
+    ],
+  },
+  night: {
+    bg: "#090c15",
+    ambient: 0.26,
+    keyColor: "#b3c4ff",
+    keyIntensity: 0.9,
+    fillIntensity: 0.22,
+    formers: [
+      { intensity: 1.8, color: "#adc2ff" },
+      { intensity: 0.8, color: "#8098d8" },
+      { intensity: 0.7, color: "#39477a" },
+    ],
+  },
+  warm: {
+    bg: "#1b1410",
+    ambient: 0.46,
+    keyColor: "#ffd8a0",
+    keyIntensity: 1.3,
+    fillIntensity: 0.45,
+    formers: [
+      { intensity: 3, color: "#ffe8c6" },
+      { intensity: 1.6, color: "#ffcf9a" },
+      { intensity: 1.1, color: "#c9895a" },
+    ],
+  },
+};
+
+/** Brightness presets → tone-mapping exposure. */
+const BRIGHT_EXPOSURE: Record<BrightPreset, number> = { dark: 0.7, studio: 1, bright: 1.45 };
+
+/** The env preset's real-time key/fill + in-scene IBL. */
+function ViewerLighting({ cfg }: { cfg: EnvConfig }) {
+  const [top, right, left] = cfg.formers;
+  return (
+    <>
+      <ambientLight intensity={cfg.ambient} />
+      <directionalLight position={[5, 8, 5]} intensity={cfg.keyIntensity} color={cfg.keyColor} />
+      <directionalLight position={[-5, 2, -3]} intensity={cfg.fillIntensity} color={cfg.keyColor} />
+      <Environment resolution={48} frames={1}>
+        <Lightformer intensity={top.intensity} color={top.color} position={[0, 5, 0]} scale={[8, 8, 1]} />
+        <Lightformer intensity={right.intensity} color={right.color} position={[5, 1, 4]} scale={[6, 6, 1]} />
+        <Lightformer intensity={left.intensity} color={left.color} position={[-5, 1, -4]} scale={[6, 6, 1]} />
+      </Environment>
+    </>
+  );
+}
+
+/** Live-drives the renderer's tone-mapping exposure from the Brightness preset. */
+function ExposureCtl({ value }: { value: number }) {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    gl.toneMappingExposure = value;
+  }, [gl, value]);
+  return null;
+}
+
+/** A small segmented preset selector (labeled, aria-pressed). */
+function SegGroup<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: readonly T[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">{label}</span>
+      <div className="flex overflow-hidden rounded-md border border-border/70">
+        {options.map((o) => (
+          <button
+            key={o}
+            type="button"
+            onClick={() => onChange(o)}
+            aria-pressed={value === o}
+            className={`flex-1 px-2 py-1 text-[11px] capitalize transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+              value === o ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {o}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** An accessible on/off row (role=switch). */
+function ToggleRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-3 text-[11px] text-muted-foreground">
+      <span>{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative h-4 w-7 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+          checked ? "bg-primary/70" : "bg-muted"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-3 w-3 rounded-full bg-background transition-all ${
+            checked ? "left-3.5" : "left-0.5"
+          }`}
+        />
+      </button>
+    </label>
+  );
+}
+
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-border/60 py-1.5 text-sm">
@@ -127,6 +284,11 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
   const [stats, setStats] = useState<ModelStats | null>(null);
   const [clipNames, setClipNames] = useState<string[]>([]);
   const [activeClip, setActiveClip] = useState<string | null>(null);
+  // Viewer lighting presets (Asset-Forge-style). Defaults match the prior fixed look.
+  const [envPreset, setEnvPreset] = useState<EnvPreset>("studio");
+  const [brightPreset, setBrightPreset] = useState<BrightPreset>("studio");
+  const [autoRotate, setAutoRotate] = useState(false);
+  const [darkBg, setDarkBg] = useState(true);
   const [saveState, saveAction, saving] = useActionState(saveAssetNotesAction, null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -181,26 +343,39 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
         {/* Viewer */}
         <div className="relative aspect-square w-full bg-muted md:aspect-auto md:w-3/5">
           {item.format === "model" && item.url ? (
-            <Canvas camera={{ position: [2.6, 1.9, 2.6], fov: 45 }} dpr={[1, 2]}>
-              <PerspectiveCamera makeDefault position={[2.6, 1.9, 2.6]} fov={45} />
-              <ambientLight intensity={0.5} />
-              <directionalLight position={[5, 8, 5]} intensity={1.1} />
-              <directionalLight position={[-5, 2, -3]} intensity={0.4} />
-              <Suspense fallback={null}>
-                <FocusModel
-                  url={item.url}
-                  onStats={setStats}
-                  onClips={onClips}
-                  activeClip={activeClip}
+            <>
+              <Canvas camera={{ position: [2.6, 1.9, 2.6], fov: 45 }} dpr={[1, 2]}>
+                <color attach="background" args={[darkBg ? ENV_PRESETS[envPreset].bg : "#3f3f46"]} />
+                <PerspectiveCamera makeDefault position={[2.6, 1.9, 2.6]} fov={45} />
+                <ExposureCtl value={BRIGHT_EXPOSURE[brightPreset]} />
+                <ViewerLighting cfg={ENV_PRESETS[envPreset]} />
+                <Suspense fallback={null}>
+                  <FocusModel
+                    url={item.url}
+                    onStats={setStats}
+                    onClips={onClips}
+                    activeClip={activeClip}
+                  />
+                </Suspense>
+                <OrbitControls
+                  makeDefault
+                  enablePan
+                  enableZoom
+                  enableDamping
+                  autoRotate={autoRotate}
+                  autoRotateSpeed={1.4}
                 />
-                <Environment resolution={48} frames={1}>
-                  <Lightformer intensity={3} position={[0, 5, 0]} scale={[8, 8, 1]} />
-                  <Lightformer intensity={1.5} position={[5, 1, 4]} scale={[6, 6, 1]} />
-                  <Lightformer intensity={1.5} position={[-5, 1, -4]} scale={[6, 6, 1]} />
-                </Environment>
-              </Suspense>
-              <OrbitControls makeDefault enablePan enableZoom enableDamping />
-            </Canvas>
+              </Canvas>
+              {/* Lighting preset panel (Asset-Forge-style) */}
+              <div className="absolute right-2 top-2 z-10 flex w-40 flex-col gap-2 rounded-lg border border-border/60 bg-background/75 p-2.5 backdrop-blur">
+                <SegGroup label="Environment" options={ENV_OPTIONS} value={envPreset} onChange={setEnvPreset} />
+                <SegGroup label="Brightness" options={BRIGHT_OPTIONS} value={brightPreset} onChange={setBrightPreset} />
+                <div className="mt-0.5 flex flex-col gap-1.5 border-t border-border/50 pt-2">
+                  <ToggleRow label="Auto-rotate" checked={autoRotate} onChange={setAutoRotate} />
+                  <ToggleRow label="Dark background" checked={darkBg} onChange={setDarkBg} />
+                </div>
+              </div>
+            </>
           ) : item.format === "audio" && item.url ? (
             <div className="flex h-full items-center justify-center p-8">
               <audio controls src={item.url} className="w-full max-w-md">
