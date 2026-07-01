@@ -176,14 +176,28 @@ function toSession(s: SupabaseSession | null): Session {
 }
 
 const { client, setSession } = createAuthClient({
+  // Magic-link is the default flow: \`signIn()\` carries no args (it's the
+  // provider-agnostic seam), so \`sendMagicLink(email)\` below is what the UI
+  // actually calls. Kept here so \`authClient.signIn()\` stays a valid no-op-ish
+  // entry point; swap in OAuth/password by realizing these two methods.
   async signIn() {
-    // TODO: pick your real flow (OAuth / magic-link / password). Stub for now.
-    await supabase.auth.signInAnonymously();
+    // No credentials at this seam — the email-carrying flow lives in
+    // \`sendMagicLink\`. This is intentionally a no-op default.
   },
   async signOut() {
     await supabase.auth.signOut();
   },
 });
+
+/**
+ * Send a magic-link (Supabase OTP) to \`email\`. On success Supabase mails a link
+ * that, when followed, drives \`onAuthStateChange\` → \`setSession\`, so the UI
+ * updates without any extra wiring. Throws on provider error.
+ */
+export async function sendMagicLink(email: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithOtp({ email });
+  if (error) throw error;
+}
 
 // Pump provider changes into the app-kit store.
 void supabase.auth.getSession().then(({ data }) => setSession(toSession(data.session)));
@@ -341,15 +355,32 @@ function buildPageTsx(name: string, modules: readonly string[]): string {
 `;
   }
 
-  // Auth picked → a client page that reads the session via the hook.
+  // Auth picked → a client page that reads the session via the hook and signs in
+  // with a magic link (Supabase OTP): enter an email, receive a link by mail.
   return `"use client";
 
+import { useState } from "react";
 import { useSession } from "@/lib/useSession";
-import { authClient } from "@/lib/supabaseAuth";
+import { authClient, sendMagicLink } from "@/lib/supabaseAuth";
 
 export default function Home() {
   const session = useSession();
   const signedIn = session.user !== null;
+
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSendMagicLink(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try {
+      await sendMagicLink(email);
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send magic link.");
+    }
+  }
 
   return (
     <section>
@@ -358,12 +389,25 @@ export default function Home() {
       <p>
         {signedIn ? \`Signed in as \${session.user?.email ?? session.user?.id}\` : "Signed out"}
       </p>
-      <button
-        type="button"
-        onClick={() => (signedIn ? authClient.signOut() : authClient.signIn())}
-      >
-        {signedIn ? "Sign out" : "Sign in"}
-      </button>
+      {signedIn ? (
+        <button type="button" onClick={() => authClient.signOut()}>
+          Sign out
+        </button>
+      ) : sent ? (
+        <p>Check your email for a magic link to sign in.</p>
+      ) : (
+        <form onSubmit={onSendMagicLink} style={{ display: "flex", gap: 8 }}>
+          <input
+            type="email"
+            required
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <button type="submit">Send magic link</button>
+        </form>
+      )}
+      {error ? <p role="alert">{error}</p> : null}
     </section>
   );
 }
@@ -443,10 +487,13 @@ function buildReadme(
     lines.push(
       `## Auth`,
       ``,
-      `\`lib/supabaseAuth.ts\` adapts Supabase to app-kit's provider-agnostic`,
+      `Sign-in uses a **magic link** (Supabase \`signInWithOtp\`) by default: the home`,
+      `page collects an email and \`sendMagicLink(email)\` mails a one-tap sign-in`,
+      `link. \`lib/supabaseAuth.ts\` adapts Supabase to app-kit's provider-agnostic`,
       `\`AuthClient\` seam; \`lib/useSession.ts\` exposes it as a React hook. UI never`,
-      `imports the Supabase SDK directly, so the provider can be swapped without`,
-      `touching app code. Required env vars are validated at boot in \`lib/env.ts\`.`,
+      `imports the Supabase SDK directly, so the provider (or flow — OAuth, password)`,
+      `can be swapped without touching app code. Required env vars are validated at`,
+      `boot in \`lib/env.ts\`.`,
       ``,
     );
   }

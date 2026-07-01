@@ -98,17 +98,26 @@ describe("generateAppScaffold — package.json", () => {
 });
 
 describe("generateAppScaffold — module wiring", () => {
-  it("auth page reads the session via useSession + wires sign-in/out", () => {
+  it("auth page reads the session via useSession + wires magic-link sign-in/out", () => {
     const map = fileMap(generateAppScaffold({ name: "A", moduleIds: [APP_AUTH] }));
     const page = map.get("app/page.tsx") as string;
     expect(page).toContain('import { useSession }');
-    expect(page).toContain("authClient.signIn()");
+    // Magic-link is the default flow: an email form calls sendMagicLink().
+    expect(page).toContain("sendMagicLink");
+    expect(page).toContain('type="email"');
+    expect(page).toContain("Send magic link");
     expect(page).toContain("authClient.signOut()");
+    // No anonymous stub remains.
+    expect(page).not.toContain("signInAnonymously");
 
     const adapter = map.get("lib/supabaseAuth.ts") as string;
     expect(adapter).toContain('from "app-kit"');
     expect(adapter).toContain("createAuthClient");
     expect(adapter).toContain('from "@supabase/supabase-js"');
+    // The adapter realizes magic-link via Supabase OTP, not the anon stub.
+    expect(adapter).toContain("export async function sendMagicLink");
+    expect(adapter).toContain("signInWithOtp({ email })");
+    expect(adapter).not.toContain("signInAnonymously");
   });
 
   it("env validates the Supabase schema when auth is picked", () => {
@@ -193,6 +202,7 @@ describe("generateAppScaffold — README", () => {
     ).get("README.md") as string;
     expect(readme).toContain("# Doc App");
     expect(readme).toContain("Auth / Session");
+    expect(readme).toContain("magic link");
     expect(readme).toContain("pnpm dev");
     expect(readme).toContain(".env.example");
   });
