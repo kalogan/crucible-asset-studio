@@ -4,6 +4,14 @@ _Durable status for the Architect/Builder pipeline (write → persist → notify
 
 ## Where we are
 
+### North star (Director, 2026-06-30)
+Crucible = a **studio-operations hub + reusable framework** (game-kit / app-kit), NOT primarily an
+asset-generation engine. Asset-gen is opportunistic, in service of the hub. The asset-gen direction
+Kevin wants: use the library's **procgen/reference assets as a style+shape SOURCE** to generate
+**higher-quality 3D** — a reference-driven **refine/upscale** pipeline (render → reference-conditioned
+img2img/upscale → TRELLIS → a *derived* asset via the existing `source_asset_id`), NOT LoRA-from-scratch.
+Deferred; needs one deliberate paid pass to prove.
+
 ### Current state (2026-06-30)
 Crucible is now a **multi-project studio hub**, not just a game asset studio:
 - **Projects** (games + apps): `kind` discriminator; dashboard = stat row + cards (name, Type/Tech/
@@ -63,21 +71,36 @@ Crucible is now a **multi-project studio hub**, not just a game asset studio:
   `@xenova/transformers` via `createModelEmbedder`, lazily imported so tsc passes with the dep ABSENT; declared
   an OPTIONAL peerDependency (core kit stays zero-dep). Opt in with `pnpm add @xenova/transformers`.
 
-### Next up (pick a thread)
-- **Wire B5 goal-injection into the runtime:** the firewall now *admits* a clamped `goTo`/`emote`, but
-  `createNpcBehavior` doesn't yet *consume* it as a next-goal (left to the consumer + documented). Optional:
-  auto-append `REASONING_MOVEMENT_GUARDRAILS` to the prompt when movement is enabled; make `navBounds`
-  mandatory (drop `goTo` when absent) instead of admitting it unclamped.
-- **Audio recipes — where from?** Bake works via script/route; next give it a source: a small UI, the
-  asset-system **sounds editor** (the `ManifestSound` stub), or per-game canon.
-- **Asset-gen core, rest of Phase 3:** **LoRA enforcer** (precision gate in the worker — fail canon-free runs
-  when `lora_status: ready`); **Kiln finishing** (`approved → finished`, own `executor:"kiln"` job type);
-  **CDN publish** (`finished → published` via per-project `cdn_endpoint`). Worker is sequential — parallel
-  fan-out deferred.
-- **app-kit Phase 2 cont.:** generated auth `signIn()` is a TODO (pick OAuth/magic-link/password); maybe an
-  app health-check matrix (kept flat for now); more modules as needed.
-- **Chore (chip spawned):** re-encode `vendor/game-kit/src/npc/memory.ts` — it's the one non-UTF-8 file in
-  the repo (~194 NUL bytes, likely a UTF-16 artifact); compiles fine but breaks grep/tooling.
+### Shipped 2026-06-30 (late — 5 more parallel threads; north star clarified)
+- **Audio recipe sounds editor** (`48a4c98`): author a tone/noise `AudioRecipe` on an asset-system sound →
+  **bake** to a stored `kind:"audio"` asset → attach the URL to the `ManifestSound` + inline `<audio>`
+  preview; persisted via the existing manifest-save. (Audio now has an authoring source.)
+- **Opt-in model embedder in the npc demo** (`195eea4`): `NPC_EMBEDDER=transformers` flips the demo brain to
+  `createTransformersEmbedder` (default-off, lazy). **Corrected the @xenova packaging**: removed the misplaced
+  Crucible peerDependency (game-kit is vendored, so it wrongly pulled the 25MB tree into the lockfile/deploy)
+  + reverted the lockfile + `webpackIgnore` on the dynamic import → warning-free build. Sub-entry stays opt-in.
+- **B5 runtime goal-injection** (`dd7bfbd`): `createNpcBehavior` gains `requestGoTo`/`emote`/`onIntent` — an
+  admitted (firewall-clamped) `goTo` becomes the NPC's next pathfinding DESTINATION; the deterministic
+  pathfinder still owns motion, the model never writes position. Default-inert; defense-in-depth re-clamp;
+  zod stays out of the client bundle. **B5 is now end-to-end** (firewall admits → runtime consumes).
+- **LoRA enforcer** (`812e71c`): worker precision gate — a `lora_status:"ready"` canon missing
+  `lora_ref`/`lora_trigger` fails the job loudly instead of generating off-style. Pure validation, no paid calls.
+- **app-kit auth = magic-link** (`2dcb03a`): generated starter's `signIn()` now emits a real `signInWithOtp`
+  magic-link flow (was an anonymous stub).
+
+### Next up (framework-first per the north star)
+- **Reference-driven refine/upscale pipeline** (the north-star asset-gen arc): procgen/reference asset →
+  render → reference-conditioned img2img/upscale → TRELLIS → **derived** asset via `source_asset_id` (schema
+  already supports it). Turns the ~480-asset library into source material. Needs one deliberate paid pass.
+- **Phase 3 finish** (shares `worker.ts`, so sequential after LoRA): **Kiln finishing** (`approved → finished`,
+  own `executor:"kiln"` job type) + **CDN publish** (`finished → published` via per-project `cdn_endpoint`).
+- **Adopt a kit in a real game** (validate the framework): wire game-kit into Project MMO / Wayfinders so the
+  25 systems stop being theoretical.
+- **Smaller/optional:** B5 prompt-addendum auto-apply + mandatory `navBounds`; store the audio *recipe* on
+  `ManifestSound` (not just the baked URL) so sounds are re-editable; app-kit password/OAuth auth variants +
+  `emailRedirectTo`; app health-check matrix (needs real app-repo data).
+- **Chore (chip spawned):** re-encode `vendor/game-kit/src/npc/memory.ts` — the one non-UTF-8 file (~194 NUL
+  bytes); compiles fine but breaks grep/tooling.
 
 ---
 
