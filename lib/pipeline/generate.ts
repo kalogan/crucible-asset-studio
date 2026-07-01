@@ -17,9 +17,22 @@ import {
   TRELLIS_DEFAULTS,
 } from "@/lib/executor";
 import type { Asset, Canon } from "@/lib/schema";
-import { buildFinalPrompt } from "@/lib/canon/prompt";
+import { buildFinalPrompt, buildCharacterTposePrompt } from "@/lib/canon/prompt";
 import { framingFor } from "@/lib/canon/framing";
 import { buildStoragePath, catalogKeyFor } from "./paths";
+
+/** The rig-ready T-pose character framing key — its own prompt + TRELLIS tuning. */
+export const CHARACTER_TPOSE_KEY = "character-tpose";
+/**
+ * Retain more geometry for rig-ready characters so joints survive auto-rigging
+ * (vs. the 0.95 preset used for props/tiles). Recorded in the recipe snapshot.
+ */
+export const TPOSE_MESH_SIMPLIFY = 0.88;
+
+/** True when a recipe snapshot was generated as a rig-ready T-pose character. */
+function isTposeRecipe(recipe: Record<string, unknown>): boolean {
+  return recipe["asset_type_key"] === CHARACTER_TPOSE_KEY;
+}
 
 export type ImageProvider = "flux" | "nanobanana";
 
@@ -59,6 +72,8 @@ export function baseRecipe(input: PipelineInput, canon: Canon | null, finalPromp
   return {
     title: input.title,
     prompt: finalPrompt,
+    // Persist the framing so downstream promote-to-3D can pick the right TRELLIS tuning.
+    asset_type_key: input.assetType ?? "prop",
     image_model: FLUX_TEXT2IMG,
     canon_id: canon?.id ?? null,
     canon_name: canon?.name ?? null,
@@ -78,8 +93,20 @@ export async function generate2D(
   // Canon supplies style; the asset-type framing supplies format (+ format nevers).
   const framing = framingFor(input.assetType ?? "prop");
   const subject = await expandSubject(canon, input.prompt);
-  const framedSubject = framing.formatCues ? `${subject}, ${framing.formatCues}` : subject;
-  const finalPrompt = buildFinalPrompt(canon, framedSubject, framing.nevers);
+  // Rig-ready T-pose characters use a dedicated assembly that takes the canon's PALETTE
+  // + MOOD but NOT its 2D-pixel-art format prefix/suffix/negatives.
+  const finalPrompt =
+    input.assetType === CHARACTER_TPOSE_KEY
+      ? buildCharacterTposePrompt(
+          canon,
+          `${subject}, ${framing.formatCues}`,
+          framing.nevers,
+        )
+      : buildFinalPrompt(
+          canon,
+          framing.formatCues ? `${subject}, ${framing.formatCues}` : subject,
+          framing.nevers,
+        );
 
   // Nano Banana (Gemini 2.5 Flash Image): text→image + canon reference images as a
   // style anchor. Returns inline base64; persist it. Fail-soft -> null if no key.
@@ -113,6 +140,7 @@ export async function generate3D(
   projectSlug: string,
   catalogKey: string,
   sourceImageUrl: string,
+  opts: { meshSimplify?: number } = {},
 ) {
   await updateJob(jobId, { phase: "cutout" });
   let cutoutUrl = sourceImageUrl;
@@ -122,7 +150,7 @@ export async function generate3D(
     // keep the original image
   }
   await updateJob(jobId, { phase: "model" });
-  const model = await generateModelFromImage(cutoutUrl);
+  const model = await generateModelFromImage(cutoutUrl, { meshSimplify: opts.meshSimplify });
   await updateJob(jobId, { phase: "saving" });
   const glbUrl = await persistToStorage({
     sourceUrl: model.url,
@@ -178,15 +206,23 @@ export async function runGenerationPipeline(input: PipelineInput): Promise<Asset
   });
   const job = await createJob({ spec_id: spec.id, status: "generating", executor: "replicate" });
   try {
+    const isTpose = input.assetType === CHARACTER_TPOSE_KEY;
+    const meshSimplify = isTpose ? TPOSE_MESH_SIMPLIFY : TRELLIS_DEFAULTS.mesh_simplify;
     const img = await generate2D(job.id, input, canon, catalogKey);
-    const { glbUrl, predictionId } = await generate3D(job.id, input.projectSlug, catalogKey, img.imageUrl);
+    const { glbUrl, predictionId } = await generate3D(
+      job.id,
+      input.projectSlug,
+      catalogKey,
+      img.imageUrl,
+      { meshSimplify },
+    );
     const recipe = {
       ...baseRecipe(input, canon, img.finalPrompt),
       model_3d: "firtoz/trellis",
       image_url: img.imageUrl,
       image_prediction: img.predictionId,
       model_prediction: predictionId,
-      trellis: TRELLIS_DEFAULTS,
+      trellis: { ...TRELLIS_DEFAULTS, mesh_simplify: meshSimplify },
     };
     await updateJob(job.id, { status: "succeeded", provider_ref: predictionId, recipe_snapshot: recipe, cost: 0.09 });
     return createAsset({
@@ -224,12 +260,22 @@ export async function convertAssetTo3D(assetId: string): Promise<Asset> {
     executor: "replicate",
   });
   try {
-    const { glbUrl, predictionId } = await generate3D(job.id, project.slug, catalogKey, sourceImage);
+    // Rig-ready T-pose characters keep more joint geometry (lower mesh_simplify).
+    const meshSimplify = isTposeRecipe(asset.recipe_snapshot)
+      ? TPOSE_MESH_SIMPLIFY
+      : TRELLIS_DEFAULTS.mesh_simplify;
+    const { glbUrl, predictionId } = await generate3D(
+      job.id,
+      project.slug,
+      catalogKey,
+      sourceImage,
+      { meshSimplify },
+    );
     const recipe = {
       ...asset.recipe_snapshot,
       model_3d: "firtoz/trellis",
       model_prediction: predictionId,
-      trellis: TRELLIS_DEFAULTS,
+      trellis: { ...TRELLIS_DEFAULTS, mesh_simplify: meshSimplify },
     };
     await updateJob(job.id, { status: "succeeded", provider_ref: predictionId, recipe_snapshot: recipe, cost: 0.08 });
     return updateAsset(asset.id, {

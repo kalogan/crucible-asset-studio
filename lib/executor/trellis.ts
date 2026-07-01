@@ -17,10 +17,23 @@ export const TRELLIS_DEFAULTS = {
   slat_guidance_strength: 1.5,
 } as const;
 
-export function trellisInput(imageUrl: string): Record<string, unknown> {
+export interface TrellisOptions {
+  /**
+   * Mesh decimation target. Lower = MORE geometry retained. Defaults to the tuned
+   * 0.95 preset; rig-ready T-pose characters pass 0.88 so joints (elbows, knees,
+   * shoulders) keep enough polygons to auto-rig cleanly.
+   */
+  meshSimplify?: number;
+}
+
+export function trellisInput(
+  imageUrl: string,
+  opts: TrellisOptions = {},
+): Record<string, unknown> {
   return {
     images: [String(imageUrl)], // string-coerce — guards against null leaking in
     ...TRELLIS_DEFAULTS,
+    mesh_simplify: opts.meshSimplify ?? TRELLIS_DEFAULTS.mesh_simplify,
   };
 }
 

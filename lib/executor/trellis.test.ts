@@ -13,6 +13,16 @@ describe("trellisInput", () => {
     expect(TRELLIS_DEFAULTS.mesh_simplify).toBe(0.95);
     expect(TRELLIS_DEFAULTS.generate_normal).toBe(false);
   });
+
+  it("defaults mesh_simplify to the 0.95 preset", () => {
+    expect(trellisInput("https://x/y.png").mesh_simplify).toBe(0.95);
+  });
+
+  it("overrides mesh_simplify for rig-ready T-pose characters", () => {
+    const input = trellisInput("https://x/y.png", { meshSimplify: 0.88 });
+    expect(input.mesh_simplify).toBe(0.88); // more joint geometry for auto-rigging
+    expect(input.slat_guidance_strength).toBe(1.5); // other tuning untouched
+  });
 });
 
 describe("normalizeModelUrl", () => {

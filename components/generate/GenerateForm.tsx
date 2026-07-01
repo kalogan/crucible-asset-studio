@@ -105,6 +105,7 @@ export function GenerateForm({
     null,
   );
   const [mode, setMode] = useState<Mode>("image");
+  const [assetType, setAssetType] = useState("prop");
   const [phase, setPhase] = useState<GenerationStatus["phase"] | null>(null);
   const [seconds, setSeconds] = useState(0);
 
@@ -170,7 +171,13 @@ export function GenerateForm({
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="flex flex-1 flex-col gap-1.5">
           <Label htmlFor="assetType">Asset type</Label>
-          <select id="assetType" name="assetType" defaultValue="prop" className={selectControl}>
+          <select
+            id="assetType"
+            name="assetType"
+            value={assetType}
+            onChange={(e) => setAssetType(e.target.value)}
+            className={selectControl}
+          >
             {ASSET_TYPE_OPTIONS.map((o) => (
               <option key={o.key} value={o.key}>
                 {o.label}
@@ -178,7 +185,9 @@ export function GenerateForm({
             ))}
           </select>
           <p className="text-xs text-muted-foreground">
-            Supplies the format (canon supplies the style).
+            {assetType === "character-tpose"
+              ? "Full-body T-pose → promote to 3D → auto-rigs cleanly."
+              : "Supplies the format (canon supplies the style)."}
           </p>
         </div>
         <div className="flex flex-1 flex-col gap-1.5">

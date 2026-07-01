@@ -5,7 +5,7 @@ import {
   cancelPrediction,
   firstOutput,
 } from "./replicate";
-import { trellisInput, normalizeModelUrl } from "./trellis";
+import { trellisInput, normalizeModelUrl, type TrellisOptions } from "./trellis";
 
 /**
  * Poll to completion, but CANCEL the prediction if we give up (timeout/abort/error)
@@ -79,9 +79,12 @@ export async function removeBackground(
 /** TRELLIS image-to-3D → GLB URL. Allows minutes (KERNEL_LESSONS §4/§5). */
 export async function generateModelFromImage(
   imageUrl: string,
-  opts: { signal?: AbortSignal } = {},
+  opts: { signal?: AbortSignal } & TrellisOptions = {},
 ): Promise<GenResult> {
-  const pred = await startPrediction("firtoz/trellis", trellisInput(imageUrl));
+  const pred = await startPrediction(
+    "firtoz/trellis",
+    trellisInput(imageUrl, { meshSimplify: opts.meshSimplify }),
+  );
   const output = await pollOrCancel(pred.id, { timeoutMs: 360_000, signal: opts.signal });
   const url = normalizeModelUrl(output);
   if (!url) throw new Error("No GLB URL returned from TRELLIS");
@@ -93,4 +96,5 @@ export { persistToStorage, persistBase64ToStorage, extForContentType, STORAGE_BU
 export { generateImageNanoBanana } from "./nanobanana";
 export { enrichPrompt } from "./enrich";
 export { normalizeModelUrl, trellisInput, TRELLIS_DEFAULTS } from "./trellis";
+export type { TrellisOptions } from "./trellis";
 export { resolveModelRequest, MODEL_REGISTRY } from "./models";

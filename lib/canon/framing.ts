@@ -14,7 +14,14 @@
  * Pure data module: no "server-only", no React — safe to import anywhere.
  */
 
-export type AssetTypeKey = "prop" | "tilesheet" | "character" | "sprite" | "icon" | "texture";
+export type AssetTypeKey =
+  | "prop"
+  | "tilesheet"
+  | "character"
+  | "character-tpose"
+  | "sprite"
+  | "icon"
+  | "texture";
 
 export interface Framing {
   key: AssetTypeKey;
@@ -48,6 +55,32 @@ export const ASSET_TYPE_FRAMINGS: Record<AssetTypeKey, Framing> = {
     // Intentionally empty: characters need faces and must not inherit a "no faces" never.
     nevers: [],
   },
+  "character-tpose": {
+    key: "character-tpose",
+    label: "Character — rig-ready (T-pose)",
+    formatCues:
+      "single full-body character head-to-toe, symmetric T-pose, both arms extended straight " +
+      "out horizontally with a clear gap from the torso, legs shoulder-width apart, standing " +
+      "upright, facing forward, front orthographic view, neutral hands, plain solid background, " +
+      "centered",
+    // Format nevers: these guard the 3D-promotable T-pose framing. Deliberately reject the
+    // 2D/pixel formats so a pixel-art canon can't pull the character back into a sprite.
+    nevers: [
+      "2D",
+      "pixel art",
+      "sprite",
+      "tile",
+      "sitting",
+      "crouching",
+      "arms down",
+      "arms crossed",
+      "action pose",
+      "foreshortening",
+      "cropped",
+      "close-up",
+      "multiple views",
+    ],
+  },
   sprite: {
     key: "sprite",
     label: "Sprite sheet",
@@ -73,6 +106,7 @@ export const ASSET_TYPE_FRAMINGS: Record<AssetTypeKey, Framing> = {
 export const ASSET_TYPE_OPTIONS: { key: AssetTypeKey; label: string }[] = [
   "prop",
   "character",
+  "character-tpose",
   "sprite",
   "icon",
   "tilesheet",

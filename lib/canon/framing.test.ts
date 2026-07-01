@@ -22,6 +22,19 @@ describe("framingFor", () => {
     expect(cues.includes("tileable") || cues.includes("grid")).toBe(true);
   });
 
+  it("character-tpose carries T-pose cues and rejects the 2D/sprite formats", () => {
+    const f = framingFor("character-tpose");
+    expect(f.key).toBe("character-tpose");
+    const cues = f.formatCues.toLowerCase();
+    expect(cues).toContain("t-pose");
+    expect(cues).toContain("full-body");
+    expect(cues).toContain("front orthographic view");
+    // Must reject the 2D formats so a pixel-art canon can't pull it back to a sprite.
+    expect(f.nevers).toContain("2D");
+    expect(f.nevers).toContain("pixel art");
+    expect(f.nevers).toContain("arms down");
+  });
+
   it("falls back to the prop framing for an unknown key", () => {
     expect(framingFor("unknown-key")).toBe(ASSET_TYPE_FRAMINGS.prop);
     expect(framingFor("").key).toBe("prop");
