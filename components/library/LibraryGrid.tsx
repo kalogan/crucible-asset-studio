@@ -37,6 +37,23 @@ export interface LibraryItem {
   artKitId: string | null;
 }
 
+/** Top-level asset kinds for the Library tabs. */
+type LibKind = "all" | "image" | "model" | "audio" | "scene";
+const KIND_TABS: readonly { key: LibKind; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "image", label: "2D Image" },
+  { key: "model", label: "3D" },
+  { key: "audio", label: "Audio" },
+  { key: "scene", label: "Scenes" },
+];
+/** Which top-level kind an item is (3D incl. procgen models; Scenes = biome/zone captures). */
+function kindOf(i: LibraryItem): Exclude<LibKind, "all"> {
+  if (i.format === "audio") return "audio";
+  if (i.format === "model") return "model";
+  if (i.type === "biome") return "scene";
+  return "image";
+}
+
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
@@ -127,13 +144,36 @@ function TileScene({ url, reduced }: { url: string; reduced: boolean }) {
 }
 
 export function LibraryGrid({ items }: { items: LibraryItem[] }) {
-  // Filterable facets: asset category (type) + every origin tag (e.g. "Skyhold").
-  const facets = buildFacets(items);
+  // Top-level kind tab (2D / 3D / audio / scenes), then facet chips WITHIN that kind.
+  const [kind, setKind] = useState<LibKind>("all");
   const [filter, setFilter] = useState<string>("all");
   const [focused, setFocused] = useState<LibraryItem | null>(null);
   const reduced = useReducedMotion();
   const containerRef = useRef<HTMLDivElement>(null);
-  const shown = filterByFacet(items, filter);
+
+  const kindItems = useMemo(
+    () => (kind === "all" ? items : items.filter((i) => kindOf(i) === kind)),
+    [items, kind],
+  );
+  // Facets (asset category + origin tags) rebuilt per kind so only relevant chips show.
+  const facets = useMemo(() => buildFacets(kindItems), [kindItems]);
+  const shown = filterByFacet(kindItems, filter);
+
+  // Per-kind counts for the tab labels.
+  const kindCount = useMemo(() => {
+    const c: Record<string, number> = { all: items.length };
+    for (const i of items) {
+      const k = kindOf(i);
+      c[k] = (c[k] ?? 0) + 1;
+    }
+    return c;
+  }, [items]);
+
+  // Switching kind resets the facet filter so a stale facet can't hide everything.
+  const selectKind = (k: LibKind) => {
+    setKind(k);
+    setFilter("all");
+  };
 
   const chip = (key: string) =>
     `min-h-9 rounded-full border px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
@@ -144,16 +184,47 @@ export function LibraryGrid({ items }: { items: LibraryItem[] }) {
 
   return (
     <div ref={containerRef} className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by type">
-        <button type="button" onClick={() => setFilter("all")} className={chip("all")}>
-          All ({items.length})
-        </button>
-        {facets.map((t) => (
-          <button key={t} type="button" onClick={() => setFilter(t)} className={chip(t)}>
-            {t}
-          </button>
-        ))}
+      {/* Top-level kind tabs (2D Image / 3D / Audio / Scenes). */}
+      <div
+        className="flex flex-wrap gap-1 border-b border-border"
+        role="tablist"
+        aria-label="Asset kind"
+      >
+        {KIND_TABS.map((t) => {
+          const active = kind === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => selectKind(t.key)}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                active
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}{" "}
+              <span className="text-xs text-muted-foreground">({kindCount[t.key] ?? 0})</span>
+            </button>
+          );
+        })}
       </div>
+
+      {/* Facet chips — asset category / origin, scoped to the active kind. */}
+      {facets.length > 0 && (
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by category">
+          <button type="button" onClick={() => setFilter("all")} className={chip("all")}>
+            All ({kindItems.length})
+          </button>
+          {facets.map((t) => (
+            <button key={t} type="button" onClick={() => setFilter(t)} className={chip(t)}>
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
 
       {shown.length === 0 ? (
         <p className="text-sm text-muted-foreground" role="status">
