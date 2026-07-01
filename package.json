@@ -20,6 +20,7 @@
     "bake-audio": "node --env-file=.env.local scripts/bake-audio.mjs",
     "import-ld-assets": "node --env-file=.env.local scripts/import-ld-assets.mjs",
     "import-storm-audio": "node --env-file=.env.local scripts/import-storm-audio.mjs",
+    "import-local": "node --env-file=.env.local scripts/import-local-asset.mjs",
     "gate": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },
   "dependencies": {
