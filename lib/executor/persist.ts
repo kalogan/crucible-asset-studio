@@ -60,8 +60,12 @@ export async function persistBase64ToStorage({
 /** Pick a storage extension from a content type. */
 export function extForContentType(contentType: string): string {
   if (contentType.includes("gltf-binary") || contentType.includes("glb")) return "glb";
+  if (contentType === "model/gltf+json") return "gltf";
   if (contentType === "image/jpeg") return "jpg";
   if (contentType === "image/webp") return "webp";
-  if (contentType === "model/gltf+json") return "gltf";
+  if (contentType === "audio/wav" || contentType === "audio/x-wav") return "wav";
+  if (contentType === "audio/mpeg") return "mp3";
+  if (contentType === "audio/mp4") return "m4a";
+  if (contentType === "audio/ogg") return "ogg";
   return "png";
 }
