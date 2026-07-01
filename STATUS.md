@@ -90,21 +90,49 @@ Crucible is now a **multi-project studio hub**, not just a game asset studio:
 
 ### Next up (framework-first per the north star)
 
-**★ GYRE-retro opportunities — "make the kit make games"** (full analysis: `docs/GYRE-RETRO.md`). GYRE
-(web-projects/gyre) is the first real game built ON the kit — it WORKED, but exposed that the kit is
-_atoms without glue_ (~11 kit primitives → ~2,300 hand-written lines). Pick up as you build more games,
-in priority order:
-1. **Harvest GYRE's glue back into game-kit** (highest leverage): turn its hand-built one-offs into
-   reusable r3f helpers — `usePointerLockFPController`, a `<GltfModel autoFit recolor?>` loader, an
-   `<Overlay>` (drei-`<Html>`) wrapper, `useSceneMachine`, sampled-audio on `AudioManager`. So game #2
-   starts where GYRE ended.
-2. **Fix the vendoring drift** — game-kit lives in 3 drifting copies (canonical web-projects/game-kit,
-   Crucible's vendored [has B5+embedder+moody-lighting+audio-kit], GYRE's older vendored). One source of
-   truth + a re-vendor command, else improvements never propagate (GYRE can't use the moody preset/audio kit yet).
-3. **Fix the scaffolder dup-imports** (chip spawned) — generated projects don't compile out of the box.
-4. **A real compiling "moody atmospheric explorer" scaffolder template** (GYRE-shaped) — 80%-done at scaffold time.
-5. **npc ergonomics** — client-safe zod-free selector mock; document client/server split + BudgetedProvider.
-6. **GYRE adopts the shipped audio kit** (`playRecipe`) + first-class game→studio audio bake/import.
+**★ GYRE-retro opportunities — "make the kit make games"** ✅ SHIPPED 2026-07-01 (full analysis:
+`docs/GYRE-RETRO.md`). GYRE (web-projects/gyre), the first real game built ON the kit, exposed the kit as
+_atoms without glue_ (~11 primitives → ~2,300 hand-written lines). This session harvested that glue back:
+1. ✅ **Harvested GYRE's glue into game-kit** (`9be4bb6`): `<GameCamera mode="first|third|topdown">` +
+   `useGameCamera` + `cylinderBounds`/`aabbBounds`, `<GltfModel autoFit recolor>` + `<Overlay>`,
+   `useSceneMachine`, sampled audio on `AudioManager` (`loadSample`/`playSample`), npc zod-free `runtime`
+   + `createSelectorMockProvider`. 307 tests.
+2. ✅ **Vendoring drift fixed** — Crucible's vendored copy is the single source; `pnpm vendor-game-kit
+   --to <game>` re-vendors it. Ran for GYRE.
+3. ✅ **Scaffolder dup-imports fixed** — `mergeImports()` merges/de-dupes named imports.
+4. ✅ **`moody-explorer` scaffold template** — runnable GYRE-shaped starter (FogExp2, moody LightingRig,
+   PostFx bloom, dust, FP camera).
+5. ✅ **npc ergonomics** — client-safe zod-free `game-kit/npc/runtime` + selector mock; auto-budgeted brain.
+6. ✅ **GYRE adopted the kit** (`7f8880d`): swapped its bespoke code onto the harvested pieces (751→668
+   modules, zod dropped, −104 lines). `/kit` catalog now tracks GYRE + the new modules (`0e1b6a6`).
+   _Remaining tail: GYRE battle music via `playRecipe` = the demo's slice C3 (see `gyre/docs/GYRE-DEMO.md`)._
+
+**★ GYRE → 15-min philosophical tech demo** (spec: `gyre/docs/GYRE-DEMO.md`). Ship GYRE: splash+settings,
+4-room descent → explicit 3-way Will choice (nudged by the negotiation lean) → **ceremonial lean turn-based
+Warden boss** (HP+Focus, one weakness+Stagger; Warden = stasis → weak to Thread/Sever, resists Orrery/Frost)
+→ 3 endings. Build COMBAT-FIRST. **In progress:** C1 standalone battle (engine + `useSceneMachine` + SMT-style
+HUD) built + being polished; C2 = the 3 Wills; **C3 = battle FEEL** (hit/damage animations, screen shake,
+damage numbers, SFX, dread music from the audio-kit recipe — the slice that makes it tense).
+
+**★ Anti-sameness + 2D-mobile arm** (audit 2026-07-01; memory `[[project-2d-mobile-kit-gap]]`). Two Director
+goals: make scaffolded games feel DIFFERENT, and be able to make 2D mobile games (puzzle/runner/rhythm).
+- **Identity-token module (IN PROGRESS)** — the anti-sameness fix. The clone risk is structural: the
+  scaffolder turns an idea into a free-text `mood` + `palette` (`vendor/game-kit/src/brief`) → a few named
+  lighting/postfx presets → ONE fBm world = every 3D game a reskin. Fix = `weightedPick` in `prng` (uniform
+  only today) + a new `identity` module: one seed → a COHERENT palette+lighting+postfx+audio+geometry bundle.
+  Building now; follow-up = wire it into `briefToScaffoldPicks`/templates (pass a token, not a mood string).
+  Framing: "feel different" is TWO problems — between-games = verbs+art (not RNG), across-runs = STRUCTURED
+  randomness (seeded/constrained). Randomness only fixes the second.
+- **2D-mobile arm (NOT STARTED — big new arm; decide priority).** The kit is three.js-centric; its THREE-free
+  spine (prng/math/render-loop/scene-state/save/settings/hud/audio-runtime) ports, but 2D render, touch input,
+  and mobile shell are absent. Ranked build order: (1) 2D render substrate (Canvas2D/sprites/tilemap + 2D
+  camera), (2) touch/gesture input (input is keybind-only, zero touch), (3) beat/rhythm clock + timing-window
+  judge on `audio` (no BPM today), (4) 2D collision + endless spawner + difficulty ramp, (5) meta layer
+  (score/combo/streak/lives/leaderboard on `save`), (6) mobile shell (portrait/safe-area/PWA/haptics/virtual
+  controls), then match-3 board + 2D juice. **Two prototype repos to MINE** (github.com/kalogan, rough): 
+  `project-rhythm-tower` (beat-grid clock + judge + chart-gen + procedural music, pure deterministic core,
+  portrait-mobile done) and `Skateboard-hero` (pure createWorld/step sim, endless weighted spawner + ramp, 2D
+  platformer physics, gesture→trick table, 2D AABB/swept collision, leaderboard, Canvas2D renderer).
 
 - **Reference-driven refine/upscale pipeline** (the north-star asset-gen arc): procgen/reference asset →
   render → reference-conditioned img2img/upscale → TRELLIS → **derived** asset via `source_asset_id` (schema
