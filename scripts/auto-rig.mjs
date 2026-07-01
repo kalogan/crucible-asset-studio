@@ -3,9 +3,11 @@
  * auto-rig.mjs — headless auto-rig driver for GYRE's forge humanoids.
  *
  * Resolves the portable Blender in tools/, downloads the input GLB if a URL is
- * given, then shells out to scripts/rig/humanoid_rig.py to build a humanoid
- * armature, skin the mesh with automatic (heat) weights, author a CLIP set
- * (idle/cast/guard/strike/hit) and export a rigged + animated GLB.
+ * given, then shells out to scripts/rig/humanoid_rig.py to MEASURE the mesh,
+ * build a humanoid armature fitted to it, skin it with geometric nearest-bone
+ * rigid weights (robust for arbitrary/multi-island generated characters, where
+ * heat weights fail), author a CLIP set (idle/cast/guard/strike/hit) and export
+ * a rigged + animated GLB.
  *
  * Usage:
  *   node scripts/auto-rig.mjs <input.glb-or-url> [--out <path>] [--render-dir <dir>]
