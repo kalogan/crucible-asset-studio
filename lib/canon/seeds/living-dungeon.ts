@@ -27,6 +27,11 @@ export function livingDungeonCanon(projectId: string): CanonInsert {
       north_star:
         "Interior of a living organism — flesh, membranes, veins, bioluminescence. " +
         "Dark, organic, tense. The dungeon is ALIVE and AWARE.",
+      // The Character-forge player theme (verbatim from the forge's playerTheme) so
+      // LD characters keep exact parity instead of the north-star fallback.
+      character_theme:
+        "Human host partially consumed by a living dungeon organism — biological horror " +
+        "aesthetic. Humanoid but with visible organic mutation overgrowth.",
       palette: { hexes: ["#4e2329", "#8a3a41", "#4dbbc0", "#0a0a12"] },
       do: [
         "2D top-down pixel art, 32x32 tiles, seamlessly tileable",

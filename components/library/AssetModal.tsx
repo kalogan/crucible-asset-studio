@@ -23,6 +23,7 @@ import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.j
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { saveAssetNotesAction } from "@/app/actions/library";
+import { rigAssetAction, type RigResult } from "@/app/actions/rig";
 import type { LibraryItem } from "./LibraryGrid";
 
 export interface ModelStats {
@@ -271,6 +272,72 @@ function ToggleRow({
   );
 }
 
+type RigPose = "adown" | "tpose";
+const RIG_POSES: readonly RigPose[] = ["adown", "tpose"];
+
+/**
+ * "Rig this" — one-click auto-rig for an un-rigged model asset. Shells out (server-side,
+ * LOCAL only) to the auto-rig CLI + Blender, then re-imports the rigged GLB as a new asset.
+ * Long-running (~30-60s); shows in-progress + a link to the result (or the surfaced error).
+ */
+function RigThis({ assetId }: { assetId: string }) {
+  const [pose, setPose] = useState<RigPose>("adown");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<RigResult | null>(null);
+
+  const onRig = async () => {
+    setBusy(true);
+    setResult(null);
+    try {
+      setResult(await rigAssetAction({ assetId, pose }));
+    } catch (err) {
+      setResult({ ok: false, error: err instanceof Error ? err.message : "Rig failed." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/30 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-foreground">Rig this</span>
+        <SegGroup<RigPose>
+          label="Pose"
+          options={RIG_POSES}
+          value={pose}
+          onChange={setPose}
+        />
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Auto-rig a humanoid armature + idle/cast/guard/strike/hit clips, then re-import as a
+        new asset. Local studio only (needs Blender) · ~30–60s.
+      </p>
+      <Button type="button" size="sm" onClick={onRig} disabled={busy} className="w-fit">
+        {busy ? "Rigging… (~30–60s)" : "Rig this"}
+      </Button>
+      {result?.ok && (
+        <p className="text-sm text-accent" role="status">
+          Rigged ✓ — created{" "}
+          <a
+            href={result.url}
+            className="underline underline-offset-2 hover:opacity-80"
+            target="_blank"
+            rel="noreferrer"
+          >
+            {result.label}
+          </a>
+          . Reload the library to see it in the grid.
+        </p>
+      )}
+      {result && !result.ok && (
+        <p className="whitespace-pre-wrap text-sm text-destructive" role="alert">
+          {result.error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-border/60 py-1.5 text-sm">
@@ -475,6 +542,12 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Rig this — only for model assets with no clips yet (i.e. not already rigged).
+              Runs the local auto-rig pipeline server-side + re-imports the rigged GLB. */}
+          {item.format === "model" && item.url && clipNames.length === 0 && (
+            <RigThis assetId={item.id} />
           )}
 
           {/* Notes */}

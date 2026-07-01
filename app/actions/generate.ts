@@ -9,14 +9,15 @@ import {
 } from "@/lib/pipeline/generate";
 import { enrichPrompt } from "@/lib/executor";
 import {
-  ART_BIBLE,
+  artBibleFromCanon,
   buildSystemPlayer,
   buildSystemEnemies,
   buildPlayerUserMessage,
   buildEnemyUserMessage,
   assembleFallbackPrompt,
-  mutationById,
-  variantById,
+  forgeOptionsForProject,
+  mutationInOptions,
+  variantInOptions,
   poseById,
   type ForgeMode,
 } from "@/lib/generate/living-dungeon-forge";
@@ -122,10 +123,12 @@ export interface ForgePromptResult {
 
 /**
  * Compose the forge's verbatim user message, run it through Claude (sonnet-4 + the
- * mode's exact art-bible system prompt), and return the enriched FLUX prompt. Fail-soft:
- * with no key (or on error) enrichPrompt returns its input unchanged — we detect that and
- * fall back to a deterministic assembled prompt that still carries theme + palette +
- * forbidden + pose.
+ * mode's exact art-bible system prompt), and return the enriched FLUX prompt. The art
+ * bible is now DERIVED FROM THE ACTIVE PROJECT'S CANON (`artBibleFromCanon`) so every
+ * game forges in its own style; mutations/variants are per-project (empty for a project
+ * that has none). Fail-soft: with no key (or on error) enrichPrompt returns its input
+ * unchanged — we detect that and fall back to a deterministic assembled prompt that
+ * still carries theme + palette + forbidden + pose.
  */
 export async function buildForgePrompt(input: {
   mode: string;
@@ -137,15 +140,21 @@ export async function buildForgePrompt(input: {
   const mode: ForgeMode = input.mode === "enemy" ? "enemy" : "player";
   const label = input.description.trim();
 
+  const active = await getActiveProject();
+  if (!active) return { ok: false, error: "No active project — pick one first." };
+  const canon = await getCanonByProject(active.id);
+  const bible = artBibleFromCanon(canon);
+  const options = forgeOptionsForProject(active.slug);
+
   if (mode === "player") {
     const pose = poseById(input.poseId);
-    const mutation = mutationById(input.mutationId);
-    const variant = variantById(input.variantId);
-    const system = buildSystemPlayer(ART_BIBLE);
+    const mutation = mutationInOptions(options, input.mutationId);
+    const variant = variantInOptions(options, input.variantId);
+    const system = buildSystemPlayer(bible);
     const userMessage = buildPlayerUserMessage({ poseLabel: pose.poseLabel, mutation, variant });
     const fallback = assembleFallbackPrompt({
       mode: "player",
-      P: ART_BIBLE,
+      P: bible,
       poseLabel: pose.poseLabel,
       mutation,
       variant,
@@ -163,11 +172,11 @@ export async function buildForgePrompt(input: {
 
   // enemy
   if (label.length < 3) return { ok: false, error: "Describe the enemy first." };
-  const system = buildSystemEnemies(ART_BIBLE);
+  const system = buildSystemEnemies(bible);
   const userMessage = buildEnemyUserMessage({ label, userDescription: label });
   const fallback = assembleFallbackPrompt({
     mode: "enemy",
-    P: ART_BIBLE,
+    P: bible,
     label,
     userDescription: label,
   });

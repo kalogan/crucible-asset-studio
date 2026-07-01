@@ -6,6 +6,7 @@ export * from './prng/index.js';
 export * from './nav/index.js';
 export * from './behavior/index.js';
 export * from './settings/index.js';
+export * from './character/index.js';
 export * from './scene-state/index.js';
 export * from './audio/index.js';
 export * from './hud/index.js';

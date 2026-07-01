@@ -1,6 +1,7 @@
 import type { CanonInsert } from "@/lib/schema";
 import { wayfindersCanon } from "./wayfinders";
 import { livingDungeonCanon } from "./living-dungeon";
+import { gyreCanon } from "./gyre";
 
 /**
  * Canon seed templates, keyed by project slug. A project whose slug matches a key
@@ -10,6 +11,7 @@ import { livingDungeonCanon } from "./living-dungeon";
 export const CANON_SEEDS: Record<string, (projectId: string) => CanonInsert> = {
   wayfinders: wayfindersCanon,
   "living-dungeon": livingDungeonCanon,
+  gyre: gyreCanon,
 };
 
 export function seedForSlug(slug: string): ((projectId: string) => CanonInsert) | null {

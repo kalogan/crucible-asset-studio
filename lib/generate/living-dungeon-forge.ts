@@ -1,19 +1,23 @@
 /**
- * Living Dungeon "asset forge" 2D prompt pipeline — ported VERBATIM.
+ * Character forge — art-bible-driven 2D prompt pipeline (originally ported VERBATIM
+ * from the Living Dungeon forge, now generalized to ANY project's canon).
  *
  * The normal Crucible path enriches the SUBJECT form and then layers canon STYLE
- * on top (see lib/canon/prompt.ts). The Living Dungeon forge does the opposite: it
- * runs the description through Claude with a per-mode SYSTEM PROMPT that bakes in
- * the whole art bible, and sends Claude's output DIRECTLY to FLUX. To reproduce the
- * forge's look 1:1 we port its exact art bible + system prompts + mutations +
- * variants here, verbatim, and feed the enriched string straight to FLUX (bypassing
- * buildFinalPrompt) via the pipeline's `finalPromptOverride`.
+ * on top (see lib/canon/prompt.ts). The Character forge does the opposite: it runs
+ * the description through Claude with a per-mode SYSTEM PROMPT that bakes in the
+ * whole art bible, and sends Claude's output DIRECTLY to FLUX. The art bible is now
+ * DERIVED from the active project's canon (`artBibleFromCanon`) so every game forges
+ * rig-ready characters in its OWN style; the system prompts / user messages / poses /
+ * fallback all stay verbatim and simply interpolate the canon-derived fields.
  *
  * Pure data + string module: no "server-only", no network — safe to import anywhere
  * and unit-testable. The Anthropic call lives in the server action (buildForgePrompt).
  */
 
-// ── Art bible (VERBATIM from the Living Dungeon forge) ───────────────────────
+import type { Canon } from "@/lib/schema";
+import { paletteHexes } from "@/lib/canon/prompt";
+
+// ── Art bible ────────────────────────────────────────────────────────────────
 export interface ArtBible {
   theme: string;
   styleRules: string;
@@ -22,6 +26,11 @@ export interface ArtBible {
   playerTheme: string;
 }
 
+/**
+ * The Living Dungeon art bible (VERBATIM). Retained as the default / canon-free
+ * fallback and as the golden fixture the tests pin against, but the live forge now
+ * builds its art bible from the active project's canon via `artBibleFromCanon`.
+ */
 export const ART_BIBLE: ArtBible = {
   theme: "Interior of a living organism — flesh, membranes, veins, bioluminescence",
   styleRules:
@@ -32,6 +41,54 @@ export const ART_BIBLE: ArtBible = {
   playerTheme:
     "Human host partially consumed by a living dungeon organism — biological horror aesthetic. Humanoid but with visible organic mutation overgrowth.",
 };
+
+// ── Canon → art bible ────────────────────────────────────────────────────────
+/** Read a string off `style_guide[key]`, or "" if absent/non-string. */
+function styleGuideString(styleGuide: Record<string, unknown>, key: string): string {
+  const v = styleGuide[key];
+  return typeof v === "string" ? v.trim() : "";
+}
+
+/** Render a comma-separated negative_prompt as "NO x, NO y, …". */
+function forbiddenFromNegatives(negativePrompt: string): string {
+  const terms = negativePrompt
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return terms.length ? terms.map((t) => `NO ${t}`).join(", ") : "";
+}
+
+/**
+ * Map a project's canon → the forge's art-bible fields. Canon-DRIVEN so any game
+ * forges in its own style:
+ *   - `theme`       = style_guide.north_star
+ *   - `colorSpec`   = the palette hexes (shared extractor, handles flat + grouped)
+ *   - `forbidden`   = negative_prompt rendered as "NO x, NO y, …"
+ *   - `playerTheme` = style_guide.character_theme, falling back to north_star +
+ *                     "a humanoid character native to this world"
+ * With no canon (or an empty one) we return the Living Dungeon `ART_BIBLE` so the
+ * canon-free path still produces a coherent, on-look prompt. `styleRules` is not
+ * canon-derived (the system prompts already fix "2D … pixel art on black") — it is
+ * carried from the default bible unchanged.
+ */
+export function artBibleFromCanon(canon: Canon | null): ArtBible {
+  if (!canon) return ART_BIBLE;
+  const sg = canon.style_guide;
+  const northStar = styleGuideString(sg, "north_star") || ART_BIBLE.theme;
+  const hexes = paletteHexes(sg);
+  const colorSpec = hexes.length ? hexes.join(", ") : ART_BIBLE.colorSpec;
+  const forbidden = forbiddenFromNegatives(canon.negative_prompt) || ART_BIBLE.forbidden;
+  const characterTheme = styleGuideString(sg, "character_theme");
+  const playerTheme =
+    characterTheme || `${northStar} — a humanoid character native to this world`;
+  return {
+    theme: northStar,
+    styleRules: ART_BIBLE.styleRules,
+    colorSpec,
+    forbidden,
+    playerTheme,
+  };
+}
 
 // ── System prompts (VERBATIM template literals) ──────────────────────────────
 /** Player-character sprite system prompt. Interpolates playerTheme/colorSpec/forbidden. */
@@ -123,6 +180,68 @@ export const PLAYER_VARIANTS: Variant[] = [
   },
 ];
 
+// ── GYRE forms (optional per-project variant set) ────────────────────────────
+/**
+ * GYRE's small character sub-type set — the caught souls of the Coil (DESIGN.md).
+ * These play the same UI role as LD's "color variant" (a labelled descriptor line
+ * appended to the user message), but describe FORM, not palette. GYRE ships no
+ * mutation set (its `mutations` is empty → the forge shows only Mode + Pose + form).
+ */
+export const GYRE_FORMS: Variant[] = [
+  {
+    id: "unspooled",
+    label: "Unspooled",
+    desc: "The player-kind — hollowed at the Still Point, countercurrent; a spare faceted figure that stopped spiralling, neither living nor spirit",
+    accent: "#cdd6e6",
+  },
+  {
+    id: "hollow",
+    label: "Hollow",
+    desc: "Still partly itself — a caught soul reshaped by the Gyre that can be spoken to; faceted, cold-lit, watchful in the fog",
+    accent: "#3a4a66",
+  },
+  {
+    id: "warden",
+    label: "Warden",
+    desc: "Bound to guard a room or a Will — hostile, mostly silent; a starker, heavier faceted effigy made of the pull",
+    accent: "#151a2b",
+  },
+];
+
+// ── Per-project forge options (mutations/variants are OPTIONAL) ───────────────
+/**
+ * The Character forge's optional sub-type selectors, keyed by project slug. LD keeps
+ * its exact mutations + color variants; GYRE contributes a small FORM set and no
+ * mutations. Any project without an entry gets empty arrays → the form renders only
+ * Mode + Pose + Description (no mutation/variant selectors).
+ */
+export interface ForgeOptions {
+  mutations: Mutation[];
+  variants: Variant[];
+}
+
+const PROJECT_FORGE_OPTIONS: Record<string, ForgeOptions> = {
+  "living-dungeon": { mutations: PLAYER_MUTATIONS, variants: PLAYER_VARIANTS },
+  gyre: { mutations: [], variants: GYRE_FORMS },
+};
+
+/** Resolve a project's optional mutation/variant sets (empty for unknown slugs). */
+export function forgeOptionsForProject(slug: string | null | undefined): ForgeOptions {
+  return (slug && PROJECT_FORGE_OPTIONS[slug]) || { mutations: [], variants: [] };
+}
+
+/** Lookup a mutation within a specific option set (falls back to a clean "none"). */
+export function mutationInOptions(options: ForgeOptions, id: string): Mutation | null {
+  if (options.mutations.length === 0) return null;
+  return options.mutations.find((m) => m.id === id) ?? options.mutations[0]!;
+}
+
+/** Lookup a variant within a specific option set (null when the project has none). */
+export function variantInOptions(options: ForgeOptions, id: string): Variant | null {
+  if (options.variants.length === 0) return null;
+  return options.variants.find((v) => v.id === id) ?? options.variants[0]!;
+}
+
 // ── Poses ────────────────────────────────────────────────────────────────────
 /**
  * KEY ADAPTATION for the 3D→rig goal. The forge's player sub-types are sprite-sheet
@@ -180,22 +299,24 @@ export function poseById(id: string): Pose {
 
 // ── User messages (VERBATIM shapes) ──────────────────────────────────────────
 /**
- * Player user message. VERBATIM shape:
+ * Player user message. VERBATIM shape when both a mutation AND a variant are present
+ * (the Living Dungeon case):
  *   `Sub-type: ${poseLabel}\nMutation: ${mutation.label} — ${mutation.desc}\n` +
  *   `Color variant: ${variant.label} — ${variant.desc}\n\nGenerate the image generation prompt.`
+ * A project without a mutation set (e.g. GYRE) passes `mutation: null` and that line
+ * is simply omitted; likewise for a project with no variants. The remaining lines
+ * keep their exact wording so LD's enriched prompt is unchanged.
  */
 export function buildPlayerUserMessage(input: {
   poseLabel: string;
-  mutation: Mutation;
-  variant: Variant;
+  mutation: Mutation | null;
+  variant: Variant | null;
 }): string {
   const { poseLabel, mutation, variant } = input;
-  return (
-    `Sub-type: ${poseLabel}\n` +
-    `Mutation: ${mutation.label} — ${mutation.desc}\n` +
-    `Color variant: ${variant.label} — ${variant.desc}\n\n` +
-    `Generate the image generation prompt.`
-  );
+  const lines = [`Sub-type: ${poseLabel}`];
+  if (mutation) lines.push(`Mutation: ${mutation.label} — ${mutation.desc}`);
+  if (variant) lines.push(`Color variant: ${variant.label} — ${variant.desc}`);
+  return `${lines.join("\n")}\n\nGenerate the image generation prompt.`;
 }
 
 /**
@@ -223,28 +344,26 @@ export function buildEnemyUserMessage(input: {
 export function assembleFallbackPrompt(input: {
   mode: ForgeMode;
   P: ArtBible;
-  // player
+  // player — mutation/variant are optional; a project without them omits those lines.
   poseLabel?: string;
-  mutation?: Mutation;
-  variant?: Variant;
+  mutation?: Mutation | null;
+  variant?: Variant | null;
   // enemy
   label?: string;
   userDescription?: string;
 }): string {
   const { mode, P } = input;
   if (mode === "player") {
-    const mutation = input.mutation ?? DEFAULT_MUTATION;
-    const variant = input.variant ?? DEFAULT_VARIANT;
     const pose = input.poseLabel ?? DEFAULT_POSE.poseLabel;
-    return [
+    const parts = [
       "2D top-down pixel art, isolated sprite on pure black background",
       P.playerTheme,
       pose,
-      `Mutation: ${mutation.desc}`,
-      `Color variant: ${variant.desc}`,
-      `Base colors: ${P.colorSpec}`,
-      P.forbidden,
-    ].join(". ");
+    ];
+    if (input.mutation) parts.push(`Mutation: ${input.mutation.desc}`);
+    if (input.variant) parts.push(`Color variant: ${input.variant.desc}`);
+    parts.push(`Base colors: ${P.colorSpec}`, P.forbidden);
+    return parts.join(". ");
   }
   // enemy
   const label = input.label ?? "enemy";

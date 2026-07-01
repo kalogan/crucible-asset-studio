@@ -9,12 +9,10 @@ import {
 } from "@/app/actions/generate";
 import type { ActionResult } from "@/app/actions/projects";
 import {
-  PLAYER_MUTATIONS,
-  PLAYER_VARIANTS,
   POSES,
-  DEFAULT_MUTATION,
-  DEFAULT_VARIANT,
   DEFAULT_POSE,
+  type Mutation,
+  type Variant,
 } from "@/lib/generate/living-dungeon-forge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,15 +27,30 @@ const selectControl =
 type Mode = "image" | "model";
 type ForgeMode = "player" | "enemy";
 
-export function LivingDungeonForgeForm() {
+export interface CharacterForgeFormProps {
+  /** The active project's display name (for the panel copy). */
+  projectName: string;
+  /** Optional per-project sub-type selectors — empty ⇒ the selector is hidden. */
+  mutations: Mutation[];
+  variants: Variant[];
+}
+
+export function CharacterForgeForm({
+  projectName,
+  mutations,
+  variants,
+}: CharacterForgeFormProps) {
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
     runForgeGenerateAction,
     null,
   );
 
+  const hasMutations = mutations.length > 0;
+  const hasVariants = variants.length > 0;
+
   const [forgeMode, setForgeMode] = useState<ForgeMode>("player");
-  const [mutationId, setMutationId] = useState(DEFAULT_MUTATION.id);
-  const [variantId, setVariantId] = useState(DEFAULT_VARIANT.id);
+  const [mutationId, setMutationId] = useState(mutations[0]?.id ?? "");
+  const [variantId, setVariantId] = useState(variants[0]?.id ?? "");
   const [poseId, setPoseId] = useState(DEFAULT_POSE.id);
   const [description, setDescription] = useState("");
   const [forgePrompt, setForgePrompt] = useState("");
@@ -95,10 +108,12 @@ export function LivingDungeonForgeForm() {
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-accent/30 bg-accent/5 p-5">
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-foreground">Living Dungeon forge</h2>
+        <h2 className="text-lg font-semibold text-foreground">Character forge</h2>
         <p className="text-xs text-muted-foreground">
-          Reproduces the forge&apos;s PLAYER/ENEMY prompt pipeline word-for-word — Claude bakes
-          the whole art bible into the FLUX prompt (canon scaffolding is bypassed).
+          Forges a rig-ready PLAYER/ENEMY character in{" "}
+          <span className="text-foreground">{projectName}</span>&apos;s own style — Claude bakes
+          this project&apos;s art bible (from its canon) into the FLUX prompt (canon scaffolding is
+          bypassed).
         </p>
       </div>
 
@@ -132,38 +147,44 @@ export function LivingDungeonForgeForm() {
 
       {forgeMode === "player" ? (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="flex flex-1 flex-col gap-1.5">
-              <Label htmlFor="forge-mutation">Mutation</Label>
-              <select
-                id="forge-mutation"
-                value={mutationId}
-                onChange={(e) => setMutationId(e.target.value)}
-                className={selectControl}
-              >
-                {PLAYER_MUTATIONS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
+          {(hasMutations || hasVariants) && (
+            <div className="flex flex-col gap-3 sm:flex-row">
+              {hasMutations && (
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Label htmlFor="forge-mutation">Mutation</Label>
+                  <select
+                    id="forge-mutation"
+                    value={mutationId}
+                    onChange={(e) => setMutationId(e.target.value)}
+                    className={selectControl}
+                  >
+                    {mutations.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {hasVariants && (
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Label htmlFor="forge-variant">Variant</Label>
+                  <select
+                    id="forge-variant"
+                    value={variantId}
+                    onChange={(e) => setVariantId(e.target.value)}
+                    className={selectControl}
+                  >
+                    {variants.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
-            <div className="flex flex-1 flex-col gap-1.5">
-              <Label htmlFor="forge-variant">Color variant</Label>
-              <select
-                id="forge-variant"
-                value={variantId}
-                onChange={(e) => setVariantId(e.target.value)}
-                className={selectControl}
-              >
-                {PLAYER_VARIANTS.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          )}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="forge-pose">Pose</Label>
             <select
@@ -191,7 +212,7 @@ export function LivingDungeonForgeForm() {
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="a swarm of pulsing membrane leeches"
+            placeholder="describe the enemy — e.g. a swarm of pulsing membrane leeches"
             className="resize-y"
           />
         </div>
@@ -221,7 +242,7 @@ export function LivingDungeonForgeForm() {
             name="title"
             required
             minLength={2}
-            placeholder="e.g. Host — membrane wings"
+            placeholder="e.g. Warden — T-pose"
             autoComplete="off"
           />
         </div>

@@ -28,6 +28,17 @@ export async function createReferenceAsset(
   return ReferenceAsset.parse(data);
 }
 
+export async function getReferenceAsset(id: string): Promise<ReferenceAsset | null> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("reference_assets")
+    .select()
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`getReferenceAsset: ${error.message}`);
+  return data ? ReferenceAsset.parse(data) : null;
+}
+
 export async function updateReferenceAssetNotes(
   id: string,
   notes: string,

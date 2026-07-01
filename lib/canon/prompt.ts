@@ -1,11 +1,32 @@
 import type { Canon } from "@/lib/schema";
 
-/** Pull hex strings out of a canon's style_guide.palette.hexes (defensively). */
-function paletteHexes(styleGuide: Record<string, unknown>): string[] {
+const HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+/**
+ * Pull hex strings out of a canon's `style_guide.palette` (defensively).
+ * Handles both shapes we author:
+ *   - flat:    `{ palette: { hexes: ["#…", …] } }`  (Living Dungeon / GYRE)
+ *   - grouped: `{ palette: { snow_cool: ["#…"], fire: ["#…"] } }`  (Wayfinders)
+ * The flat `hexes` array wins when present; otherwise every hex-looking string in
+ * the grouped values is collected (order preserved).
+ */
+export function paletteHexes(styleGuide: Record<string, unknown>): string[] {
   const p = styleGuide.palette;
   if (!p || typeof p !== "object") return [];
-  const hexes = (p as Record<string, unknown>).hexes;
-  return Array.isArray(hexes) ? hexes.filter((x): x is string => typeof x === "string") : [];
+  const rec = p as Record<string, unknown>;
+  const flat = rec.hexes;
+  if (Array.isArray(flat)) {
+    return flat.filter((x): x is string => typeof x === "string");
+  }
+  // Grouped palette — flatten every array/string value, keep hex-looking strings.
+  const out: string[] = [];
+  for (const v of Object.values(rec)) {
+    if (typeof v === "string" && HEX_RE.test(v)) out.push(v);
+    else if (Array.isArray(v)) {
+      for (const x of v) if (typeof x === "string" && HEX_RE.test(x)) out.push(x);
+    }
+  }
+  return out;
 }
 
 /**

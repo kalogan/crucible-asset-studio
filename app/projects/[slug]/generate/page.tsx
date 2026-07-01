@@ -4,7 +4,8 @@ import { getActiveProject } from "@/lib/active-project";
 import { getCanonByProject } from "@/lib/db/canons";
 import { canonReadiness } from "@/lib/canon/precision";
 import { GenerateForm } from "@/components/generate/GenerateForm";
-import { LivingDungeonForgeForm } from "@/components/generate/LivingDungeonForgeForm";
+import { CharacterForgeForm } from "@/components/generate/CharacterForgeForm";
+import { forgeOptionsForProject } from "@/lib/generate/living-dungeon-forge";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,16 @@ export default async function GeneratePage({
             </p>
           )}
           <GenerateForm initialTitle={sp.title ?? ""} initialPrompt={sp.prompt ?? ""} />
-          <LivingDungeonForgeForm />
+          {(() => {
+            const forge = forgeOptionsForProject(active.slug);
+            return (
+              <CharacterForgeForm
+                projectName={active.name}
+                mutations={forge.mutations}
+                variants={forge.variants}
+              />
+            );
+          })()}
         </>
       )}
     </main>
