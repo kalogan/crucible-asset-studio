@@ -37,6 +37,12 @@ describe("formatForMime", () => {
     expect(formatForMime("application/octet-stream.GLB")).toBe("model");
   });
 
+  it("maps audio/* to audio", () => {
+    expect(formatForMime("audio/wav")).toBe("audio");
+    expect(formatForMime("audio/mpeg")).toBe("audio");
+    expect(formatForMime("AUDIO/MP4")).toBe("audio");
+  });
+
   it("maps everything else to image", () => {
     expect(formatForMime("image/png")).toBe("image");
     expect(formatForMime("image/jpeg")).toBe("image");

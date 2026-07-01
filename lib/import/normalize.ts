@@ -25,10 +25,12 @@ export function sanitizeTags(input: unknown): string[] {
 }
 
 /**
- * A reference asset is a live 3D `model` when the payload is binary/text glTF, else an
- * `image` (PNG/JPEG capture). Case-insensitive on the mime type.
+ * The reference-asset format from a mime type: a live 3D `model` for glTF, `audio` for any
+ * audio/* (WAV/MP3/…), else an `image` (PNG/JPEG capture). Case-insensitive.
  */
-export function formatForMime(mimeType: string): "image" | "model" {
+export function formatForMime(mimeType: string): "image" | "model" | "audio" {
   const m = mimeType.toLowerCase();
-  return m.includes("gltf") || m.includes("glb") ? "model" : "image";
+  if (m.includes("gltf") || m.includes("glb")) return "model";
+  if (m.startsWith("audio/")) return "audio";
+  return "image";
 }
