@@ -68,13 +68,14 @@ async function download(url) {
 }
 
 function parseArgs(argv) {
-  const args = { in: null, out: null, renderDir: null, pose: "adown" };
+  const args = { in: null, out: null, renderDir: null, pose: "adown", targetTris: 0 };
   const rest = argv.slice(2);
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === "--out") args.out = rest[++i];
     else if (a === "--render-dir") args.renderDir = rest[++i];
     else if (a === "--pose") args.pose = rest[++i]; // adown (arms-down) | tpose
+    else if (a === "--target-tris") args.targetTris = rest[++i]; // decimate budget (0 = off)
     else if (!a.startsWith("--") && !args.in) args.in = a;
   }
   return args;
@@ -108,6 +109,9 @@ async function main() {
   log("output:", outPath);
 
   const pyArgs = ["--in", inPath, "--out", outPath, "--pose", args.pose];
+  if (Number(args.targetTris) > 0) {
+    pyArgs.push("--target-tris", String(args.targetTris));
+  }
   if (args.renderDir) {
     pyArgs.push("--render-dir", resolve(args.renderDir));
   }

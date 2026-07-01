@@ -40,7 +40,8 @@ import mathutils
 def parse_args():
     argv = sys.argv
     args = argv[argv.index("--") + 1:] if "--" in argv else []
-    out = {"in": None, "out": None, "render_dir": None, "export": True, "pose": "adown"}
+    out = {"in": None, "out": None, "render_dir": None, "export": True,
+           "pose": "adown", "target_tris": 0}
     i = 0
     while i < len(args):
         a = args[i]
@@ -52,6 +53,8 @@ def parse_args():
             out["render_dir"] = args[i + 1]; i += 2
         elif a == "--pose":
             out["pose"] = args[i + 1]; i += 2   # "adown" (arms-down) | "tpose"
+        elif a == "--target-tris":
+            out["target_tris"] = int(args[i + 1]); i += 2   # decimate budget (0 = off)
         elif a == "--no-export":
             out["export"] = False; i += 1
         else:
@@ -406,6 +409,34 @@ def normalize_mesh(mesh):
         "y", round(b[2], 3), round(b[3], 3),
         "z", round(b[4], 3), round(b[5], 3))
     return mesh
+
+
+def _tri_count(mesh):
+    mesh.data.calc_loop_triangles()
+    return len(mesh.data.loop_triangles)
+
+
+def decimate_mesh(mesh, target_tris):
+    """Collapse-decimate the mesh to ~target_tris triangles, for a mobile/LOD budget
+    (and for faceted low-poly art styles like GYRE). No-op if target_tris<=0 or the
+    mesh is already under budget. Run BEFORE fitting/skinning so the armature + weights
+    fit the FINAL geometry (and there's far less to weight). TRELLIS ships ~20k tris;
+    a mobile hero wants ~5-8k, a background enemy ~1-3k."""
+    if target_tris <= 0:
+        return
+    cur = _tri_count(mesh)
+    if cur <= target_tris:
+        log(f"decimate: {cur} tris already <= target {target_tris}, skipping")
+        return
+    ratio = max(0.01, min(1.0, target_tris / cur))
+    bpy.ops.object.select_all(action="DESELECT")
+    mesh.select_set(True)
+    bpy.context.view_layer.objects.active = mesh
+    mod = mesh.modifiers.new("decimate", "DECIMATE")
+    mod.decimate_type = "COLLAPSE"
+    mod.ratio = ratio
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    log(f"decimated {cur} -> {_tri_count(mesh)} tris (ratio {ratio:.3f}, target {target_tris})")
 
 
 def mirror_x(v):
@@ -1078,6 +1109,7 @@ def main():
     clean_scene()
     mesh = import_glb(args["in"])
     normalize_mesh(mesh)
+    decimate_mesh(mesh, args.get("target_tris", 0))  # optional mobile/LOD budget
     lm = measure_landmarks(mesh)
     arm_obj = build_armature(pose, lm)
     skin(mesh, arm_obj, pose=pose, clean=(os.environ.get("RIG_NOCLEAN") != "1"), lm=lm)
