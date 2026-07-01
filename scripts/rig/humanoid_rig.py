@@ -38,7 +38,7 @@ import mathutils
 def parse_args():
     argv = sys.argv
     args = argv[argv.index("--") + 1:] if "--" in argv else []
-    out = {"in": None, "out": None, "render_dir": None, "export": True}
+    out = {"in": None, "out": None, "render_dir": None, "export": True, "pose": "adown"}
     i = 0
     while i < len(args):
         a = args[i]
@@ -48,6 +48,8 @@ def parse_args():
             out["out"] = args[i + 1]; i += 2
         elif a == "--render-dir":
             out["render_dir"] = args[i + 1]; i += 2
+        elif a == "--pose":
+            out["pose"] = args[i + 1]; i += 2   # "adown" (arms-down) | "tpose"
         elif a == "--no-export":
             out["export"] = False; i += 1
         else:
@@ -93,6 +95,27 @@ LIMBS_L = [
 # The "hips" root needs a non-zero length; give it a short upward nub so Blender
 # keeps it. (head==tail bones get deleted.)
 HIPS_TAIL = (0.00, 0.00, 0.055)
+
+# T-POSE arm bones — arms extended horizontally (+X) at shoulder height. Used when
+# the source sculpt was GENERATED in a T-pose (the forge's "Rig-ready" path), whose
+# separated arms bind with clean SMOOTH weights (no shoulder bleed) — no rigid seam.
+# Legs are identical to LIMBS_L (legs hang down in both poses).
+# NOTE: first-guess placements, like the arms-down set was before it got render-tuned.
+# Validate + nudge against the first real T-pose model.
+TPOSE_ARMS_L = [
+    ("clavicle", (0.020, 0.00, 0.305), (0.090, 0.00, 0.302), "chest"),
+    ("upperarm", (0.090, 0.00, 0.300), (0.230, 0.00, 0.300), "clavicle"),
+    ("forearm",  (0.230, 0.00, 0.300), (0.360, 0.00, 0.300), "upperarm"),
+    ("hand",     (0.360, 0.00, 0.300), (0.420, 0.00, 0.300), "forearm"),
+]
+
+
+def limbs_for(pose):
+    """The limb bone set for the given pose. Arms differ (down vs out); legs shared."""
+    if pose == "tpose":
+        legs = [b for b in LIMBS_L if b[0] in ("thigh", "shin", "foot")]
+        return TPOSE_ARMS_L + legs
+    return LIMBS_L
 
 
 # --------------------------------------------------------------------------- #
@@ -163,9 +186,9 @@ def mirror_x(v):
     return (-v[0], v[1], v[2])
 
 
-def build_armature():
+def build_armature(pose="adown"):
     """Build the humanoid armature from the proportion config. Returns the
-    armature object (in object mode)."""
+    armature object (in object mode). `pose` picks the arm layout (adown|tpose)."""
     arm_data = bpy.data.armatures.new("humanoid")
     arm_obj = bpy.data.objects.new("humanoid", arm_data)
     bpy.context.scene.collection.objects.link(arm_obj)
@@ -197,7 +220,7 @@ def build_armature():
     # rotation deforms .L and .R identically. A naive X-flip leaves .R with the
     # wrong local axes, so the same keyframe rotates the .R arm INTO the body
     # and tears the shoulder.
-    for name, head, tail, parent in LIMBS_L:
+    for name, head, tail, parent in limbs_for(pose):
         add(name + ".L", head, tail, parent)
 
     # symmetrize .L -> .R with correct mirrored roll.
@@ -209,9 +232,17 @@ def build_armature():
     return arm_obj
 
 
-def skin(mesh, arm_obj, clean=True):
-    """Parent mesh to armature with automatic (heat) weights, then clean the
-    weights so arms-down auto-weights don't bleed the arm into the torso."""
+def skin(mesh, arm_obj, pose="adown", clean=True):
+    """Parent mesh to armature with automatic (heat) weights, then post-process by
+    pose:
+      - adown (arms-down sculpt): RIGID (1 bone/vertex, no smooth). The arms rest
+        against the torso, so heat weights BLEED and limbs morph/tear (verified:
+        taffy shoulders + hip membranes). Rigid makes limbs swing as solid segments.
+        Tradeoff: a hard joint seam, which reads fine (even intentional) on the mesh.
+      - tpose (arms-out sculpt): SMOOTH weights. The arms are separated, so heat
+        weights DON'T bleed — keep a glTF-friendly (<=4) smoothed set for seamless
+        joints (no rigid seam). This is why generating characters in a T-pose makes
+        rigging 'just work' (see the forge's Rig-ready path)."""
     bpy.ops.object.select_all(action="DESELECT")
     mesh.select_set(True)
     arm_obj.select_set(True)
@@ -222,24 +253,25 @@ def skin(mesh, arm_obj, clean=True):
         log("skinned (raw auto-weights, no cleanup)")
         return
 
-    # --- RIGID weighting ----------------------------------------------------
-    # Automatic (heat) weights BLEND across the shoulder/hip on an arms-down sculpt,
-    # so limbs "morph"/tear when posed (verified: taffy shoulders + hip membranes).
-    # For this faceted low-poly character we bind RIGID instead: limit each vertex to
-    # its ONE dominant bone at weight 1.0, and DO NOT smooth (smoothing is what
-    # re-introduces the bleed). Limbs then swing as solid segments — no stretching,
-    # no membranes. The tradeoff is a hard seam at each joint, which reads fine (even
-    # intentional) on the faceted mesh.
     # NOTE: select all verts in EDIT mode first, or the ops act on a stale selection.
     bpy.ops.object.select_all(action="DESELECT")
     mesh.select_set(True)
     bpy.context.view_layer.objects.active = mesh
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.object.vertex_group_limit_total(limit=1)  # ONE bone per vertex
-    bpy.ops.object.vertex_group_normalize_all(lock_active=False)  # -> weight 1.0
-    bpy.ops.object.mode_set(mode="OBJECT")
-    log("skinned (rigid: 1 bone / vertex)")
+    if pose == "tpose":
+        bpy.ops.object.vertex_group_limit_total(limit=4)
+        bpy.ops.object.vertex_group_normalize_all(lock_active=False)
+        bpy.ops.object.mode_set(mode="OBJECT")
+        bpy.ops.object.mode_set(mode="WEIGHT_PAINT")
+        bpy.ops.object.vertex_group_smooth(group_select_mode="ALL", factor=0.5, repeat=2)
+        bpy.ops.object.mode_set(mode="OBJECT")
+        log("skinned (smooth: T-pose, arms separated)")
+    else:
+        bpy.ops.object.vertex_group_limit_total(limit=1)  # ONE bone per vertex
+        bpy.ops.object.vertex_group_normalize_all(lock_active=False)  # -> weight 1.0
+        bpy.ops.object.mode_set(mode="OBJECT")
+        log("skinned (rigid: 1 bone / vertex, arms-down)")
 
 
 # --------------------------------------------------------------------------- #
@@ -539,11 +571,21 @@ def main():
         raise SystemExit("need --in <glb>")
     log("input:", args["in"])
 
+    pose = args.get("pose", "adown")
+    log("pose mode:", pose)
+
     clean_scene()
     mesh = import_glb(args["in"])
     normalize_mesh(mesh)
-    arm_obj = build_armature()
-    skin(mesh, arm_obj, clean=(os.environ.get("RIG_NOCLEAN") != "1"))
+    arm_obj = build_armature(pose)
+    skin(mesh, arm_obj, pose=pose, clean=(os.environ.get("RIG_NOCLEAN") != "1"))
+
+    if pose == "tpose":
+        log("NOTE: T-pose BIND + smooth weights are wired (the validated win). The "
+            "clips below are still authored for the arms-DOWN rest; on a T-pose bind "
+            "the rest is arms-OUT, so cast/guard/strike/hit need one render-tune pass "
+            "against the real T-pose model (author animation against the actual rig, "
+            "not blind). Idle will show arms-out until that pass.")
 
     # author clips
     author_idle(arm_obj)
