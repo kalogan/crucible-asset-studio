@@ -96,6 +96,13 @@ Crucible is now a **multi-project studio hub**, not just a game asset studio:
   own `executor:"kiln"` job type) + **CDN publish** (`finished → published` via per-project `cdn_endpoint`).
 - **Adopt a kit in a real game** (validate the framework): wire game-kit into Project MMO / Wayfinders so the
   25 systems stop being theoretical.
+- **Borrow from `threejs-game-skills`** (audit → `docs/EXTERNAL-SKILLS-AUDIT.md`, MIT). NOT started — Kevin is
+  exploring the current build first. When ready, in priority order: **(T1)** port the provider-agnostic quality
+  checklists (AAA visual scorecard, definition-of-done, playtest-QA, release-risk) into `/brief` + scaffolder +
+  review; **(T2)** physics adapter seam (Rapier) + headless-canvas QA (Playwright, new dep) + touch/safe-area
+  HUD + perf overlay — real game-kit gaps; **(T3, paid/optional)** Tripo (auto-rig + animation — what TRELLIS
+  can't) + ElevenLabs (real SFX/voice) adapters behind the executor. **Meta:** package game-kit + scaffolder +
+  `/brief` as composable agent skills ("crucible game skills") — a framework play.
 - **Smaller/optional:** B5 prompt-addendum auto-apply + mandatory `navBounds`; store the audio *recipe* on
   `ManifestSound` (not just the baked URL) so sounds are re-editable; app-kit password/OAuth auth variants +
   `emailRedirectTo`; app health-check matrix (needs real app-repo data).
