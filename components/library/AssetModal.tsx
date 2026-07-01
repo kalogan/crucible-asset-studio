@@ -271,6 +271,36 @@ function ToggleRow({
   );
 }
 
+/** Animation-clip tabs over the viewer — switch which glTF AnimationClip plays. */
+function ClipTabs({
+  clips,
+  active,
+  onSelect,
+}: {
+  clips: string[];
+  active: string | null;
+  onSelect: (c: string) => void;
+}) {
+  if (clips.length === 0) return null;
+  return (
+    <div className="absolute bottom-2 left-1/2 z-10 flex max-w-[92%] -translate-x-1/2 flex-wrap justify-center gap-1 rounded-lg border border-border/60 bg-background/75 p-1 backdrop-blur">
+      {clips.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onSelect(c)}
+          aria-pressed={active === c}
+          className={`rounded-md px-2.5 py-1 text-[11px] capitalize transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+            active === c ? "bg-primary/20 text-primary" : "text-muted-foreground hover:bg-muted"
+          }`}
+        >
+          {c}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-border/60 py-1.5 text-sm">
@@ -375,6 +405,8 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
                   <ToggleRow label="Dark background" checked={darkBg} onChange={setDarkBg} />
                 </div>
               </div>
+              {/* Animation clip tabs (only when the model carries glTF clips). */}
+              <ClipTabs clips={clipNames} active={activeClip} onSelect={setActiveClip} />
             </>
           ) : item.format === "audio" && item.url ? (
             <div className="flex h-full items-center justify-center p-8">
@@ -390,7 +422,7 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
               No preview
             </div>
           )}
-          {item.format === "model" && (
+          {item.format === "model" && clipNames.length === 0 && (
             <p className="pointer-events-none absolute bottom-2 left-0 right-0 text-center text-[11px] text-muted-foreground">
               drag to rotate · scroll to zoom · right-drag to pan
             </p>
