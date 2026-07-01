@@ -89,13 +89,30 @@ Crucible is now a **multi-project studio hub**, not just a game asset studio:
   magic-link flow (was an anonymous stub).
 
 ### Next up (framework-first per the north star)
+
+**★ GYRE-retro opportunities — "make the kit make games"** (full analysis: `docs/GYRE-RETRO.md`). GYRE
+(web-projects/gyre) is the first real game built ON the kit — it WORKED, but exposed that the kit is
+_atoms without glue_ (~11 kit primitives → ~2,300 hand-written lines). Pick up as you build more games,
+in priority order:
+1. **Harvest GYRE's glue back into game-kit** (highest leverage): turn its hand-built one-offs into
+   reusable r3f helpers — `usePointerLockFPController`, a `<GltfModel autoFit recolor?>` loader, an
+   `<Overlay>` (drei-`<Html>`) wrapper, `useSceneMachine`, sampled-audio on `AudioManager`. So game #2
+   starts where GYRE ended.
+2. **Fix the vendoring drift** — game-kit lives in 3 drifting copies (canonical web-projects/game-kit,
+   Crucible's vendored [has B5+embedder+moody-lighting+audio-kit], GYRE's older vendored). One source of
+   truth + a re-vendor command, else improvements never propagate (GYRE can't use the moody preset/audio kit yet).
+3. **Fix the scaffolder dup-imports** (chip spawned) — generated projects don't compile out of the box.
+4. **A real compiling "moody atmospheric explorer" scaffolder template** (GYRE-shaped) — 80%-done at scaffold time.
+5. **npc ergonomics** — client-safe zod-free selector mock; document client/server split + BudgetedProvider.
+6. **GYRE adopts the shipped audio kit** (`playRecipe`) + first-class game→studio audio bake/import.
+
 - **Reference-driven refine/upscale pipeline** (the north-star asset-gen arc): procgen/reference asset →
   render → reference-conditioned img2img/upscale → TRELLIS → **derived** asset via `source_asset_id` (schema
   already supports it). Turns the ~480-asset library into source material. Needs one deliberate paid pass.
 - **Phase 3 finish** (shares `worker.ts`, so sequential after LoRA): **Kiln finishing** (`approved → finished`,
   own `executor:"kiln"` job type) + **CDN publish** (`finished → published` via per-project `cdn_endpoint`).
-- **Adopt a kit in a real game** (validate the framework): wire game-kit into Project MMO / Wayfinders so the
-  25 systems stop being theoretical.
+- **Adopt a kit in a real game** — ✅ DONE via **GYRE** (built ON game-kit from scratch). See the retro
+  block above for the follow-through (harvest its glue back into the kit).
 - **Borrow from `threejs-game-skills`** (audit → `docs/EXTERNAL-SKILLS-AUDIT.md`, MIT). NOT started — Kevin is
   exploring the current build first. When ready, in priority order: **(T1)** port the provider-agnostic quality
   checklists (AAA visual scorecard, definition-of-done, playtest-QA, release-risk) into `/brief` + scaffolder +
