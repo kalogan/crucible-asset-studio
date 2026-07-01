@@ -7,7 +7,7 @@ import {
 import { vendorKitFiles } from "@/lib/scaffold/vendor";
 import { slugify } from "@/lib/util/slug";
 
-const TEMPLATES = new Set<ScaffoldTemplate>(["blank", "multiplayer", "procgen-world"]);
+const TEMPLATES = new Set<ScaffoldTemplate>(["blank", "multiplayer", "procgen-world", "moody-explorer"]);
 
 /**
  * Build the scaffold zip server-side, INCLUDING the vendored game-kit source so the

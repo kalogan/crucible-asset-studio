@@ -22,7 +22,11 @@ import { SYSTEMS } from "@/lib/kit/catalog";
 
 export type ScaffoldTarget = "r3f" | "vanilla";
 
-export type ScaffoldTemplate = "blank" | "multiplayer" | "procgen-world";
+export type ScaffoldTemplate =
+  | "blank"
+  | "multiplayer"
+  | "procgen-world"
+  | "moody-explorer";
 
 export type ScaffoldFile = { path: string; content: string };
 
@@ -63,6 +67,30 @@ export const TEMPLATES: readonly TemplateMeta[] = [
     description:
       "Seeded low-poly world generation (prng + palette + geometry). Same seed → identical world; re-roll by changing the seed.",
     systemIds: ["render-bootstrap", "prng", "palette", "geo", "lighting"],
+  },
+  {
+    id: "moody-explorer",
+    label: "Moody Explorer",
+    description:
+      "A GYRE-shaped atmospheric first-person starter: a dark faceted room, fog, a single cold light, bloom, and WASD + mouse-look. Runnable, not stubs.",
+    // The GYRE-shaped stack: render + camera + input drive the FP explorer;
+    // lighting/postfx/fx set the mood; geo/palette/prng carve the room; audio +
+    // math/scene-state round out the runtime.
+    systemIds: [
+      "render-bootstrap",
+      "camera-rigs",
+      "input",
+      "scene-state",
+      "lighting",
+      "postfx",
+      "geo",
+      "palette",
+      "fx-particles",
+      "nav",
+      "audio",
+      "math",
+      "prng",
+    ],
   },
 ] as const;
 
@@ -626,15 +654,92 @@ function resolveSystems(systemIds: readonly string[]): string[] {
   ).map((s) => s.id);
 }
 
-/** Stable, deduped imports preserving first-seen order. */
-function dedupe(lines: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const line of lines) {
-    if (!seen.has(line)) {
-      seen.add(line);
-      out.push(line);
+/**
+ * Merge + de-duplicate a list of import statements into a single, minimal import
+ * section — the fix for the duplicate-import bug.
+ *
+ * Each system contributes its own imports independently, so overlapping systems
+ * used to emit the same module more than once (e.g. `prng` + `nav` + `npc-behavior`
+ * each emitted a `from "game-kit"` line, producing duplicate `createRng` /
+ * `createGridNav` identifiers → the generated project didn't compile). A flat
+ * string-level dedupe can't fix that: the lines differ character-for-character
+ * even though they import overlapping names from the SAME specifier.
+ *
+ * This merger works at the import level:
+ *   - Named imports (`import { a, type B } from "m"`) from the SAME specifier are
+ *     merged into ONE statement; each imported name appears once, keyed by
+ *     (name, alias) so `foo as bar` and a plain `foo` don't collide.
+ *   - The `type` modifier is preserved per-name; if a name is imported both as a
+ *     value and as `type`, the VALUE import wins (it's the stronger form and a
+ *     value import can stand in for a type).
+ *   - Named imports are emitted in first-seen order (of specifier, then of name)
+ *     so output stays deterministic.
+ *   - Any import that isn't a simple named import (`import * as THREE …`,
+ *     default imports, bare side-effect imports, `import type X …`) is passed
+ *     through verbatim, deduped by exact line, and emitted before the merged
+ *     named blocks in first-seen order.
+ */
+function mergeImports(lines: readonly string[]): string[] {
+  // Matches `import { ... } from "specifier";` (single-line named imports — the
+  // only shape the wiring recipes emit). Everything else is passed through.
+  const namedRe = /^import\s*\{([^}]*)\}\s*from\s*["']([^"']+)["'];?\s*$/;
+
+  const passthrough: string[] = [];
+  const passthroughSeen = new Set<string>();
+
+  /** specifier → ordered list of { name, alias, isType } with a de-dupe index. */
+  const namedOrder: string[] = [];
+  const named = new Map<
+    string,
+    { order: string[]; byKey: Map<string, { text: string; isType: boolean }> }
+  >();
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line === "") continue;
+    const m = namedRe.exec(line);
+    if (!m) {
+      if (!passthroughSeen.has(line)) {
+        passthroughSeen.add(line);
+        passthrough.push(line);
+      }
+      continue;
     }
+
+    const specifier = m[2] as string;
+    if (!named.has(specifier)) {
+      named.set(specifier, { order: [], byKey: new Map() });
+      namedOrder.push(specifier);
+    }
+    const bucket = named.get(specifier)!;
+
+    for (const part of (m[1] as string).split(",")) {
+      const token = part.trim();
+      if (token === "") continue;
+      const isType = /^type\s+/.test(token);
+      // Strip a leading `type ` so the identity key ignores the modifier — a
+      // value import and a type import of the same name must collapse to one.
+      const body = token.replace(/^type\s+/, "").trim();
+      const key = body; // includes any `X as Y` alias, so aliases stay distinct
+      const existing = bucket.byKey.get(key);
+      if (!existing) {
+        bucket.byKey.set(key, { text: body, isType });
+        bucket.order.push(key);
+      } else if (existing.isType && !isType) {
+        // Upgrade a previously type-only import to a value import.
+        existing.isType = false;
+      }
+    }
+  }
+
+  const out: string[] = [...passthrough];
+  for (const specifier of namedOrder) {
+    const bucket = named.get(specifier)!;
+    const names = bucket.order.map((key) => {
+      const entry = bucket.byKey.get(key)!;
+      return entry.isType ? `type ${entry.text}` : entry.text;
+    });
+    out.push(`import { ${names.join(", ")} } from "${specifier}";`);
   }
   return out;
 }
@@ -681,6 +786,7 @@ function templateContribution(
 ): TemplateContribution {
   if (template === "procgen-world") return procgenContribution(target);
   if (template === "multiplayer") return multiplayerContribution(slug);
+  if (template === "moody-explorer") return moodyExplorerContribution(target);
   return emptyContribution();
 }
 
@@ -817,6 +923,419 @@ export function World(props: WorldOptions) {
     [props.seed, props.radius, props.tileSize],
   );
   return <primitive object={group} />;
+}
+`;
+
+// ── Moody Explorer template ──────────────────────────────────────────────────
+//
+// A GYRE-shaped atmospheric first-person starter that RUNS (not TODO stubs): a
+// dark faceted room carved by prng + geo + palette, fog, a single cold light
+// (game-kit's "moody" lighting preset), bloom (postfx "moody" preset), a drifting
+// dust particle field, and a first-person camera driven by WASD + mouse-look.
+//
+// Unlike the other templates, this one owns its whole main entry — the scene is a
+// single self-contained module so every piece is wired against the CURRENT kit API
+// (createFirstPersonCamera / useFirstPersonCamera + createInputMap, createLightingRig,
+// createPostFx, createParticles). The per-system generic recipes are bypassed here
+// (they'd emit TODO stubs + an option-less <Particles/>); see the moody main builders.
+
+function moodyExplorerContribution(target: ScaffoldTarget): TemplateContribution {
+  const c = emptyContribution();
+  // The pure, target-agnostic room builder (prng + geo + palette).
+  c.files.push({ path: "src/moodyRoom.ts", content: MOODY_ROOM_TS });
+
+  if (target === "r3f") {
+    c.files.push({ path: "src/MoodyScene.tsx", content: MOODY_SCENE_TSX });
+  } else {
+    c.files.push({ path: "src/moodyScene.ts", content: MOODY_SCENE_VANILLA_TS });
+  }
+  return c;
+}
+
+/**
+ * Pure, faceted "moody room" builder — a dark box interior carved from game-kit's
+ * prng + geo + palette. Deterministic: same seed → same room. Target-agnostic
+ * (returns a THREE.Group), so both the r3f and vanilla scenes reuse it.
+ */
+const MOODY_ROOM_TS = `import * as THREE from "three";
+import {
+  createRng,
+  createPalette,
+  nonIndexedFlat,
+  jitterVerts,
+} from "game-kit";
+
+export interface MoodyRoomOptions {
+  /** Room seed — same seed always carves the same room. Default 7. */
+  seed?: number;
+  /** Interior half-extent in world units (room is 2·size across). Default 10. */
+  size?: number;
+  /** Wall + ceiling height. Default 5. */
+  height?: number;
+}
+
+/**
+ * Build a dark faceted room: a jittered floor, four walls, a ceiling, and a
+ * scatter of angular monoliths — the kind of cold interior you explore in GYRE.
+ * Flat-shaded + vertex-jittered so it reads hand-carved under a single light.
+ */
+export function buildMoodyRoom(opts: MoodyRoomOptions = {}): THREE.Group {
+  const seed = opts.seed ?? 7;
+  const size = opts.size ?? 10;
+  const height = opts.height ?? 5;
+  const rng = createRng(seed);
+
+  const palette = createPalette({
+    floor: "#1b1e26",
+    wall: "#23262f",
+    ceiling: "#15171d",
+    stone: "#2c2f38",
+  });
+
+  const room = new THREE.Group();
+  room.name = "moody-room";
+
+  // Floor — a jittered, flat-shaded plane.
+  const floorGeo = nonIndexedFlat(
+    new THREE.PlaneGeometry(size * 2, size * 2, 8, 8),
+  );
+  floorGeo.rotateX(-Math.PI / 2);
+  jitterVerts(floorGeo, rng.fork(1).next, 0.08);
+  const floor = new THREE.Mesh(floorGeo, palette.flatMat("floor"));
+  floor.receiveShadow = true;
+  room.add(floor);
+
+  // Ceiling.
+  const ceilGeo = nonIndexedFlat(
+    new THREE.PlaneGeometry(size * 2, size * 2, 8, 8),
+  );
+  ceilGeo.rotateX(Math.PI / 2);
+  jitterVerts(ceilGeo, rng.fork(2).next, 0.08);
+  const ceiling = new THREE.Mesh(ceilGeo, palette.flatMat("ceiling"));
+  ceiling.position.y = height;
+  ceiling.receiveShadow = true;
+  room.add(ceiling);
+
+  // Four walls.
+  const wallMat = palette.flatMat("wall");
+  const wallDefs: Array<{ pos: [number, number, number]; rotY: number }> = [
+    { pos: [0, height / 2, -size], rotY: 0 },
+    { pos: [0, height / 2, size], rotY: Math.PI },
+    { pos: [-size, height / 2, 0], rotY: Math.PI / 2 },
+    { pos: [size, height / 2, 0], rotY: -Math.PI / 2 },
+  ];
+  for (const def of wallDefs) {
+    const wallGeo = nonIndexedFlat(
+      new THREE.PlaneGeometry(size * 2, height, 8, 4),
+    );
+    jitterVerts(wallGeo, rng.next, 0.06);
+    const wall = new THREE.Mesh(wallGeo, wallMat);
+    wall.position.set(def.pos[0], def.pos[1], def.pos[2]);
+    wall.rotation.y = def.rotY;
+    wall.receiveShadow = true;
+    room.add(wall);
+  }
+
+  // A scatter of angular monoliths to explore around.
+  const stoneMat = palette.flatMat("stone");
+  const count = 5 + rng.int(4);
+  for (let i = 0; i < count; i++) {
+    const h = 0.8 + rng.next() * 2.4;
+    const w = 0.4 + rng.next() * 0.9;
+    const geo = nonIndexedFlat(new THREE.BoxGeometry(w, h, w));
+    jitterVerts(geo, rng.next, 0.12);
+    const monolith = new THREE.Mesh(geo, stoneMat);
+    const inset = size - 1.5;
+    monolith.position.set(
+      (rng.next() * 2 - 1) * inset,
+      h / 2,
+      (rng.next() * 2 - 1) * inset,
+    );
+    monolith.rotation.y = rng.next() * Math.PI;
+    monolith.castShadow = true;
+    monolith.receiveShadow = true;
+    room.add(monolith);
+  }
+
+  return room;
+}
+`;
+
+/**
+ * r3f moody scene: fog + a cold moody lighting rig + bloom + a first-person
+ * camera (WASD + pointer-lock mouse-look) exploring the faceted room, with a
+ * drifting dust particle field. Uses the CURRENT kit API — useFirstPersonCamera
+ * from game-kit/r3f, driven by a createInputMap-based input hook.
+ */
+const MOODY_SCENE_TSX = `import { useEffect, useMemo, useRef } from "react";
+import { useThree, useFrame } from "@react-three/fiber";
+import * as THREE from "three";
+import { LightingRig, PostFx, useFirstPersonCamera } from "game-kit/r3f";
+import { BLOOM_MOODY, createInputMap, createParticles, createRng } from "game-kit";
+import { buildMoodyRoom } from "./moodyRoom";
+
+/**
+ * WASD (held-key) + pointer-lock mouse-look, built on game-kit's createInputMap.
+ * Returns a getter yielding the per-frame CameraInput useFirstPersonCamera drains.
+ */
+function useExplorerInput(): () => { lookDelta: [number, number]; move: [number, number] } {
+  const input = useMemo(
+    () =>
+      createInputMap([
+        { id: "forward", default: "w" },
+        { id: "back", default: "s" },
+        { id: "left", default: "a" },
+        { id: "right", default: "d" },
+      ]),
+    [],
+  );
+  const held = useRef<Set<string>>(new Set());
+  const look = useRef<[number, number]>([0, 0]);
+  const locked = useRef(false);
+
+  useEffect(() => {
+    const canvas = document.querySelector("canvas");
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const action = input.actionFor(e.key);
+      if (action) held.current.add(action);
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      const action = input.actionFor(e.key);
+      if (action) held.current.delete(action);
+    };
+    const onMouseMove = (e: MouseEvent) => {
+      if (!locked.current) return;
+      look.current[0] += e.movementX;
+      look.current[1] += e.movementY;
+    };
+    const onLockChange = () => {
+      locked.current = document.pointerLockElement === canvas;
+      if (!locked.current) held.current.clear();
+    };
+    const onClick = () => canvas?.requestPointerLock?.();
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("pointerlockchange", onLockChange);
+    canvas?.addEventListener("click", onClick);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("pointerlockchange", onLockChange);
+      canvas?.removeEventListener("click", onClick);
+    };
+  }, [input]);
+
+  return () => {
+    const h = held.current;
+    const move: [number, number] = [
+      (h.has("right") ? 1 : 0) - (h.has("left") ? 1 : 0),
+      (h.has("forward") ? 1 : 0) - (h.has("back") ? 1 : 0),
+    ];
+    const lookDelta: [number, number] = [look.current[0], look.current[1]];
+    look.current[0] = 0;
+    look.current[1] = 0;
+    return { lookDelta, move };
+  };
+}
+
+/** A slow drifting dust field — game-kit's pooled particle system as bloom fodder. */
+function Dust() {
+  const system = useMemo(
+    () => createParticles({ max: 200, size: 0.06, color: 0x6f7d99, rng: createRng(3).next }),
+    [],
+  );
+  useEffect(() => {
+    // Seed a static-ish cloud, then let it drift + recycle.
+    for (let i = 0; i < 60; i++) {
+      system.emit(
+        [(Math.random() * 2 - 1) * 9, Math.random() * 4 + 0.5, (Math.random() * 2 - 1) * 9],
+        1,
+        { velocity: [0, 0.05, 0], spread: 0.05, life: 8 },
+      );
+    }
+    return () => system.dispose();
+  }, [system]);
+  useFrame((_, dt) => {
+    system.update(dt);
+    if (Math.random() < 0.3) {
+      system.emit(
+        [(Math.random() * 2 - 1) * 9, 0.4, (Math.random() * 2 - 1) * 9],
+        1,
+        { velocity: [0, 0.06, 0], spread: 0.05, life: 8 },
+      );
+    }
+  });
+  return <primitive object={system.object} />;
+}
+
+/** The faceted room + everything that makes it moody. */
+export function MoodyScene() {
+  const scene = useThree((s) => s.scene);
+  const room = useMemo(() => buildMoodyRoom({ seed: 7 }), []);
+  const getInput = useExplorerInput();
+
+  // First-person camera at eye height; WASD + mouse-look drive it each frame.
+  const fp = useFirstPersonCamera(getInput, { moveSpeed: 3.2, lookSensitivity: 0.0022 });
+  useEffect(() => {
+    fp.setPosition([0, 1.7, 6]);
+  }, [fp]);
+
+  // Cold fog so the room fades into dark — the signature moody depth cue.
+  useEffect(() => {
+    const prev = scene.fog;
+    scene.fog = new THREE.FogExp2(0x0a0c12, 0.055);
+    return () => {
+      scene.fog = prev;
+    };
+  }, [scene]);
+
+  return (
+    <>
+      <primitive object={room} />
+      <LightingRig
+        preset="moody"
+        sun={{ color: "#6f8dff", intensity: 1.4, position: [3, 6, 2], castShadow: true }}
+      />
+      <Dust />
+      {/* The r3f <PostFx> takes bloom values directly; feed it the "moody" profile. */}
+      <PostFx bloom={BLOOM_MOODY} />
+    </>
+  );
+}
+`;
+
+/**
+ * Vanilla moody scene: the same faceted room + cold fog + moody lighting + bloom
+ * + drifting dust, driven by createFirstPersonCamera and a createInputMap-based
+ * WASD + pointer-lock input rig. \`startMoodyExplorer(app)\` boots the whole thing.
+ */
+const MOODY_SCENE_VANILLA_TS = `import * as THREE from "three";
+import {
+  createRenderer,
+  createLoop,
+  createLightingRig,
+  createPostFx,
+  createParticles,
+  createFirstPersonCamera,
+  createInputMap,
+  createRng,
+} from "game-kit";
+import { buildMoodyRoom } from "./moodyRoom";
+
+/** Boot the moody first-person explorer into \`app\`. Returns a teardown fn. */
+export function startMoodyExplorer(app: HTMLElement): () => void {
+  const { renderer, scene } = createRenderer({ clearColor: 0x0a0c12 });
+  app.appendChild(renderer.domElement);
+
+  // Cold exponential fog — the room fades into the dark.
+  scene.fog = new THREE.FogExp2(0x0a0c12, 0.055);
+
+  const camera = new THREE.PerspectiveCamera(
+    70,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    200,
+  );
+  camera.position.set(0, 1.7, 6);
+
+  // The faceted room (prng + geo + palette).
+  scene.add(buildMoodyRoom({ seed: 7 }));
+
+  // A single cold light + ambient floor via the "moody" preset.
+  createLightingRig(scene, {
+    preset: "moody",
+    sun: { color: "#6f8dff", intensity: 1.4, position: [3, 6, 2], castShadow: true },
+  });
+
+  // Bloom (moody preset) — rendered instead of renderer.render().
+  const postfx = createPostFx(renderer, scene, camera, { preset: "moody" });
+
+  // Drifting dust as bloom fodder.
+  const dust = createParticles({ max: 200, size: 0.06, color: 0x6f7d99, rng: createRng(3).next });
+  scene.add(dust.object);
+  for (let i = 0; i < 60; i++) {
+    dust.emit(
+      [(Math.random() * 2 - 1) * 9, Math.random() * 4 + 0.5, (Math.random() * 2 - 1) * 9],
+      1,
+      { velocity: [0, 0.05, 0], spread: 0.05, life: 8 },
+    );
+  }
+
+  // First-person camera + WASD + pointer-lock mouse-look.
+  const fp = createFirstPersonCamera(camera, { moveSpeed: 3.2, lookSensitivity: 0.0022 });
+  const input = createInputMap([
+    { id: "forward", default: "w" },
+    { id: "back", default: "s" },
+    { id: "left", default: "a" },
+    { id: "right", default: "d" },
+  ]);
+  const held = new Set<string>();
+  let look: [number, number] = [0, 0];
+  let locked = false;
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    const action = input.actionFor(e.key);
+    if (action) held.add(action);
+  };
+  const onKeyUp = (e: KeyboardEvent) => {
+    const action = input.actionFor(e.key);
+    if (action) held.delete(action);
+  };
+  const onMouseMove = (e: MouseEvent) => {
+    if (!locked) return;
+    look[0] += e.movementX;
+    look[1] += e.movementY;
+  };
+  const onLockChange = () => {
+    locked = document.pointerLockElement === renderer.domElement;
+    if (!locked) held.clear();
+  };
+  const onClick = () => renderer.domElement.requestPointerLock?.();
+
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+  window.addEventListener("mousemove", onMouseMove);
+  document.addEventListener("pointerlockchange", onLockChange);
+  renderer.domElement.addEventListener("click", onClick);
+
+  function resize(): void {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    postfx.setSize(window.innerWidth, window.innerHeight);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  const loop = createLoop((dt) => {
+    const move: [number, number] = [
+      (held.has("right") ? 1 : 0) - (held.has("left") ? 1 : 0),
+      (held.has("forward") ? 1 : 0) - (held.has("back") ? 1 : 0),
+    ];
+    fp.update(dt, { lookDelta: [look[0], look[1]], move });
+    camera.position.y = 1.7; // stay at eye height
+    look = [0, 0];
+    dust.update(dt);
+    postfx.render();
+  });
+  loop.start();
+
+  return () => {
+    loop.stop();
+    window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("keyup", onKeyUp);
+    window.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("pointerlockchange", onLockChange);
+    window.removeEventListener("resize", resize);
+    renderer.domElement.removeEventListener("click", onClick);
+    postfx.dispose();
+    dust.dispose();
+    renderer.dispose();
+  };
 }
 `;
 
@@ -1162,7 +1681,7 @@ function buildVanillaMain(
   const hasBootstrap = resolved.includes("render-bootstrap");
 
   const lines: string[] = [];
-  lines.push(...dedupe(imports));
+  lines.push(...mergeImports(imports));
   lines.push(``);
   lines.push(`const slug = "${slug}";`);
   lines.push(`const app = document.querySelector<HTMLDivElement>("#app");`);
@@ -1242,7 +1761,7 @@ function buildR3fMain(
   if (contrib.r3fModule.length > 0) moduleSetup.push(...contrib.r3fModule);
 
   const lines: string[] = [];
-  lines.push(...dedupe(imports));
+  lines.push(...mergeImports(imports));
   lines.push(``);
   lines.push(`const slug = "${slug}";`);
 
@@ -1289,6 +1808,62 @@ function buildR3fMain(
   lines.push(`);`);
   lines.push(``);
   return lines.join("\n");
+}
+
+/**
+ * The moody-explorer r3f entry: a shadowed <Canvas> that renders the whole
+ * <MoodyScene/> (room + fog + moody lighting + bloom + FP camera). Everything is
+ * inside the scene module, so the entry stays tiny.
+ */
+function buildMoodyR3fMain(slug: string): string {
+  return [
+    `import { StrictMode } from "react";`,
+    `import { createRoot } from "react-dom/client";`,
+    `import { Canvas } from "@react-three/fiber";`,
+    `import { MoodyScene } from "./MoodyScene";`,
+    ``,
+    `const slug = "${slug}";`,
+    ``,
+    `function Game() {`,
+    `  // slug: ${slug} — an atmospheric first-person starter. Click to capture the`,
+    `  // mouse (pointer lock), then WASD + mouse-look to explore the room.`,
+    `  return (`,
+    `    <Canvas shadows camera={{ fov: 70, position: [0, 1.7, 6], near: 0.1, far: 200 }}>`,
+    `      <MoodyScene />`,
+    `    </Canvas>`,
+    `  );`,
+    `}`,
+    ``,
+    `const container = document.querySelector<HTMLDivElement>("#root");`,
+    `if (!container) throw new Error("Missing #root mount node");`,
+    `createRoot(container).render(`,
+    `  <StrictMode>`,
+    `    <Game />`,
+    `  </StrictMode>,`,
+    `);`,
+    ``,
+  ].join("\n");
+}
+
+/**
+ * The moody-explorer vanilla entry: mount the scene into #app. All the wiring
+ * lives in startMoodyExplorer (renderer, room, lighting, bloom, FP camera).
+ */
+function buildMoodyVanillaMain(slug: string): string {
+  return [
+    `import { startMoodyExplorer } from "./moodyScene";`,
+    ``,
+    `const slug = "${slug}";`,
+    `void slug;`,
+    ``,
+    `const app = document.querySelector<HTMLDivElement>("#app");`,
+    `if (!app) throw new Error("Missing #app mount node");`,
+    ``,
+    `// Boot the atmospheric first-person explorer. Click the canvas to capture the`,
+    `// mouse (pointer lock), then WASD + mouse-look to explore the dark faceted room.`,
+    `startMoodyExplorer(app);`,
+    ``,
+  ].join("\n");
 }
 
 /** A starter `.gitignore` so the first commit never drags in node_modules/dist. */
@@ -1412,6 +1987,24 @@ function buildReadme(
     );
   }
 
+  if (template === "moody-explorer") {
+    const sceneFile =
+      target === "r3f" ? "src/MoodyScene.tsx" : "src/moodyScene.ts";
+    lines.push(
+      ``,
+      `### Moody explorer`,
+      ``,
+      `A runnable atmospheric first-person starter — a dark faceted room, cold fog, a`,
+      `single moody light, bloom, and a drifting dust field. **Click the canvas** to`,
+      `capture the mouse (pointer lock), then **WASD + mouse-look** to explore.`,
+      ``,
+      `- \`src/moodyRoom.ts\` — the seeded faceted room (\`buildMoodyRoom({ seed })\`,`,
+      `  from game-kit's prng + geo + palette). Change the seed to re-roll the room.`,
+      `- \`${sceneFile}\` — fog + \`moody\` lighting/bloom presets + first-person camera`,
+      `  (WASD + pointer-lock look) + particle dust. This is the piece you build on.`,
+    );
+  }
+
   lines.push(
     ``,
     `## Push to GitHub`,
@@ -1450,10 +2043,21 @@ export function generateScaffold(opts: ScaffoldOptions): ScaffoldFile[] {
   const contrib = templateContribution(template, opts.target, slug);
 
   const mainPath = opts.target === "r3f" ? "src/main.tsx" : "src/main.ts";
-  const mainContent =
-    opts.target === "r3f"
-      ? buildR3fMain(slug, resolved, contrib)
-      : buildVanillaMain(slug, resolved, contrib);
+  let mainContent: string;
+  if (template === "moody-explorer") {
+    // The moody template owns its whole entry: it renders a single self-contained
+    // scene (wired against the real kit API) rather than the generic per-system
+    // recipes (which would emit TODO stubs + an option-less <Particles/>).
+    mainContent =
+      opts.target === "r3f"
+        ? buildMoodyR3fMain(slug)
+        : buildMoodyVanillaMain(slug);
+  } else {
+    mainContent =
+      opts.target === "r3f"
+        ? buildR3fMain(slug, resolved, contrib)
+        : buildVanillaMain(slug, resolved, contrib);
+  }
 
   return [
     { path: "package.json", content: buildPackageJson(slug, opts.target, contrib) },

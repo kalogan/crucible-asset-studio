@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateScaffold, type ScaffoldFile } from "./generate";
+import { generateScaffold, TEMPLATES, type ScaffoldFile } from "./generate";
 
 function fileMap(files: ScaffoldFile[]): Map<string, string> {
   return new Map(files.map((f) => [f.path, f.content]));
@@ -145,9 +145,11 @@ describe("generateScaffold — main wiring", () => {
       systemIds: ["camera-rigs", "skeletal-anim"],
     });
     const main = fileMap(files).get("src/main.tsx") as string;
-    // Hooks imported from /r3f, called inside Systems(), rendered as <Systems />.
-    expect(main).toContain('import { useOrbitCamera } from "game-kit/r3f"');
-    expect(main).toContain('import { useClipPlayer } from "game-kit/r3f"');
+    // Hooks imported from /r3f (merged into ONE statement), called inside
+    // Systems(), rendered as <Systems />.
+    expect(main).toContain(
+      'import { useOrbitCamera, useClipPlayer } from "game-kit/r3f";',
+    );
     expect(main).toContain("function Systems()");
     expect(main).toContain("useOrbitCamera();");
     expect(main).toContain("useClipPlayer();");
@@ -163,8 +165,11 @@ describe("generateScaffold — main wiring", () => {
       systemIds: ["audio", "save"],
     });
     const main = fileMap(files).get("src/main.tsx") as string;
-    // Imported from "game-kit" (not /r3f), initialized outside <Canvas>.
-    expect(main).toContain('import { createAudioManager } from "game-kit"');
+    // Imported from "game-kit" (not /r3f), initialized outside <Canvas>. Both
+    // no-r3f factories merge into ONE "game-kit" import statement.
+    expect(main).toContain(
+      'import { createAudioManager, createSaveStore } from "game-kit";',
+    );
     expect(main).toContain("createAudioManager()");
     expect(main).toContain('createSaveStore("audio-game")');
     expect(main).not.toContain("${slug}");
@@ -309,7 +314,13 @@ describe("generateScaffold — npc / nav / behavior wiring", () => {
         systemIds: ["render-bootstrap", "nav"],
       }),
     ).get("src/main.ts") as string;
-    expect(main).toContain('import { createGridNav, type Vec2 } from "game-kit"');
+    // nav's names merge into the shared "game-kit" import (with render-bootstrap's).
+    const gameKitImport = main
+      .split("\n")
+      .find((l) => /^import\s*\{[^}]*\}\s*from\s*"game-kit";?\s*$/.test(l.trim()));
+    expect(gameKitImport).toBeDefined();
+    expect(gameKitImport).toContain("createGridNav");
+    expect(gameKitImport).toContain("type Vec2");
     expect(main).toContain("createGridNav({");
     expect(main).toContain("nav.findPath");
   });
@@ -390,6 +401,206 @@ describe("generateScaffold — npc / nav / behavior wiring", () => {
     ).get("src/main.tsx") as string;
     expect(main).toContain("createGridNav({");
     expect(main).not.toContain("${slug}");
+  });
+});
+
+/**
+ * Extract every identifier bound by the top-of-file named imports
+ * (`import { a, type B, c as d } from "…"`). Returns the LOCAL binding names
+ * (so `c as d` contributes `d`). Used to assert no identifier is bound twice.
+ */
+function importedIdentifiers(main: string): string[] {
+  const ids: string[] = [];
+  const re = /^import\s*\{([^}]*)\}\s*from\s*["'][^"']+["'];?\s*$/;
+  for (const line of main.split("\n")) {
+    const m = re.exec(line.trim());
+    if (!m) continue;
+    for (const part of (m[1] as string).split(",")) {
+      const token = part.trim().replace(/^type\s+/, "");
+      if (token === "") continue;
+      const asMatch = /\bas\s+(\w+)$/.exec(token);
+      ids.push(asMatch ? (asMatch[1] as string) : token);
+    }
+  }
+  return ids;
+}
+
+describe("generateScaffold — merged, de-duplicated imports", () => {
+  it("emits NO duplicate identifiers for overlapping systems (prng + nav + npc-behavior)", () => {
+    for (const target of ["vanilla", "r3f"] as const) {
+      const path = target === "r3f" ? "src/main.tsx" : "src/main.ts";
+      const main = fileMap(
+        generateScaffold({
+          name: "Overlap",
+          target,
+          // These three all import from "game-kit" with OVERLAPPING names:
+          //   prng         → createRng
+          //   nav          → createGridNav, type Vec2
+          //   npc-behavior → createGridNav, createNpcBehavior, createRng
+          systemIds: ["render-bootstrap", "prng", "nav", "npc-behavior"],
+        }),
+      ).get(path) as string;
+
+      const ids = importedIdentifiers(main);
+      const dupes = ids.filter((id, i) => ids.indexOf(id) !== i);
+      expect(dupes).toEqual([]);
+      // Overlapping names survive the merge exactly once.
+      expect(ids.filter((id) => id === "createRng")).toHaveLength(1);
+      expect(ids.filter((id) => id === "createGridNav")).toHaveLength(1);
+      // The merged names are all present.
+      expect(ids).toContain("createNpcBehavior");
+      expect(ids).toContain("Vec2");
+    }
+  });
+
+  it("merges named imports from the same specifier into ONE statement", () => {
+    const main = fileMap(
+      generateScaffold({
+        name: "Merge",
+        target: "vanilla",
+        systemIds: ["render-bootstrap", "prng", "nav", "npc-behavior"],
+      }),
+    ).get("src/main.ts") as string;
+    // Exactly one `from "game-kit";` named-import line (not three).
+    const gameKitLines = main
+      .split("\n")
+      .filter((l) => /^import\s*\{[^}]*\}\s*from\s*"game-kit";?\s*$/.test(l.trim()));
+    expect(gameKitLines).toHaveLength(1);
+    // `import * as THREE` (a non-named import) is preserved as its own line.
+    expect(main).toContain('import * as THREE from "three";');
+  });
+
+  it("preserves the type-only modifier on a name only imported as a type", () => {
+    const main = fileMap(
+      generateScaffold({
+        name: "Types",
+        target: "vanilla",
+        systemIds: ["render-bootstrap", "nav"],
+      }),
+    ).get("src/main.ts") as string;
+    // nav imports `type Vec2` — the modifier must survive the merge.
+    expect(main).toContain("type Vec2");
+  });
+});
+
+describe("generateScaffold — moody-explorer template", () => {
+  it("is a selectable template with the GYRE-shaped systems pre-selected", () => {
+    const meta = TEMPLATES.find((t) => t.id === "moody-explorer");
+    expect(meta).toBeDefined();
+    const ids = new Set(meta?.systemIds ?? []);
+    for (const expected of [
+      "render-bootstrap",
+      "camera-rigs",
+      "input",
+      "scene-state",
+      "lighting",
+      "postfx",
+      "geo",
+      "palette",
+      "fx-particles",
+      "nav",
+      "audio",
+      "math",
+      "prng",
+    ]) {
+      expect(ids.has(expected)).toBe(true);
+    }
+  });
+
+  it("lists the pre-selected systems in the README (via forced template systems)", () => {
+    const readme = fileMap(
+      generateScaffold({
+        name: "Gloom",
+        target: "r3f",
+        template: "moody-explorer",
+        systemIds: [],
+      }),
+    ).get("README.md") as string;
+    // The template forces its systems in even with empty systemIds.
+    expect(readme).toContain("Lighting");
+    expect(readme).toContain("Post FX");
+    expect(readme).toContain("Camera Rigs");
+    expect(readme).toContain("Moody explorer");
+  });
+
+  it("emits a runnable r3f moody scene (room + moody presets + FP camera + dust)", () => {
+    const map = fileMap(
+      generateScaffold({
+        name: "Gloom",
+        target: "r3f",
+        template: "moody-explorer",
+        systemIds: [],
+      }),
+    );
+    expect(map.has("src/moodyRoom.ts")).toBe(true);
+    expect(map.has("src/MoodyScene.tsx")).toBe(true);
+
+    const room = map.get("src/moodyRoom.ts") as string;
+    expect(room).toContain("export function buildMoodyRoom");
+    // Real kit APIs — prng + geo + palette carve the room.
+    expect(room).toContain("createRng");
+    expect(room).toContain("createPalette");
+    expect(room).toContain("nonIndexedFlat");
+    expect(room).toContain("jitterVerts");
+
+    const scene = map.get("src/MoodyScene.tsx") as string;
+    // Wires the CURRENT kit API for the atmospheric first-person scene.
+    expect(scene).toContain(
+      'import { LightingRig, PostFx, useFirstPersonCamera } from "game-kit/r3f"',
+    );
+    expect(scene).toContain("createInputMap");
+    expect(scene).toContain("useFirstPersonCamera(");
+    expect(scene).toContain('preset="moody"');
+    expect(scene).toContain("FogExp2");
+    expect(scene).toContain("createParticles({");
+    expect(scene).toContain("buildMoodyRoom({ seed: 7 })");
+
+    const main = map.get("src/main.tsx") as string;
+    expect(main).toContain('import { MoodyScene } from "./MoodyScene"');
+    expect(main).toContain("<MoodyScene />");
+    expect(main).toContain("<Canvas shadows");
+    // NOT the generic TODO-stub fallback scene.
+    expect(main).not.toContain("TODO: game-specific wiring");
+    // No duplicate identifiers in the entry either.
+    const ids = importedIdentifiers(main);
+    expect(ids.filter((id, i) => ids.indexOf(id) !== i)).toEqual([]);
+  });
+
+  it("emits a runnable vanilla moody scene (startMoodyExplorer + FP + bloom)", () => {
+    const map = fileMap(
+      generateScaffold({
+        name: "Gloom",
+        target: "vanilla",
+        template: "moody-explorer",
+        systemIds: [],
+      }),
+    );
+    expect(map.has("src/moodyRoom.ts")).toBe(true);
+    expect(map.has("src/moodyScene.ts")).toBe(true);
+    expect(map.has("src/MoodyScene.tsx")).toBe(false);
+
+    const scene = map.get("src/moodyScene.ts") as string;
+    expect(scene).toContain("export function startMoodyExplorer");
+    expect(scene).toContain("createFirstPersonCamera");
+    expect(scene).toContain("createInputMap");
+    expect(scene).toContain("createPostFx");
+    expect(scene).toContain('preset: "moody"');
+    expect(scene).toContain("postfx.render()");
+
+    const main = map.get("src/main.ts") as string;
+    expect(main).toContain('import { startMoodyExplorer } from "./moodyScene"');
+    expect(main).toContain("startMoodyExplorer(app)");
+    expect(main).not.toContain("${slug}");
+  });
+
+  it("emits no server files (moody-explorer is single-player)", () => {
+    const paths = generateScaffold({
+      name: "Gloom",
+      target: "r3f",
+      template: "moody-explorer",
+      systemIds: [],
+    }).map((f) => f.path);
+    expect(paths.some((p) => p.startsWith("server/"))).toBe(false);
   });
 });
 
