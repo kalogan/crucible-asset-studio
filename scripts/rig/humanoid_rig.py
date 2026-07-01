@@ -222,26 +222,24 @@ def skin(mesh, arm_obj, clean=True):
         log("skinned (raw auto-weights, no cleanup)")
         return
 
-    # --- weight cleanup -----------------------------------------------------
-    # 1) limit total influences per vertex to 4 (glTF-friendly, kills stray
-    #    long-range bleed) and normalize.
-    # 2) a light smooth pass to soften the shoulder/deltoid seam that arms-down
-    #    heat weights leave (verified: reduces the shoulder tear-flap).
-    # NOTE: select all verts in EDIT mode first, or the ops act on a stale
-    # selection / silently no-op.
+    # --- RIGID weighting ----------------------------------------------------
+    # Automatic (heat) weights BLEND across the shoulder/hip on an arms-down sculpt,
+    # so limbs "morph"/tear when posed (verified: taffy shoulders + hip membranes).
+    # For this faceted low-poly character we bind RIGID instead: limit each vertex to
+    # its ONE dominant bone at weight 1.0, and DO NOT smooth (smoothing is what
+    # re-introduces the bleed). Limbs then swing as solid segments — no stretching,
+    # no membranes. The tradeoff is a hard seam at each joint, which reads fine (even
+    # intentional) on the faceted mesh.
+    # NOTE: select all verts in EDIT mode first, or the ops act on a stale selection.
     bpy.ops.object.select_all(action="DESELECT")
     mesh.select_set(True)
     bpy.context.view_layer.objects.active = mesh
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.object.vertex_group_limit_total(limit=4)
-    bpy.ops.object.vertex_group_normalize_all(lock_active=False)
+    bpy.ops.object.vertex_group_limit_total(limit=1)  # ONE bone per vertex
+    bpy.ops.object.vertex_group_normalize_all(lock_active=False)  # -> weight 1.0
     bpy.ops.object.mode_set(mode="OBJECT")
-
-    bpy.ops.object.mode_set(mode="WEIGHT_PAINT")
-    bpy.ops.object.vertex_group_smooth(group_select_mode="ALL", factor=0.5, repeat=3)
-    bpy.ops.object.mode_set(mode="OBJECT")
-    log("skinned + weight-cleaned")
+    log("skinned (rigid: 1 bone / vertex)")
 
 
 # --------------------------------------------------------------------------- #
