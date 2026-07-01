@@ -25,6 +25,7 @@
     "import-woodturning-audio": "node --env-file=.env.local scripts/import-woodturning-audio.mjs",
     "import-mmo-audio": "node --env-file=.env.local scripts/import-mmo-audio.mjs",
     "import-local": "node --env-file=.env.local scripts/import-local-asset.mjs",
+    "vendor-game-kit": "node scripts/vendor-game-kit.mjs",
     "gate": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },
   "dependencies": {
