@@ -19,8 +19,9 @@ describe("trellisInput", () => {
   });
 
   it("overrides mesh_simplify for rig-ready T-pose characters", () => {
-    const input = trellisInput("https://x/y.png", { meshSimplify: 0.88 });
-    expect(input.mesh_simplify).toBe(0.88); // more joint geometry for auto-rigging
+    // 0.9 is TRELLIS's floor (it 422s below it) — the most geometry it allows.
+    const input = trellisInput("https://x/y.png", { meshSimplify: 0.9 });
+    expect(input.mesh_simplify).toBe(0.9); // more joint geometry for auto-rigging
     expect(input.slat_guidance_strength).toBe(1.5); // other tuning untouched
   });
 });

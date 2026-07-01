@@ -25,9 +25,11 @@ import { buildStoragePath, catalogKeyFor } from "./paths";
 export const CHARACTER_TPOSE_KEY = "character-tpose";
 /**
  * Retain more geometry for rig-ready characters so joints survive auto-rigging
- * (vs. the 0.95 preset used for props/tiles). Recorded in the recipe snapshot.
+ * (vs. the 0.95 preset used for props/tiles). 0.9 is firtoz/trellis's FLOOR — it
+ * rejects anything below with a 422 "mesh_simplify must be >= 0.9" — so this is the
+ * most geometry TRELLIS allows. Recorded in the recipe snapshot.
  */
-export const TPOSE_MESH_SIMPLIFY = 0.88;
+export const TPOSE_MESH_SIMPLIFY = 0.9;
 
 /** True when a recipe snapshot was generated as a rig-ready T-pose character. */
 function isTposeRecipe(recipe: Record<string, unknown>): boolean {
