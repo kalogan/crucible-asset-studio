@@ -5,7 +5,7 @@
 // from the codebases. Edit the tables below to keep the audit current.
 //
 // Two kit families live here, keyed by `kind` (the shared ProjectKind enum):
-//   - "game" — the game-kit systems (three.js) audited against the five games.
+//   - "game" — the game-kit systems (three.js) audited against the six games.
 //   - "app"  — the app-kit systems (Next.js/React/Supabase) shared across the
 //              studio's web apps (Glerb, Metagenomics Visualizer, Project
 //              Baseline, …). New family — see APP_SYSTEMS below.
@@ -45,13 +45,19 @@ export type Game = {
  */
 export type Adoption = "core" | "gap" | "na";
 
-// Column order is fixed: PM, WT, SB, CV, DD.
+// Column order is fixed: PM, WT, SB, CV, DD, GY.
+// NOTE: GYRE is different in kind from the first five. Those were pre-existing games
+// audited for consolidation, so their `core` means "hand-rolls its own impl the kit
+// would replace." GYRE is the first game BUILT ON the kit and now CONSUMING it, so its
+// `core` means "adopted from the kit" (see the GYRE-retro harvest). Same cell colour,
+// opposite story — GYRE's cores are the kit working, not debt to unify.
 export const GAMES: readonly Game[] = [
   { id: "project-mmo", name: "Project MMO", engine: "three-r3f" },
   { id: "woodturning-studio", name: "Woodturning Studio", engine: "three-r3f" },
   { id: "storm-break-hockey", name: "Storm-Break Hockey", engine: "three-vanilla" },
   { id: "corrupted-veil", name: "Corrupted Veil", engine: "three-vanilla" },
   { id: "deceive-me-daddy", name: "Deceive Me Daddy", engine: "three-vanilla" },
+  { id: "gyre", name: "GYRE", engine: "three-r3f" },
 ] as const;
 
 export const SYSTEMS: readonly KitSystem[] = [
@@ -75,6 +81,8 @@ export const SYSTEMS: readonly KitSystem[] = [
   { id: "netcode", name: "Netcode", tier: "kit", status: "built", module: "net" },
   { id: "fx-particles", name: "FX Particles", tier: "system", status: "built", module: "fx" },
   { id: "skeletal-anim", name: "Skeletal Anim", tier: "system", status: "built", module: "clip" },
+  // Harvested from GYRE (2026-07-01): drop-in glTF model loading + a DOM-overlay bridge.
+  { id: "gltf", name: "glTF Models", tier: "system", status: "built", module: "gltf" },
   { id: "deploy-presets", name: "Deploy Presets", tier: "kit", status: "built", module: "presets" },
   { id: "npc-reasoning", name: "NPC Reasoning", tier: "kit", status: "built", module: "npc" },
   { id: "nav", name: "Nav / Pathfinding", tier: "system", status: "built", module: "nav" },
@@ -93,7 +101,7 @@ export const SYSTEM_DESCRIPTIONS: Record<string, string> = {
   "scene-state": "A scene/screen state machine (menu → playing → paused).",
   lighting: "Three-point + image-based lighting rig presets, distilled from shipped games.",
   postfx: "Post-processing pipeline (bloom) with sane, tone-mapped defaults.",
-  audio: "Audio manager — buses, master/category volumes, effective-gain clamping.",
+  audio: "Audio manager — buses, master/category volumes, effective-gain clamping; recipe synth (playRecipe/bake) + sampled playback (loadSample/playSample).",
   hud: "HUD layer registry for stacking overlay UI.",
   anim: "Procedural animator — drive transforms/values over time.",
   geo: "Low-poly geometry helpers (hard flat normals, deterministic vertex jitter).",
@@ -103,15 +111,16 @@ export const SYSTEM_DESCRIPTIONS: Record<string, string> = {
   save: "Save store with a stable content hash (fnv1a).",
   math: "Math utilities — clamp, lerp, frame-rate-independent damp, vec3.",
   "render-bootstrap": "WebGL renderer + scene + fixed-timestep loop with shipped-game defaults.",
-  "camera-rigs": "Camera controllers — orbit-follow, chase, first-person.",
+  "camera-rigs": "Camera controllers — orbit-follow, chase, first-person; <GameCamera mode> switches first / third / topdown out of the box, with bounds constraints.",
   netcode: "Transport-agnostic netcode seam (local loopback room now; Colyseus adapter later).",
   "fx-particles": "Pooled particle system (free-list, zero per-frame allocation).",
   "skeletal-anim": "Skeletal / glTF clip player + procedural-clip baking.",
   "deploy-presets": "Deploy config presets (Vite base, Fly.io, Vercel, Dockerfile).",
-  "npc-reasoning": "Server-side NPC brain — firewalled LLM reasoning + memory + local semantic recall (Grok/Claude). Scaffolds a server-only reference wiring (never bundled client-side).",
+  "npc-reasoning": "Server-side NPC brain — firewalled LLM reasoning + memory + local semantic recall (Grok/Claude). Scaffolds a server-only reference wiring (never bundled client-side). A zod-free `npc/runtime` entry + selector mock make the mock brain safe to run client-side.",
   nav: "Grid + A* pathfinding behind a Pathfinder seam. Scaffolds a walkable grid you path over with findPath.",
   "npc-behavior": "Deterministic NPC behaviour (wander/patrol) + follow steering + utility-AI. Scaffolds a wandering NPC you tick(dt) over the nav grid.",
   "npc-reasoning-movement": "⚠ GATED, default-OFF firewall widening — lets the model drive NPC movement by REQUESTING a destination (goTo) or a bounded gesture (emote). The pathfinder still owns actual movement; goTo is clamped to walkable bounds. Review the firewall before shipping. Add on top of NPC Reasoning.",
+  gltf: "Drop-in <GltfModel autoFit> loader (fit-to-height, per-material recolor, shadow flags, preload) + <Overlay>, a drei-Html wrapper that bridges DOM out of the Canvas. Distilled from GYRE.",
 };
 
 // ── app-kit family (kind: "app") ─────────────────────────────────────────────
@@ -136,38 +145,44 @@ export const APP_SYSTEM_DESCRIPTIONS: Record<string, string> = {
 
 /**
  * ADOPTION[systemId][gameId] — the audit matrix.
- * Rows follow column order PM, WT, SB, CV, DD.
+ * Rows follow column order PM, WT, SB, CV, DD, GY.
+ * GYRE's `core` cells = "adopted from the kit" (it's a kit CONSUMER); the other
+ * five games' `core` cells = "hand-rolled, kit would unify." See GAMES note above.
  */
 export const ADOPTION: Record<string, Record<string, Adoption>> = {
-  prng: { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "gap", "corrupted-veil": "gap", "deceive-me-daddy": "core" },
-  settings: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core" },
-  "scene-state": { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core" },
-  lighting: { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core" },
-  postfx: { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core" },
-  audio: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "gap" },
-  hud: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core" },
-  anim: { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "na" },
-  geo: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "gap" },
-  palette: { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "gap" },
-  artkit: { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "gap", "corrupted-veil": "core", "deceive-me-daddy": "na" },
-  input: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core" },
-  save: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "na", "corrupted-veil": "core", "deceive-me-daddy": "na" },
-  math: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core" },
-  "render-bootstrap": { "project-mmo": "na", "woodturning-studio": "na", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core" },
-  "camera-rigs": { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core" },
-  netcode: { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "na", "deceive-me-daddy": "core" },
-  "fx-particles": { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "gap" },
-  "skeletal-anim": { "project-mmo": "gap", "woodturning-studio": "core", "storm-break-hockey": "gap", "corrupted-veil": "gap", "deceive-me-daddy": "core" },
-  "deploy-presets": { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core" },
-  // Wayfinders (project-mmo) shipped the Grok-backed conversational NPC brain; the
+  prng: { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "gap", "corrupted-veil": "gap", "deceive-me-daddy": "core", gyre: "core" },
+  settings: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core", gyre: "gap" },
+  "scene-state": { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core", gyre: "core" },
+  lighting: { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core", gyre: "core" },
+  postfx: { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core", gyre: "core" },
+  audio: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "gap", gyre: "core" },
+  hud: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core", gyre: "gap" },
+  anim: { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "na", gyre: "gap" },
+  geo: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "gap", gyre: "core" },
+  palette: { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "gap", gyre: "core" },
+  artkit: { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "gap", "corrupted-veil": "core", "deceive-me-daddy": "na", gyre: "na" },
+  input: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core", gyre: "gap" },
+  save: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "na", "corrupted-veil": "core", "deceive-me-daddy": "na", gyre: "gap" },
+  math: { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core", gyre: "core" },
+  "render-bootstrap": { "project-mmo": "na", "woodturning-studio": "na", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core", gyre: "na" },
+  "camera-rigs": { "project-mmo": "core", "woodturning-studio": "core", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core", gyre: "core" },
+  netcode: { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "na", "deceive-me-daddy": "core", gyre: "na" },
+  "fx-particles": { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "gap", gyre: "gap" },
+  "skeletal-anim": { "project-mmo": "gap", "woodturning-studio": "core", "storm-break-hockey": "gap", "corrupted-veil": "gap", "deceive-me-daddy": "core", gyre: "na" },
+  "deploy-presets": { "project-mmo": "core", "woodturning-studio": "gap", "storm-break-hockey": "core", "corrupted-veil": "core", "deceive-me-daddy": "core", gyre: "gap" },
+  // Wayfinders (project-mmo) shipped the Grok-backed conversational NPC brain; GYRE's
+  // Hollow runs the same kit brain client-side (zod-free runtime + mock provider). The
   // other games have no dialogue-NPC system today, so it's n/a to their current design.
-  "npc-reasoning": { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na" },
+  "npc-reasoning": { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na", gyre: "core" },
   // Nav/pathfinding + NPC behavior were distilled from project-mmo's sim-core; the other
   // games don't drive autonomous grid NPCs, so n/a to their current design.
-  nav: { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na" },
-  "npc-behavior": { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na" },
+  nav: { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na", gyre: "na" },
+  "npc-behavior": { "project-mmo": "core", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na", gyre: "na" },
   // Gated reasoning→movement bridge — a brand-new opt-in widening; no game ships it yet.
-  "npc-reasoning-movement": { "project-mmo": "na", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na" },
+  "npc-reasoning-movement": { "project-mmo": "na", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "na", "deceive-me-daddy": "na", gyre: "na" },
+  // glTF loading + Overlay were HARVESTED FROM GYRE, so GYRE is `core`; r3f games that
+  // load models could adopt it (gap); the procedural games have no glTF (na).
+  gltf: { "project-mmo": "gap", "woodturning-studio": "na", "storm-break-hockey": "na", "corrupted-veil": "gap", "deceive-me-daddy": "gap", gyre: "core" },
 };
 
 /** Look up adoption for a (system, game) pair. Returns `na` if unmapped. */

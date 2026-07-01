@@ -80,9 +80,11 @@ describe("ranking helpers are descending and exclude zero-count systems", () => 
     expect(ranked.every((o) => o.games.length === o.count)).toBe(true);
   });
 
-  it("adoptHere ranks built systems by # of core games; fully-adopted systems top out at 5", () => {
+  it("adoptHere ranks built systems by # of core games; a system core in every game tops out at the game count", () => {
     const ranked = adoptHere();
-    expect(ranked[0]?.count).toBe(5);
+    // A universally-adopted system (e.g. scene-state / camera-rigs, core in all games
+    // incl. GYRE) tops out at the number of games — derived, so it survives adding games.
+    expect(ranked[0]?.count).toBe(REAL_GAMES.length);
     for (let i = 1; i < ranked.length; i++) {
       expect(ranked[i - 1]!.count).toBeGreaterThanOrEqual(ranked[i]!.count);
     }
