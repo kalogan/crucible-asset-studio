@@ -13,6 +13,10 @@ _reference/
 .env.*.local
 *.local
 
+# Local tooling (portable Blender for the auto-rig pipeline, etc.) — fetched by a
+# setup script, never committed (large binaries; version pinned in the script).
+tools/
+
 # Build output
 dist/
 build/

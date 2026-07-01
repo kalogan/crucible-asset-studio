@@ -26,6 +26,8 @@
     "import-mmo-audio": "node --env-file=.env.local scripts/import-mmo-audio.mjs",
     "import-local": "node --env-file=.env.local scripts/import-local-asset.mjs",
     "vendor-game-kit": "node scripts/vendor-game-kit.mjs",
+    "setup-blender": "node scripts/setup-blender.mjs",
+    "auto-rig": "node scripts/auto-rig.mjs",
     "gate": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },
   "dependencies": {
