@@ -14,6 +14,7 @@ export * from './save/index.js';
 export * from './math/index.js';
 export * from './net/index.js';
 export * from './presets/index.js';
+export * from './identity/index.js';
 
 // three-dependent modules.
 export * from './lighting/index.js';

@@ -54,6 +54,116 @@ function mixSeed(seed: number, salt: number): number {
 }
 
 /**
+ * One entry in a weighted table: a value paired with a non-negative weight.
+ * A weight of 0 means "never pick this"; higher weights are proportionally more
+ * likely. Weights don't need to sum to 1 — they're normalized internally.
+ */
+export interface WeightedEntry<T> {
+  value: T;
+  weight: number;
+}
+
+/**
+ * Deterministically pick one entry from a weighted table, consuming exactly ONE
+ * `rng.next()` draw (so it composes cleanly with the rest of a seeded stream).
+ *
+ * The probability of an entry is `weight / totalWeight`. This is the non-uniform
+ * companion to `Rng.pick` (which is uniform-only) — the anti-sameness primitive
+ * the identity module leans on to bias archetype selection.
+ *
+ * Guards (a table must express a real distribution):
+ *   - empty table            → throws
+ *   - any non-finite weight   → throws (NaN/Infinity can't define a share)
+ *   - any negative weight     → throws (a share can't be negative)
+ *   - total weight of 0       → throws (nothing is selectable)
+ *
+ * Zero-weight entries are allowed as long as SOME entry has positive weight;
+ * they're simply never returned.
+ */
+export function weightedPick<T>(rng: Rng, entries: readonly WeightedEntry<T>[]): T {
+  if (entries.length === 0) {
+    throw new RangeError('weightedPick: entries is empty');
+  }
+
+  let total = 0;
+  for (const e of entries) {
+    const w = e.weight;
+    if (!Number.isFinite(w)) {
+      throw new RangeError(`weightedPick: weight must be finite (got ${w})`);
+    }
+    if (w < 0) {
+      throw new RangeError(`weightedPick: weight must be >= 0 (got ${w})`);
+    }
+    total += w;
+  }
+  if (total <= 0) {
+    throw new RangeError('weightedPick: total weight is 0 — nothing is selectable');
+  }
+
+  // One draw scaled into [0, total); walk the cumulative weights.
+  let target = rng.next() * total;
+  for (const e of entries) {
+    target -= e.weight;
+    if (target < 0) return e.value;
+  }
+  // Float rounding can leave `target` at ~0 after the loop; fall back to the last
+  // positive-weight entry so we always return a valid (never zero-weight) value.
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    if (e && e.weight > 0) return e.value;
+  }
+  // Unreachable: total > 0 guarantees at least one positive-weight entry.
+  throw new RangeError('weightedPick: no positive-weight entry (unreachable)');
+}
+
+/**
+ * Build a reusable sampler bound to a weighted table. Handy when the SAME table
+ * is sampled many times against different rng streams (e.g. one archetype table
+ * sampled per-seed). Each call consumes one `rng.next()` draw, exactly like
+ * `weightedPick`. The table is validated eagerly on construction.
+ */
+export function weightedTable<T>(
+  entries: readonly WeightedEntry<T>[],
+): (rng: Rng) => T {
+  // Validate once up-front by sampling shape (reuses weightedPick's guards via a
+  // throwaway draw-free check): re-run the same guard logic without a draw.
+  if (entries.length === 0) {
+    throw new RangeError('weightedTable: entries is empty');
+  }
+  let total = 0;
+  for (const e of entries) {
+    if (!Number.isFinite(e.weight)) {
+      throw new RangeError(`weightedTable: weight must be finite (got ${e.weight})`);
+    }
+    if (e.weight < 0) {
+      throw new RangeError(`weightedTable: weight must be >= 0 (got ${e.weight})`);
+    }
+    total += e.weight;
+  }
+  if (total <= 0) {
+    throw new RangeError('weightedTable: total weight is 0 — nothing is selectable');
+  }
+  const frozen = entries.slice();
+  return (rng: Rng): T => weightedPick(rng, frozen);
+}
+
+/**
+ * Hash an arbitrary string into a well-distributed 32-bit unsigned seed (FNV-1a).
+ * Lets callers seed the PRNG from a TOKEN (a name, an id) as readily as a number,
+ * without collapsing similar strings to nearby seeds. Empty string → a fixed
+ * non-zero constant so it still produces a usable stream.
+ */
+export function hashStringToSeed(token: string): number {
+  let h = 0x811c9dc5; // FNV offset basis
+  for (let i = 0; i < token.length; i++) {
+    h ^= token.charCodeAt(i);
+    h = Math.imul(h, 0x01000193); // FNV prime
+  }
+  // Avoid a 0 seed (a degenerate mulberry32 start) for the empty string.
+  return (h >>> 0) || 0x9e3779b9;
+}
+
+/**
  * Create a seeded Rng from a numeric seed.
  * Same seed → identical sequence, every time.
  */
