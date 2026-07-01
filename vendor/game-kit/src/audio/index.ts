@@ -56,6 +56,19 @@ export interface PlayNoiseOpts {
   gain?: number;
 }
 
+export interface PlaySampleOpts {
+  /** Channel to route through. Defaults to 'sfx'. */
+  channel?: Channel;
+  /** Per-play linear gain layered on top of the channel volume (0..1). Defaults to 1. */
+  gain?: number;
+  /**
+   * Playback rate. 1 = original pitch/speed; <1 pitches DOWN + slows (heavier);
+   * >1 pitches UP + speeds. Defaults to 1. (GYRE played a footstep at 0.72 for a
+   * duller, weightier impact.)
+   */
+  rate?: number;
+}
+
 export interface AudioManager {
   /** Unlock/create the AudioContext (call on the first user gesture). Idempotent. */
   resume(): Promise<void>;
@@ -76,6 +89,26 @@ export interface AudioManager {
    * No-op until resumed (like the rest of the manager).
    */
   playRecipe(recipe: AudioRecipe, opts?: PlayRecipeOpts): void;
+  /**
+   * The live AudioContext, or null before `resume()` / in a no-AudioContext env.
+   * Exposed so callers can decode/create buffers on the SAME context the manager
+   * mixes through (GYRE had to stand up a SECOND AudioContext just to play one WAV
+   * — {@link loadSample} / {@link playSample} remove that need).
+   */
+  getContext(): AudioContext | null;
+  /**
+   * Fetch + decode an audio file into an AudioBuffer, CACHED by URL (repeat calls
+   * return the same buffer). Requires a context — call `resume()` first (on a user
+   * gesture). Rejects if there's no AudioContext or the fetch/decode fails; the
+   * caller decides how to degrade (e.g. fall back to a synth tick).
+   */
+  loadSample(url: string): Promise<AudioBuffer>;
+  /**
+   * Play a decoded AudioBuffer once through the channel→master graph, with an
+   * optional per-play gain + playback rate. No-op until resumed / without a
+   * context. Get a buffer from {@link loadSample}.
+   */
+  playSample(buffer: AudioBuffer, opts?: PlaySampleOpts): void;
   /** Close the AudioContext and release nodes. Safe to call repeatedly. */
   dispose(): void;
 }
@@ -137,6 +170,8 @@ export function createAudioManager(opts: AudioManagerOptions = {}): AudioManager
   let masterGain: GainNode | null = null;
   /** Per-channel GainNodes (excluding 'master', which is `masterGain`). */
   const channelGains = new Map<Channel, GainNode>();
+  /** Decoded sample buffers, cached by URL (+ the in-flight decode promise). */
+  const sampleCache = new Map<string, Promise<AudioBuffer>>();
   let disposed = false;
 
   function masterLevel(): number {
@@ -315,9 +350,73 @@ export function createAudioManager(opts: AudioManagerOptions = {}): AudioManager
       }
     },
 
+    getContext(): AudioContext | null {
+      return disposed ? null : ctx;
+    },
+
+    loadSample(url: string): Promise<AudioBuffer> {
+      if (disposed) return Promise.reject(new Error('AudioManager disposed'));
+      const cached = sampleCache.get(url);
+      if (cached) return cached;
+      if (!ctx) {
+        return Promise.reject(
+          new Error('AudioManager.loadSample: no AudioContext — call resume() first (on a user gesture)'),
+        );
+      }
+      const c = ctx;
+      const promise = (async (): Promise<AudioBuffer> => {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`loadSample fetch ${res.status} for ${url}`);
+        const bytes = await res.arrayBuffer();
+        // decodeAudioData is promise-based in modern browsers; the buffer is
+        // reusable across many playSample calls.
+        return c.decodeAudioData(bytes);
+      })();
+      // Cache the PROMISE so concurrent callers share one fetch/decode; evict on
+      // failure so a transient error can be retried.
+      promise.catch(() => {
+        if (sampleCache.get(url) === promise) sampleCache.delete(url);
+      });
+      sampleCache.set(url, promise);
+      return promise;
+    },
+
+    playSample(buffer: AudioBuffer, sampleOpts: PlaySampleOpts = {}): void {
+      if (disposed || !ctx) return;
+      const bus = gainFor(sampleOpts.channel ?? DEFAULT_CHANNEL);
+      if (!bus) return;
+      const now = ctx.currentTime;
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      if (sampleOpts.rate !== undefined && sampleOpts.rate > 0) {
+        src.playbackRate.value = sampleOpts.rate;
+      }
+      // Route through a per-play GainNode only when attenuating; at full gain go
+      // straight to the channel bus (the channel/master gains still apply).
+      const gain = clamp01(sampleOpts.gain ?? 1);
+      let env: GainNode | null = null;
+      if (gain < 1) {
+        env = ctx.createGain();
+        env.gain.value = gain;
+        src.connect(env).connect(bus);
+      } else {
+        src.connect(bus);
+      }
+      src.onended = () => {
+        try {
+          src.disconnect();
+          env?.disconnect();
+        } catch {
+          /* already gone */
+        }
+      };
+      src.start(now);
+    },
+
     dispose(): void {
       if (disposed) return;
       disposed = true;
+      sampleCache.clear();
       channelGains.clear();
       masterGain = null;
       const c = ctx;

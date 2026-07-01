@@ -10,7 +10,12 @@
  */
 
 import type { ReasoningPersona, NpcIntent } from './schema.js';
-import type { BudgetedProvider } from './budgetedProvider.js';
+import type { ReasoningProvider } from './provider.js';
+import {
+  toBudgetedProvider,
+  type BudgetedProvider,
+  type BudgetedProviderOptions,
+} from './budgetedProvider.js';
 import {
   appendTurnToRecord,
   buildMemoryView,
@@ -58,8 +63,19 @@ export interface NpcSayResult {
 }
 
 export interface NpcBrainDeps {
-  /** The budgeted provider seam (built ONCE; always scripted-falls-back on failure). */
-  provider: BudgetedProvider;
+  /**
+   * The reasoning provider seam. Pass EITHER a raw {@link ReasoningProvider} (e.g.
+   * `createMockProvider(...)`, `createSelectorMockProvider(...)`, or a keyed provider) OR an
+   * already-{@link BudgetedProvider}. A raw provider is AUTO-WRAPPED once in the budget +
+   * timeout + scripted-fallback firewall — so a mock "just works" without the caller
+   * hand-wrapping in `createBudgetedProvider`. Tune the auto-wrap with {@link NpcBrainDeps.budget}.
+   */
+  provider: ReasoningProvider | BudgetedProvider;
+  /**
+   * OPTIONAL budget/timeout options for the auto-wrap, used ONLY when `provider` is a raw
+   * provider (ignored when it's already budgeted — you chose the options when you wrapped it).
+   */
+  budget?: BudgetedProviderOptions;
   /** The durable memory store (ship your own; `createInMemoryNpcStore` for dev/tests). */
   store: NpcMemoryStore;
   /** Resolve an NPC's reasoning info (persona + name + fallback + retention), or undefined. */
@@ -98,6 +114,10 @@ export interface NpcBrain {
 
 export function createNpcBrain(deps: NpcBrainDeps): NpcBrain {
   const now = deps.now ?? Date.now;
+  // Accept a raw OR already-budgeted provider — wrap once (idempotent) so the rest of the
+  // brain always talks to the budget firewall. This is the ergonomics fix: a mock provider
+  // can be passed straight in without the caller hand-wrapping it.
+  const provider = toBudgetedProvider(deps.provider, deps.budget ?? {});
 
   return {
     isReasoningCapable(npcId: string): boolean {
@@ -144,7 +164,7 @@ export function createNpcBrain(deps: NpcBrainDeps): NpcBrain {
       // Run the budgeted provider (firewalls + scripted-falls-back; never throws).
       let intents: NpcIntent[];
       try {
-        const res = await deps.provider.respond(
+        const res = await provider.respond(
           {
             npcName: info.name,
             persona: info.persona,

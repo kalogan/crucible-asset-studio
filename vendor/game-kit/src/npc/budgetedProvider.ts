@@ -13,7 +13,7 @@
  * line — never an error, never a hang, never a runaway bill. Server-side only.
  */
 
-import { parseReasoningResponse } from './schema.js';
+import { buildSayIntents } from './trustedIntent.js';
 import type { ReasoningRequest, ReasoningResponse } from './schema.js';
 import type { ReasoningProvider } from './provider.js';
 
@@ -51,6 +51,23 @@ export interface BudgetedProvider {
   readonly name: string;
   respond(req: ReasoningRequest, ctx: BudgetedInteraction): Promise<ReasoningResponse>;
   complete(systemPrompt: string, userPrompt: string, ctx: BudgetedCompletion): Promise<string>;
+  /**
+   * Brand: marks a value as ALREADY budget-wrapped so {@link toBudgetedProvider} is
+   * idempotent (a caller can pass either a raw or a wrapped provider and never double-wrap).
+   */
+  readonly __budgeted: true;
+}
+
+/**
+ * True when `p` is already a {@link BudgetedProvider} (vs a raw {@link ReasoningProvider}).
+ * A raw provider's `respond(req, signal?)` takes an optional AbortSignal; a budgeted one's
+ * `respond(req, ctx)` takes the per-interaction context — so a game shouldn't pass one where
+ * the other is expected. The `__budgeted` brand disambiguates them cheaply + safely.
+ */
+export function isBudgetedProvider(
+  p: ReasoningProvider | BudgetedProvider,
+): p is BudgetedProvider {
+  return (p as Partial<BudgetedProvider>).__budgeted === true;
 }
 
 const DEFAULTS = {
@@ -69,10 +86,10 @@ function prune(hits: number[], cutoff: number): number[] {
 
 /** Build the scripted-fallback response (the authored lines as a single `say` intent). */
 function scriptedFallback(lines: readonly string[]): ReasoningResponse {
-  const text = (lines[0] ?? '').trim();
-  if (text.length === 0) return { intents: [] };
-  // Route through the firewall so even the fallback obeys the intent contract (caps text).
-  return { intents: parseReasoningResponse({ intents: [{ kind: 'say', text }] }) };
+  // The authored `fallbackLines` are a TRUSTED string, so build the intent zod-free (same
+  // length cap the firewall applies). This keeps the whole client path (mock + budget +
+  // brain) off zod; only the real untrusted-LLM provider still imports the schema.
+  return { intents: buildSayIntents(lines[0] ?? '') };
 }
 
 /**
@@ -113,6 +130,7 @@ export function createBudgetedProvider(
 
   return {
     name: `budgeted(${inner.name})`,
+    __budgeted: true,
 
     async respond(req: ReasoningRequest, ctx: BudgetedInteraction): Promise<ReasoningResponse> {
       // (b) Budget gate — over budget ⇒ scripted fallback (no inner call, no cost).
@@ -162,4 +180,21 @@ export function createBudgetedProvider(
       }
     },
   };
+}
+
+/**
+ * Coerce EITHER a raw {@link ReasoningProvider} or an already-budgeted provider into a
+ * {@link BudgetedProvider} — idempotent (an already-wrapped provider is returned as-is).
+ *
+ * This is the ergonomics fix behind `createNpcBrain` accepting a raw provider: a game can
+ * pass `createMockProvider(lines)` (or a selector mock, or a keyed provider) directly and
+ * the brain wraps it once, instead of the caller having to remember to hand-wrap in
+ * `createBudgetedProvider`. Pass `options` to tune the budget/timeout on the auto-wrap; they
+ * are ignored when `p` is already budgeted (wrap once, with the options you chose then).
+ */
+export function toBudgetedProvider(
+  p: ReasoningProvider | BudgetedProvider,
+  options: BudgetedProviderOptions = {},
+): BudgetedProvider {
+  return isBudgetedProvider(p) ? p : createBudgetedProvider(p, options);
 }

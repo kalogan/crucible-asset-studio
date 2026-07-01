@@ -353,3 +353,239 @@ export function createFirstPersonCamera(
     },
   };
 }
+
+// ── Unified GameCamera config (pure, THREE-free, unit-testable) ───────────────
+//
+// The three controllers above are the shared vanilla core. The r3f layer
+// (./r3f.tsx) exposes a single `<GameCamera mode … />` / `useGameCamera({ mode
+// … })` that picks one of three modes and wires BOTH the camera and its
+// controls so a game just names a mode:
+//
+//   - "first"   — pointer-lock mouse-look + WASD at a fixed eye height, with an
+//                 optional bounds/collision hook. Harvested from GYRE's
+//                 hand-built player.tsx (pointer-lock lifecycle, pitch clamp,
+//                 WASD, eye height, cylinder/AABB collision).
+//   - "third"   — chase/orbit camera following a target: mouse-orbit + scroll
+//                 zoom + smoothed follow (wraps createOrbitCamera).
+//   - "topdown" — 2D top-down: camera straight down over a target on the XZ
+//                 plane, WASD pans the target on the ground, no pitch.
+//
+// The helpers below are the PURE pieces (no three, no DOM) that both the r3f
+// layer and the test consume, so the math never drifts from the wiring.
+
+/** Which of the three built-in camera modes to run. */
+export type GameCameraMode = 'first' | 'third' | 'topdown';
+
+/**
+ * Options shared across every mode. Every field is optional; each mode reads
+ * only the ones it cares about and falls back to a sensible default.
+ */
+export interface GameCameraOptions {
+  /** WASD/stick movement speed, units per second. Default 2.2 (`first`/`topdown`). */
+  moveSpeed?: number;
+  /** Mouse-look sensitivity, radians per pixel. Default 0.0025 (`first`). */
+  lookSensitivity?: number;
+  /** Invert vertical look. Default false. */
+  invertY?: boolean;
+
+  // ── first-person ──
+  /** Fixed camera eye height, held every frame (no vertical drift). Default 1.7. */
+  eyeHeight?: number;
+  /** Pitch clamp magnitude, radians. Default ~85°. */
+  pitchLimit?: number;
+
+  // ── third-person orbit/chase ──
+  /** Orbit distance from the target. Clamped to [minZoom, maxZoom]. Default 12. */
+  distance?: number;
+  /** Closest the camera may zoom. Default 3. */
+  minZoom?: number;
+  /** Farthest the camera may zoom. Default 20. */
+  maxZoom?: number;
+  /** Look target Y offset above the pivot. Default 1.2. */
+  lookYOffset?: number;
+  /** Position/lookAt smoothing rate per second. Default 12. */
+  followRate?: number;
+  /** Orbit drag sensitivity, radians per pixel. Default 0.006. */
+  dragSensitivity?: number;
+  /** Zoom sensitivity, distance units per wheel unit. Default 0.008. */
+  zoomSensitivity?: number;
+
+  // ── top-down ──
+  /** Height of the top-down camera above the ground plane. Default 20. */
+  height?: number;
+}
+
+/** All GameCamera options with defaults filled in — the resolved config. */
+export interface ResolvedGameCameraOptions {
+  moveSpeed: number;
+  lookSensitivity: number;
+  invertY: boolean;
+  eyeHeight: number;
+  pitchLimit: number;
+  distance: number;
+  minZoom: number;
+  maxZoom: number;
+  lookYOffset: number;
+  followRate: number;
+  dragSensitivity: number;
+  zoomSensitivity: number;
+  height: number;
+}
+
+/**
+ * Fill every {@link GameCameraOptions} field with its default. Pure: same input
+ * → same output, no state. `minZoom`/`maxZoom` are kept ordered and `distance`
+ * is clamped into that range so downstream orbit math never sees an inverted or
+ * out-of-range window.
+ */
+export function resolveGameCameraOptions(
+  opts: GameCameraOptions = {},
+): ResolvedGameCameraOptions {
+  const minZoom = opts.minZoom ?? 3;
+  const maxZoom = opts.maxZoom ?? 20;
+  const lo = Math.min(minZoom, maxZoom);
+  const hi = Math.max(minZoom, maxZoom);
+  return {
+    moveSpeed: opts.moveSpeed ?? 2.2,
+    lookSensitivity: opts.lookSensitivity ?? 0.0025,
+    invertY: opts.invertY ?? false,
+    eyeHeight: opts.eyeHeight ?? 1.7,
+    pitchLimit: opts.pitchLimit ?? 85 * DEG2RAD,
+    distance: clamp(opts.distance ?? 12, lo, hi),
+    minZoom: lo,
+    maxZoom: hi,
+    lookYOffset: opts.lookYOffset ?? 1.2,
+    followRate: opts.followRate ?? 12,
+    dragSensitivity: opts.dragSensitivity ?? 0.006,
+    zoomSensitivity: opts.zoomSensitivity ?? 0.008,
+    height: opts.height ?? 20,
+  };
+}
+
+/**
+ * Clamp a first-person pitch to ±`limit` radians so the view never flips past
+ * straight up/down. Pure mirror of the clamp inside {@link createFirstPersonCamera}.
+ */
+export function clampPitch(pitch: number, limit: number = 85 * DEG2RAD): number {
+  const l = Math.abs(limit);
+  return clamp(pitch, -l, l);
+}
+
+/**
+ * Third-person orbit offset from a target: given azimuth (yaw around Y),
+ * elevation (pitch above the XZ plane) and distance, return the camera position
+ * `[x, y, z]` that orbits `target`. Same spherical→cartesian mapping the orbit
+ * controller integrates, exposed as a pure function for tests / static rigs.
+ */
+export function orbitOffset(
+  target: Vec3,
+  azimuth: number,
+  elevation: number,
+  distance: number,
+): [number, number, number] {
+  const cosEl = Math.cos(elevation);
+  return [
+    target[0] + distance * cosEl * Math.sin(azimuth),
+    target[1] + distance * Math.sin(elevation),
+    target[2] + distance * Math.cos(azimuth) * cosEl,
+  ];
+}
+
+/**
+ * Top-down camera eye position: straight up over the target on the XZ plane at
+ * `height`. No pitch — the camera looks down −Y at the target.
+ */
+export function topDownEyePosition(target: Vec3, height: number): [number, number, number] {
+  return [target[0], target[1] + height, target[2]];
+}
+
+/**
+ * Camera-relative ground movement on the XZ plane from a yaw and WASD axes.
+ * `move` is `[strafe, forward]` each in [-1, 1]; returns the `[dx, dz]` delta to
+ * add for `dt` seconds at `speed`. yaw=0 faces −Z (matches the FP controller).
+ * Pure — shared by first-person and top-down so both walk identically.
+ */
+export function groundMoveDelta(
+  yaw: number,
+  move: [number, number],
+  speed: number,
+  dt: number,
+): [number, number] {
+  const strafe = move[0];
+  const forward = move[1];
+  if (strafe === 0 && forward === 0) return [0, 0];
+  const sinY = Math.sin(yaw);
+  const cosY = Math.cos(yaw);
+  // forward = (-sinY, -cosY); right = (-forward.z, forward.x) = (cosY, -sinY).
+  const fx = -sinY;
+  const fz = -cosY;
+  const rx = -fz; // = cosY
+  const rz = fx; // = -sinY
+  const dist = speed * dt;
+  return [(fx * forward + rx * strafe) * dist, (fz * forward + rz * strafe) * dist];
+}
+
+/**
+ * A collision/bounds constraint the game supplies so first-person / top-down
+ * movement stays inside its level. Given the position the controller just
+ * integrated, return the corrected `[x, z]` (Y is owned by the mode: eye height
+ * for first, target Y for top-down). Return the input unchanged to allow it.
+ *
+ * This is the exact hook GYRE's player.tsx open-coded (cylinder clamp inside the
+ * room's outer wall, outside the central Coil) — now a first-class kit concept.
+ */
+export type BoundsConstraint = (x: number, z: number) => [number, number];
+
+/** Axis-aligned rectangle on the XZ plane, for {@link aabbBounds}. */
+export interface AABBBounds {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
+/**
+ * A {@link BoundsConstraint} that clamps movement into an axis-aligned rectangle
+ * on the ground plane (the common "keep the player inside the room" case).
+ */
+export function aabbBounds(b: AABBBounds): BoundsConstraint {
+  const minX = Math.min(b.minX, b.maxX);
+  const maxX = Math.max(b.minX, b.maxX);
+  const minZ = Math.min(b.minZ, b.maxZ);
+  const maxZ = Math.max(b.minZ, b.maxZ);
+  return (x, z) => [clamp(x, minX, maxX), clamp(z, minZ, maxZ)];
+}
+
+/**
+ * A {@link BoundsConstraint} keeping movement inside a circle of `radius`
+ * centered at (`cx`, `cz`) on the XZ plane — the cylinder-collision pattern
+ * harvested from GYRE (keep the player inside the room's inradius). Optionally
+ * also keep them OUTSIDE an inner "hole" of `innerRadius` (e.g. a pit / drop).
+ */
+export function cylinderBounds(
+  radius: number,
+  cx = 0,
+  cz = 0,
+  innerRadius = 0,
+): BoundsConstraint {
+  const outer = Math.abs(radius);
+  const inner = Math.abs(innerRadius);
+  return (x, z) => {
+    const dx = x - cx;
+    const dz = z - cz;
+    const r = Math.hypot(dx, dz);
+    // Push back inside the outer wall.
+    if (r > outer) {
+      if (r === 0) return [cx + outer, cz];
+      const s = outer / r;
+      return [cx + dx * s, cz + dz * s];
+    }
+    // Push back out of the inner hole.
+    if (inner > 0 && r < inner) {
+      if (r === 0) return [cx + inner, cz]; // degenerate: nudge along +X
+      const s = inner / r;
+      return [cx + dx * s, cz + dz * s];
+    }
+    return [x, z];
+  };
+}

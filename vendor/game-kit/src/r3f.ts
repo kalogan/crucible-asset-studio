@@ -11,3 +11,5 @@ export * from './camera/r3f.js';
 export * from './fx/r3f.js';
 export * from './clip/r3f.js';
 export * from './render/r3f.js';
+export * from './gltf/r3f.js';
+export * from './scene-state/r3f.js';
