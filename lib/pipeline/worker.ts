@@ -20,6 +20,7 @@ import {
 } from "./generate";
 import { FLUX_TEXT2IMG, TRELLIS_DEFAULTS } from "@/lib/executor";
 import { PER_RUN_COST_ESTIMATE } from "@/lib/budget";
+import { enforceLoraReadiness, type LoraEnforcement } from "./lora";
 import type { AssetSpec, Canon, Job, Project } from "@/lib/schema";
 
 /**
@@ -82,12 +83,30 @@ function inputFromSpec(spec: AssetSpec, project: Project): { input: PipelineInpu
   };
 }
 
+/**
+ * Reproducibility stamp for the enforced LoRA. `baseRecipe` already surfaces
+ * lora_ref/lora_trigger from the canon; this adds the enforced status so the snapshot
+ * makes it explicit that a trained LoRA was required + applied for this generation.
+ */
+function loraRecipeFields(enforcement: LoraEnforcement) {
+  return enforcement.enforced
+    ? { lora_status: "ready" as const, lora_ref: enforcement.loraRef, lora_trigger: enforcement.loraTrigger }
+    : {};
+}
+
 /** MOCK generation — deterministic placeholder URLs, no provider call, no persist, no spend. */
-function mockOutputs(input: PipelineInput, spec: AssetSpec, canon: Canon | null, mode: "image" | "model") {
+function mockOutputs(
+  input: PipelineInput,
+  spec: AssetSpec,
+  canon: Canon | null,
+  mode: "image" | "model",
+  enforcement: LoraEnforcement,
+) {
   const finalPrompt = `[dry-run] ${input.prompt}`;
   const imageUrl = `mock://${buildStoragePath(input.projectSlug, spec.catalog_key, "png")}`;
   const recipe = {
     ...baseRecipe(input, canon, finalPrompt),
+    ...loraRecipeFields(enforcement),
     image_url: imageUrl,
     image_prediction: "dry-run",
     dry_run: true,
@@ -110,8 +129,10 @@ async function realOutputs(
   spec: AssetSpec,
   canon: Canon | null,
   mode: "image" | "model",
+  enforcement: LoraEnforcement,
 ) {
   const img = await generate2D(jobId, input, canon, spec.catalog_key);
+  const lora = loraRecipeFields(enforcement);
   if (mode === "model") {
     const { glbUrl, predictionId } = await generate3D(jobId, input.projectSlug, spec.catalog_key, img.imageUrl);
     return {
@@ -121,6 +142,7 @@ async function realOutputs(
       cost: 0.09,
       recipe: {
         ...baseRecipe(input, canon, img.finalPrompt),
+        ...lora,
         model_3d: "firtoz/trellis",
         image_url: img.imageUrl,
         image_prediction: img.predictionId,
@@ -134,7 +156,7 @@ async function realOutputs(
     kind: "image" as const,
     providerRef: img.predictionId,
     cost: 0.01,
-    recipe: { ...baseRecipe(input, canon, img.finalPrompt), image_url: img.imageUrl, image_prediction: img.predictionId },
+    recipe: { ...baseRecipe(input, canon, img.finalPrompt), ...lora, image_url: img.imageUrl, image_prediction: img.predictionId },
   };
 }
 
@@ -148,8 +170,17 @@ async function runClaimedJob(job: Job, dryRun: boolean): Promise<JobResult> {
     const canon = await getCanonByProject(project.id);
     const { input, mode } = inputFromSpec(spec, project);
 
+    // ── LoRA precision gate ──
+    // When the canon's LoRA is trained (lora_status "ready"), the trained model MUST be
+    // applied: fail loudly if lora_ref/lora_trigger are missing rather than silently
+    // generating off-style, canon-free output. This gate is pure validation (no spend),
+    // so it runs on BOTH the dry-run and real paths — a misconfigured canon fails a
+    // mock run too, surfacing the problem before an operator flips dryRun off.
+    const enforcement = enforceLoraReadiness(canon);
+    if (!enforcement.ok) throw new Error(enforcement.error);
+
     if (dryRun) {
-      const out = mockOutputs(input, spec, canon, mode);
+      const out = mockOutputs(input, spec, canon, mode, enforcement);
       await updateJob(job.id, {
         status: "succeeded",
         phase: "saving",
@@ -169,7 +200,7 @@ async function runClaimedJob(job: Job, dryRun: boolean): Promise<JobResult> {
       return { jobId: job.id, status: "succeeded", cost: 0, note: "dry-run" };
     }
 
-    const out = await realOutputs(job.id, input, spec, canon, mode);
+    const out = await realOutputs(job.id, input, spec, canon, mode, enforcement);
     await updateJob(job.id, {
       status: "succeeded",
       provider_ref: out.providerRef,
