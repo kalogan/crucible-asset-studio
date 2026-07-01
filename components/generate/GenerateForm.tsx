@@ -106,31 +106,35 @@ export function GenerateForm({
   );
   const [mode, setMode] = useState<Mode>("image");
   const [assetType, setAssetType] = useState("prop");
-  const [phase, setPhase] = useState<GenerationStatus["phase"] | null>(null);
-  const [seconds, setSeconds] = useState(0);
-
+  // Poll the SERVER's in-flight status (not just this form's `pending`), so the
+  // indicator shows — and the submit stays disabled — whenever a generation is
+  // running: one you started with a prior click, from another tab, or that
+  // outlived a reload. This is what fixes "no feedback, so I clicked again".
+  const [serverStatus, setServerStatus] = useState<GenerationStatus | null>(null);
   useEffect(() => {
-    if (!pending) {
-      setPhase(null);
-      setSeconds(0);
-      return;
-    }
-    const started = Date.now();
-    const tick = setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
-    const poll = setInterval(async () => {
+    let alive = true;
+    const poll = async () => {
       try {
         const s = await getGenerationStatus();
-        if (s) setPhase(s.phase);
+        if (alive) setServerStatus(s);
       } catch {
-        // transient — keep last known phase
+        // transient — keep last known status
       }
-    }, 2500);
-    void getGenerationStatus().then((s) => s && setPhase(s.phase));
+    };
+    void poll();
+    const id = setInterval(poll, 2500);
     return () => {
-      clearInterval(tick);
-      clearInterval(poll);
+      alive = false;
+      clearInterval(id);
     };
   }, [pending]);
+
+  const busy = pending || serverStatus !== null;
+  // The 3D phases only apply once a run reaches cutout/model; otherwise mirror the
+  // form's selected mode for the phase list.
+  const activeMode: Mode =
+    serverStatus?.phase === "cutout" || serverStatus?.phase === "model" ? "model" : mode;
+  const seconds = serverStatus ? Math.floor(serverStatus.elapsedMs / 1000) : 0;
 
   const radio =
     "flex flex-1 cursor-pointer flex-col gap-1 rounded-md border p-3 text-sm " +
@@ -248,11 +252,13 @@ export function GenerateForm({
         </div>
       </fieldset>
 
-      <Button type="submit" disabled={pending} className="w-fit px-5">
-        {pending ? "Generating…" : mode === "image" ? "Generate image" : "Generate 3D"}
+      <Button type="submit" disabled={busy} className="w-fit px-5">
+        {busy ? "Generating…" : mode === "image" ? "Generate image" : "Generate 3D"}
       </Button>
 
-      {pending && <StageIndicator phase={phase} seconds={seconds} mode={mode} />}
+      {busy && (
+        <StageIndicator phase={serverStatus?.phase ?? null} seconds={seconds} mode={activeMode} />
+      )}
       {state?.error && (
         <p role="alert" className="text-sm text-destructive">
           {state.error}
