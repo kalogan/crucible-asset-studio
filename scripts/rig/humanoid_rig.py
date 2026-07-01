@@ -583,6 +583,124 @@ def _smooth_torso_seams(mesh, per_bone, repeat=6, factor=0.5):
         % (len(torso_set), repeat))
 
 
+def _smooth_weights_laplacian(mesh, per_bone, repeat=4, factor=0.5, top_k=4):
+    """General Laplacian weight-smoothing pass over the WHOLE skin.
+
+    The rigid nearest-bone assignment gives every vertex a single bone at weight
+    1.0, so every joint is a HARD boundary: on a big arm swing the upperarm verts
+    all rotate as one solid block and a flat slab shears out at the shoulder
+    (same at the elbow / knee). This pass turns each hard boundary into a short
+    multi-bone GRADIENT so limbs BEND: for each vertex we iteratively blend its
+    per-bone weight vector with the AVERAGE of its edge-connected neighbours,
+    then renormalize. A handful of iterations only spreads influence a couple of
+    vertex-rings across each seam — a local gradient at the joint, not global
+    bleed — so the deltoid/elbow/knee bend smoothly while the mid-limb stays
+    essentially rigid.
+
+    GUARD against the 'taffy shoulder' (arm weight leaking down the torso so the
+    swing drags the chest): after smoothing, each vertex is re-clamped to its
+    top-`top_k` bones and renormalized, killing the long tail of tiny far-bone
+    influences that a many-iteration smooth would otherwise accumulate. Combined
+    with the existing candidate filtering (crown/tendril verts never bind to arm
+    bones in the first place) this keeps the bend local to the joint."""
+    me = mesh.data
+    nv = len(me.vertices)
+    if nv == 0:
+        return
+
+    # group index -> bone name, and the reverse; only real deform groups.
+    gname = {vg.index: vg.name for vg in mesh.vertex_groups}
+    ARM_PREFIX = ("clavicle", "upperarm", "forearm", "hand")
+    arm_gidx = {gi for gi, n in gname.items()
+                if n.split(".")[0] in ARM_PREFIX}
+
+    # which verts were ORIGINALLY torso/leg-owned (i.e. NOT an arm bone). The
+    # Laplacian may bleed a little arm weight onto these near the armpit; if that
+    # arm weight grows large, the arm swing DRAGS them into a web ("taffy"). We
+    # cap the arm-weight these verts can pick up so the seam softens on the ARM
+    # side (arm verts freely blend toward the near-static torso) without the
+    # torso following the swing.
+    torso_owned = set()
+    for i, v in enumerate(me.vertices):
+        gs = list(v.groups)
+        if gs and max(gs, key=lambda g: g.weight).group not in arm_gidx:
+            torso_owned.add(i)
+
+    # dense per-vertex weight vectors as dict{gidx: w}, seeded from current skin.
+    W = [dict() for _ in range(nv)]
+    for i, v in enumerate(me.vertices):
+        for g in v.groups:
+            if g.weight > 0.0:
+                W[i][g.group] = g.weight
+
+    # edge adjacency (whole mesh)
+    adj = [[] for _ in range(nv)]
+    for e in me.edges:
+        a, c = e.vertices
+        adj[a].append(c)
+        adj[c].append(a)
+
+    for _ in range(repeat):
+        newW = [None] * nv
+        for i in range(nv):
+            nb = adj[i]
+            cur = W[i]
+            if not nb:
+                newW[i] = dict(cur)
+                continue
+            # accumulate neighbour average
+            avg = {}
+            for j in nb:
+                for gi, w in W[j].items():
+                    avg[gi] = avg.get(gi, 0.0) + w
+            inv = 1.0 / len(nb)
+            acc = {}
+            keys = set(cur) | set(avg)
+            for gi in keys:
+                acc[gi] = (1.0 - factor) * cur.get(gi, 0.0) \
+                    + factor * (avg.get(gi, 0.0) * inv)
+            newW[i] = acc
+        W = newW
+
+    # clamp to top_k bones + renormalize, then write back.
+    # ARM_WEIGHT_CAP: a torso/leg-owned vertex may keep at most this fraction of
+    # arm-bone influence. This stops the arm swing from dragging armpit/collar
+    # verts into a web ("taffy") while still letting the ARM side of the seam
+    # soften (arm-owned verts are uncapped, so their deltoid cap bends).
+    ARM_WEIGHT_CAP = 0.25
+    for i in range(nv):
+        w = W[i]
+        if not w:
+            continue
+        if i in torso_owned:
+            armw = sum(v for gi, v in w.items() if gi in arm_gidx)
+            if armw > ARM_WEIGHT_CAP and armw > 1e-9:
+                scale = ARM_WEIGHT_CAP / armw
+                for gi in list(w):
+                    if gi in arm_gidx:
+                        w[gi] *= scale
+        if len(w) > top_k:
+            top = sorted(w.items(), key=lambda kv: kv[1], reverse=True)[:top_k]
+            w = dict(top)
+        s = sum(w.values())
+        if s <= 1e-9:
+            continue
+        # rewrite this vertex's membership: set kept groups, drop the rest.
+        kept = set()
+        for gi, val in w.items():
+            nval = val / s
+            if nval <= 1e-4:
+                continue
+            mesh.vertex_groups[gname[gi]].add([i], nval, "REPLACE")
+            kept.add(gi)
+        # remove any stale group memberships not in the smoothed top-k set
+        for g in list(me.vertices[i].groups):
+            if g.group not in kept:
+                mesh.vertex_groups[gname[g.group]].remove([i])
+    log("laplacian weight-smooth (%d verts, %dx factor %.2f, top-%d clamp)"
+        % (nv, repeat, factor, top_k))
+
+
 def _feather_shoulder_seam(mesh, per_bone, lm, factor=0.5, repeat=3):
     """Narrow the rigid ARM<->torso seam at the shoulder into a short gradient.
 
@@ -784,23 +902,26 @@ def _skin_geometric(mesh, arm_obj, pose="adown", clean=True, lm=None):
     mod.object = arm_obj
     mod.use_vertex_groups = True
 
-    # --- custom TORSO-ONLY seam softening (optional; on by default) ---
-    # Pure 1-bone rigid weights leave a hard, sometimes JAGGED seam wherever two
-    # bones that rotate differently meet — most visibly the chest/neck twist in
-    # `strike`, which shears the chest/shoulder boundary into flat sheets.
+    # --- weight smoothing so JOINTS BEND instead of shearing (on by default) ---
+    # Pure 1-bone rigid weights make every joint a HARD boundary: on a big arm
+    # swing (cast/strike ~55-70 deg) the upperarm verts all rotate as one solid
+    # block and a flat slab shears out at the shoulder — same at the elbow/knee.
     #
-    # We soften ONLY the spine-chain seams (hips<->spine<->chest<->neck<->head)
-    # with a custom neighbour-averaging pass. Crucially it blends ONLY among the
-    # torso bones and touches ONLY torso verts — it never lets arm/leg weight
-    # leak into the torso (which is what Blender's global vertex_group_smooth
-    # does, reintroducing the "taffy shoulder" when an arm lifts in cast). So the
-    # torso twist softens while every limb stays fully RIGID (clean solid
-    # segments — the intended aesthetic). Islands keep their nearest bone; the
-    # skin (skins:1) is preserved throughout."""
+    # We run a GENERAL Laplacian weight-smooth over the whole skin: each vertex
+    # blends toward the average of its edge-connected neighbours' weights, a few
+    # iterations, then re-clamps to its top-4 bones + renormalizes. A handful of
+    # iterations only spreads influence a couple of vertex-rings across each seam
+    # — a local gradient at the shoulder/elbow/knee, not global bleed — so limbs
+    # BEND smoothly. The top-4 clamp + the existing candidate filtering (crown/
+    # tendril verts never bind to an arm bone) guard against the "taffy shoulder"
+    # (arm weight dragging the torso). A final torso-only pass keeps the chest/
+    # neck twist seams smooth. Islands keep their nearest bone; skins:1 is
+    # preserved throughout.
     if clean and os.environ.get("RIG_NOSMOOTH") != "1":
-        _smooth_torso_seams(mesh, per_bone)
-        if pose != "tpose" and lm is not None:
-            _feather_shoulder_seam(mesh, per_bone, lm)
+        reps = int(os.environ.get("RIG_SMOOTH_REPS", "3"))
+        fac = float(os.environ.get("RIG_SMOOTH_FAC", "0.5"))
+        _smooth_weights_laplacian(mesh, per_bone, repeat=reps, factor=fac, top_k=4)
+        _smooth_torso_seams(mesh, per_bone, repeat=4, factor=0.5)
 
     log("skinned (rigid nearest-bone-segment, %d groups, pose=%s)"
         % (sum(1 for n, _, _ in segs if per_bone[n]), pose))
@@ -899,21 +1020,22 @@ def author_cast(arm_obj):
     # peak: arms swing up & forward — the "arms up to receive/cast" gesture.
     # upperarm rotates about local X to lift the hanging arm up/forward; +X on
     # .L, mirrored on .R (symmetrized roll makes the same sign lift both). Kept
-    # at ~100 deg: past ~120 the shoulder skin inverts and tears under
-    # auto-weights (verified by render), so we stay in the clean range and add a
-    # small clavicle raise + elbow bend to read as "reaching up".
+    # at ~65 deg: a firm raised gesture that reads as "reaching up" WITHOUT the
+    # over-extended ~100 deg swing that maximised the shoulder seam and tore a
+    # slab out under rigid weights. The Laplacian weight-smooth lets this bend
+    # cleanly at the deltoid; a small clavicle raise + elbow bend sell the reach.
     for f in (fpeak, f1 - 4):
-        _key_rot(arm_obj, "clavicle.L", f, (0, 0, D(-14)))
-        _key_rot(arm_obj, "clavicle.R", f, (0, 0, D(14)))
-        _key_rot(arm_obj, "upperarm.L", f, (D(100), 0, D(10)))
-        _key_rot(arm_obj, "upperarm.R", f, (D(100), 0, D(-10)))
-        _key_rot(arm_obj, "forearm.L", f, (D(-40), 0, 0))
-        _key_rot(arm_obj, "forearm.R", f, (D(-40), 0, 0))
+        _key_rot(arm_obj, "clavicle.L", f, (0, 0, D(-12)))
+        _key_rot(arm_obj, "clavicle.R", f, (0, 0, D(12)))
+        _key_rot(arm_obj, "upperarm.L", f, (D(65), 0, D(8)))
+        _key_rot(arm_obj, "upperarm.R", f, (D(65), 0, D(-8)))
+        _key_rot(arm_obj, "forearm.L", f, (D(-28), 0, 0))
+        _key_rot(arm_obj, "forearm.R", f, (D(-28), 0, 0))
         _key_rot(arm_obj, "chest", f, (D(-6), 0, 0))   # lean back slightly
         _key_rot(arm_obj, "head", f, (D(-6), 0, 0))    # look up
     # settle back toward peak (hold-ish)
-    _key_rot(arm_obj, "upperarm.L", f1, (D(92), 0, D(9)))
-    _key_rot(arm_obj, "upperarm.R", f1, (D(92), 0, D(-9)))
+    _key_rot(arm_obj, "upperarm.L", f1, (D(60), 0, D(7)))
+    _key_rot(arm_obj, "upperarm.R", f1, (D(60), 0, D(-7)))
     act = arm_obj.animation_data.action
     act.use_frame_range = True
     act.frame_start, act.frame_end = f0, f1
@@ -967,15 +1089,18 @@ def author_strike(arm_obj):
         _key_rot(arm_obj, name, f0, (0, 0, 0))
     # wind up: arm back, torso coils. Twist is spread across chest+neck (a
     # single hard chest-Z twist crimps the neck junction — verified by render).
-    _key_rot(arm_obj, "upperarm.R", fwind, (D(-40), 0, D(-25)))
-    _key_rot(arm_obj, "forearm.R", fwind, (D(-30), 0, 0))
-    _key_rot(arm_obj, "chest", fwind, (0, 0, D(-12)))
-    _key_rot(arm_obj, "neck", fwind, (0, 0, D(6)))
+    _key_rot(arm_obj, "upperarm.R", fwind, (D(-32), 0, D(-22)))
+    _key_rot(arm_obj, "forearm.R", fwind, (D(-26), 0, 0))
+    _key_rot(arm_obj, "chest", fwind, (0, 0, D(-11)))
+    _key_rot(arm_obj, "neck", fwind, (0, 0, D(5)))
     _key_rot(arm_obj, "hips", fwind, (0, 0, D(-8)))
-    # hit: arm swings forward/down, torso uncoils, small step (thigh forward)
-    _key_rot(arm_obj, "upperarm.R", fhit, (D(95), 0, D(10)))
-    _key_rot(arm_obj, "forearm.R", fhit, (D(-20), 0, 0))
-    _key_rot(arm_obj, "chest", fhit, (0, 0, D(14)))
+    # hit: arm swings forward/down, torso uncoils, small step (thigh forward).
+    # Peak swing softened ~95 -> ~62 deg: a firm forward strike gesture that the
+    # smoothed shoulder can bend cleanly, instead of the over-extended swing that
+    # maximised the seam and tore a slab out of the shoulder.
+    _key_rot(arm_obj, "upperarm.R", fhit, (D(62), 0, D(8)))
+    _key_rot(arm_obj, "forearm.R", fhit, (D(-18), 0, 0))
+    _key_rot(arm_obj, "chest", fhit, (0, 0, D(13)))
     _key_rot(arm_obj, "neck", fhit, (0, 0, D(-6)))
     _key_rot(arm_obj, "hips", fhit, (0, 0, D(10)))
     _key_rot(arm_obj, "thigh.R", fhit, (D(25), 0, 0))
