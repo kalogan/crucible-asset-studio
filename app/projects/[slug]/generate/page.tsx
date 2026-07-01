@@ -4,6 +4,7 @@ import { getActiveProject } from "@/lib/active-project";
 import { getCanonByProject } from "@/lib/db/canons";
 import { canonReadiness } from "@/lib/canon/precision";
 import { GenerateForm } from "@/components/generate/GenerateForm";
+import { LivingDungeonForgeForm } from "@/components/generate/LivingDungeonForgeForm";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,7 @@ export default async function GeneratePage({
             </p>
           )}
           <GenerateForm initialTitle={sp.title ?? ""} initialPrompt={sp.prompt ?? ""} />
+          <LivingDungeonForgeForm />
         </>
       )}
     </main>

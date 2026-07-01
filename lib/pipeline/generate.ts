@@ -43,6 +43,14 @@ export interface PipelineInput {
   prompt: string;
   assetType?: string;
   provider?: ImageProvider;
+  /**
+   * Living Dungeon forge escape hatch. When set, this exact string is sent to FLUX
+   * verbatim — the canon scaffolding (framing + buildFinalPrompt) is bypassed entirely.
+   * The forge already baked the whole art bible into this prompt via Claude, so
+   * re-layering canon style would fight it. Everything downstream (persist, review,
+   * promote-to-3D, auto-rig) is unchanged.
+   */
+  finalPromptOverride?: string;
 }
 
 function referenceUrls(canon: Canon | null): string[] {
@@ -90,18 +98,26 @@ export async function generate2D(
   catalogKey: string,
 ) {
   await updateJob(jobId, { phase: "image" });
-  // Canon supplies style; the asset-type framing supplies format (+ format nevers).
-  const framing = framingFor(input.assetType ?? "prop");
-  const subject = await expandSubject(canon, input.prompt);
-  // Every asset type (incl. rig-ready T-pose characters) uses the FULL canon for STYLE —
-  // palette, background, mood, and its "no photorealistic / no human faces" guards — which
-  // is exactly what gives the Living Dungeon look. The framing only supplies FORMAT: the
-  // T-pose framing makes it a single full-body figure that promotes to a riggable mesh.
-  const finalPrompt = buildFinalPrompt(
-    canon,
-    framing.formatCues ? `${subject}, ${framing.formatCues}` : subject,
-    framing.nevers,
-  );
+  // Living Dungeon forge: the enriched prompt already carries the whole art bible
+  // (Claude baked in theme + palette + forbidden + pose). Send it to FLUX VERBATIM and
+  // skip framing + buildFinalPrompt so canon style can't re-layer and fight it.
+  let finalPrompt: string;
+  if (input.finalPromptOverride && input.finalPromptOverride.trim()) {
+    finalPrompt = input.finalPromptOverride.trim();
+  } else {
+    // Canon supplies style; the asset-type framing supplies format (+ format nevers).
+    const framing = framingFor(input.assetType ?? "prop");
+    const subject = await expandSubject(canon, input.prompt);
+    // Every asset type (incl. rig-ready T-pose characters) uses the FULL canon for STYLE —
+    // palette, background, mood, and its "no photorealistic / no human faces" guards — which
+    // is exactly what gives the Living Dungeon look. The framing only supplies FORMAT: the
+    // T-pose framing makes it a single full-body figure that promotes to a riggable mesh.
+    finalPrompt = buildFinalPrompt(
+      canon,
+      framing.formatCues ? `${subject}, ${framing.formatCues}` : subject,
+      framing.nevers,
+    );
+  }
 
   // Nano Banana (Gemini 2.5 Flash Image): text→image + canon reference images as a
   // style anchor. Returns inline base64; persist it. Fail-soft -> null if no key.

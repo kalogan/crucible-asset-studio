@@ -18,6 +18,13 @@ const DEFAULT_SYSTEM =
 export interface EnrichOptions {
   system?: string;
   model?: string;
+  /** Cap output tokens (default 600). The Living Dungeon forge pins this to 400 for parity. */
+  maxTokens?: number;
+  /**
+   * When set, this exact string is sent as the user message (no `Asset: …` wrapping).
+   * The Living Dungeon forge composes its own verbatim user message and passes it here.
+   */
+  userMessage?: string;
 }
 
 export async function enrichPrompt(
@@ -29,6 +36,7 @@ export async function enrichPrompt(
 
   const model = opts.model ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL;
   const system = opts.system ?? DEFAULT_SYSTEM;
+  const userContent = opts.userMessage ?? `Asset: ${rawPrompt}\n\nGenerate the prompt.`;
 
   try {
     const res = await fetch(ANTHROPIC_API, {
@@ -40,9 +48,9 @@ export async function enrichPrompt(
       },
       body: JSON.stringify({
         model,
-        max_tokens: 600,
+        max_tokens: opts.maxTokens ?? 600,
         system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-        messages: [{ role: "user", content: `Asset: ${rawPrompt}\n\nGenerate the prompt.` }],
+        messages: [{ role: "user", content: userContent }],
       }),
     });
     if (!res.ok) return rawPrompt;
