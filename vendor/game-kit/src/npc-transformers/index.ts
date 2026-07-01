@@ -103,7 +103,7 @@ export function createTransformersEmbedder(
         // Cast through the local shim — the package has no types bundled here, and we
         // deliberately don't take a static `@types`/import dependency on it.
         const mod = (await import(
-          /* @vite-ignore */ TRANSFORMERS_MODULE
+          /* webpackIgnore: true */ /* @vite-ignore */ TRANSFORMERS_MODULE
         )) as unknown as TransformersModule;
         return mod.pipeline('feature-extraction', model);
       })();
