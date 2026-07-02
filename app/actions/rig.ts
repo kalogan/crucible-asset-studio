@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { getReferenceAsset, createReferenceAsset } from "@/lib/db/reference-assets";
 import { getProject } from "@/lib/db/projects";
-import { persistBase64ToStorage } from "@/lib/executor";
+import { persistBase64ToStorage, contentHash } from "@/lib/executor";
 import { deriveRiggedMeta } from "@/lib/rig/derive";
 
 export type RigResult =
@@ -101,12 +101,12 @@ export async function rigAssetAction(input: RigInput): Promise<RigResult> {
     }
     if (!existsSync(outPath)) return { ok: false, error: "Auto-rig produced no output GLB." };
 
-    // 3) Re-import: persist the rigged GLB to durable Storage + create a NEW asset row.
-    //    Mirrors app/api/import — createReferenceAsset delete-then-inserts on the art_kit_id,
-    //    so re-rigging the same source replaces the prior rigged copy (idempotent).
+    // 3) Re-import: persist the rigged GLB to durable Storage + create a NEW asset VERSION.
+    //    createReferenceAsset now version-not-deletes on the art_kit_id (keeps history), and
+    //    the content-hashed path means each re-rig writes a new file so the prior GLB survives.
     const bytes = await readFile(outPath);
     const safe = meta.artKitId.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const storagePath = `${project.slug}/reference/${meta.assetType}/${safe}.glb`;
+    const storagePath = `${project.slug}/reference/${meta.assetType}/${safe}.${contentHash(bytes)}.glb`;
     const url = await persistBase64ToStorage({
       base64: bytes.toString("base64"),
       mimeType: "model/gltf-binary",

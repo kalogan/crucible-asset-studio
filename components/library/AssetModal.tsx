@@ -24,6 +24,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { saveAssetNotesAction } from "@/app/actions/library";
 import { rigAssetAction, type RigResult } from "@/app/actions/rig";
+import {
+  getAssetVersions,
+  promoteAssetVersion,
+  type AssetVersion,
+} from "@/app/actions/asset-versions";
 import type { LibraryItem } from "./LibraryGrid";
 
 export interface ModelStats {
@@ -358,6 +363,10 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
   const [darkBg, setDarkBg] = useState(true);
   const [saveState, saveAction, saving] = useActionState(saveAssetNotesAction, null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  // Version history (lineage = project + art_kit_id). Empty unless there are ≥2 versions.
+  const [versions, setVersions] = useState<AssetVersion[]>([]);
+  const [activeId, setActiveId] = useState(item.id);
+  const [promoting, setPromoting] = useState(false);
 
   // When a model's clips load, auto-play an idle-ish one (else the first) so it's lively.
   const onClips = useCallback((names: string[]) => {
@@ -391,6 +400,37 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
     }
   }, [item.createdAt]);
 
+  // Load the lineage's versions on open; flip through them by swapping the viewed URL.
+  useEffect(() => {
+    let alive = true;
+    getAssetVersions(item.id).then((v) => {
+      if (alive) setVersions(v);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [item.id]);
+
+  const baseUrl = item.url;
+  const activeVersion = versions.find((v) => v.id === activeId);
+  // The viewed URL follows the selected version; falls back to the item's own URL.
+  const activeUrl = activeVersion?.url ?? baseUrl;
+  const stepVersion = (dir: number) => {
+    if (versions.length < 2) return;
+    const idx = versions.findIndex((v) => v.id === activeId);
+    const next = versions[(idx + dir + versions.length) % versions.length];
+    if (next) setActiveId(next.id);
+  };
+  const promote = async () => {
+    setPromoting(true);
+    try {
+      await promoteAssetVersion(activeId);
+      setVersions(await getAssetVersions(item.id));
+    } finally {
+      setPromoting(false);
+    }
+  };
+
   return (
     <div
       role="dialog"
@@ -409,7 +449,7 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
       <div className="relative z-10 flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl md:flex-row lg:max-w-5xl xl:max-w-6xl">
         {/* Viewer */}
         <div className="relative aspect-square w-full bg-muted md:aspect-auto md:w-3/5">
-          {item.format === "model" && item.url ? (
+          {item.format === "model" && activeUrl ? (
             <>
               <Canvas camera={{ position: [2.6, 1.9, 2.6], fov: 45 }} dpr={[1, 2]}>
                 <color attach="background" args={[darkBg ? ENV_PRESETS[envPreset].bg : "#3f3f46"]} />
@@ -418,7 +458,7 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
                 <ViewerLighting cfg={ENV_PRESETS[envPreset]} />
                 <Suspense fallback={null}>
                   <FocusModel
-                    url={item.url}
+                    url={activeUrl}
                     onStats={setStats}
                     onClips={onClips}
                     activeClip={activeClip}
@@ -443,15 +483,15 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
                 </div>
               </div>
             </>
-          ) : item.format === "audio" && item.url ? (
+          ) : item.format === "audio" && activeUrl ? (
             <div className="flex h-full items-center justify-center p-8">
-              <audio controls src={item.url} className="w-full max-w-md">
+              <audio controls src={activeUrl} className="w-full max-w-md">
                 <track kind="captions" />
               </audio>
             </div>
-          ) : item.url ? (
+          ) : activeUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.url} alt={item.label} className="h-full w-full object-contain" />
+            <img src={activeUrl} alt={item.label} className="h-full w-full object-contain" />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               No preview
@@ -491,6 +531,51 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
             )}
             <MetaRow label="Format">{item.format}</MetaRow>
             <MetaRow label="Added">{added}</MetaRow>
+
+            {/* Version flipper — flip through / compare past versions of this asset. */}
+            {versions.length > 1 && activeVersion && (
+              <div className="my-2 rounded-md border border-border bg-muted/40 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">Versions</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => stepVersion(1)}
+                      aria-label="Older version"
+                      className="rounded px-1.5 text-muted-foreground hover:text-foreground"
+                    >
+                      ‹
+                    </button>
+                    <span className="text-xs tabular-nums">
+                      v{activeVersion.version}{" "}
+                      <span className="text-muted-foreground">/ {versions.length}</span>
+                      {activeVersion.isCurrent && (
+                        <span className="ml-1 text-emerald-500">· current</span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => stepVersion(-1)}
+                      aria-label="Newer version"
+                      className="rounded px-1.5 text-muted-foreground hover:text-foreground"
+                    >
+                      ›
+                    </button>
+                  </div>
+                </div>
+                {!activeVersion.isCurrent && (
+                  <button
+                    type="button"
+                    onClick={promote}
+                    disabled={promoting}
+                    className="mt-1 w-full rounded bg-primary/10 px-2 py-1 text-xs text-primary hover:bg-primary/20 disabled:opacity-50"
+                  >
+                    {promoting ? "Setting…" : "Make this the current version"}
+                  </button>
+                )}
+              </div>
+            )}
+
             {item.format === "model" && (
               <>
                 <MetaRow label="Triangles">
@@ -546,7 +631,7 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
 
           {/* Rig this — only for model assets with no clips yet (i.e. not already rigged).
               Runs the local auto-rig pipeline server-side + re-imports the rigged GLB. */}
-          {item.format === "model" && item.url && clipNames.length === 0 && (
+          {item.format === "model" && activeUrl && clipNames.length === 0 && (
             <RigThis assetId={item.id} />
           )}
 
@@ -582,9 +667,9 @@ export function AssetModal({ item, onClose }: { item: LibraryItem; onClose: () =
             </div>
           </form>
 
-          {item.url && (
+          {activeUrl && (
             <a
-              href={item.url}
+              href={activeUrl}
               download
               className="mt-auto w-fit rounded text-sm text-primary underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >

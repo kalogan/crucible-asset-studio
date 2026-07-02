@@ -92,7 +92,7 @@ export async function generateModelFromImage(
 }
 
 export { startPrediction, pollPrediction, cancelPrediction, firstOutput } from "./replicate";
-export { persistToStorage, persistBase64ToStorage, extForContentType, STORAGE_BUCKET } from "./persist";
+export { persistToStorage, persistBase64ToStorage, extForContentType, contentHash, STORAGE_BUCKET } from "./persist";
 export { generateImageNanoBanana } from "./nanobanana";
 export { enrichPrompt } from "./enrich";
 export { normalizeModelUrl, trellisInput, TRELLIS_DEFAULTS } from "./trellis";

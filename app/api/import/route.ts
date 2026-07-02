@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getProjectBySlug } from "@/lib/db/projects";
 import { createReferenceAsset } from "@/lib/db/reference-assets";
-import { persistBase64ToStorage, extForContentType } from "@/lib/executor";
+import { persistBase64ToStorage, extForContentType, contentHash } from "@/lib/executor";
 import { ReferenceAssetType } from "@/lib/schema";
 import { sanitizeTags, formatForMime } from "@/lib/import/normalize";
 
@@ -59,7 +59,10 @@ export async function POST(req: Request): Promise<NextResponse> {
 
   try {
     const safe = (artKitId ?? label).replace(/[^a-zA-Z0-9._-]/g, "_");
-    const path = `${slug}/reference/${typeParsed.data}/${safe}.${extForContentType(mimeType)}`;
+    // Content-hash the object key so a re-sync writes a NEW file (prior version's asset
+    // survives for the modal flipper) instead of overwriting it.
+    const hash = contentHash(Buffer.from(dataBase64, "base64"));
+    const path = `${slug}/reference/${typeParsed.data}/${safe}.${hash}.${extForContentType(mimeType)}`;
     const url = await persistBase64ToStorage({ base64: dataBase64, mimeType, path });
     const ref = await createReferenceAsset({
       project_id: project.id,

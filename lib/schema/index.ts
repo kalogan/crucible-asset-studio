@@ -188,6 +188,10 @@ export const ReferenceAsset = z.object({
   art_kit_id: z.string().nullable(),
   tags: z.array(z.string()).default([]),
   notes: z.string().default(""),
+  /** Version within a lineage (project_id + art_kit_id); 1-based, increments per re-sync. */
+  version: z.number().int().default(1),
+  /** Exactly one row per lineage is current — the default Library view shows only these. */
+  is_current: z.boolean().default(true),
   created_at: ts,
 });
 export type ReferenceAsset = z.infer<typeof ReferenceAsset>;

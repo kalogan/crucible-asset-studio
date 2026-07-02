@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { createServiceClient } from "@/lib/supabase/server";
 
 /**
@@ -55,6 +56,16 @@ export async function persistBase64ToStorage({
   if (error) throw new Error(`persistBase64ToStorage: upload failed — ${error.message}`);
   const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
   return data.publicUrl;
+}
+
+/**
+ * Short content hash (12 hex of sha256) for versioned storage paths. Putting this in the
+ * object key means a re-synced asset writes a NEW file instead of overwriting the prior
+ * version's GLB — so old versions survive for the modal flipper / A-B compare. Identical
+ * re-imports hash to the same key (idempotent, no wasted storage).
+ */
+export function contentHash(bytes: Uint8Array | Buffer): string {
+  return createHash("sha256").update(bytes).digest("hex").slice(0, 12);
 }
 
 /** Pick a storage extension from a content type. */

@@ -6,26 +6,81 @@ import {
   type ReferenceAssetInsert as ReferenceAssetInsertT,
 } from "@/lib/schema";
 
+/**
+ * Insert a reference asset as a NEW VERSION of its lineage (project_id + art_kit_id),
+ * preserving history. Re-syncing the same art_kit_id no longer DELETES the prior row — it
+ * demotes the lineage's rows to `is_current = false` and inserts the new one at
+ * `version = max + 1, is_current = true`. Callers give each version a content-hashed
+ * storage path (see `versionedStoragePath`) so the prior GLB survives too. Assets with a
+ * null art_kit_id have no lineage → they're always version 1 / current (unchanged).
+ */
 export async function createReferenceAsset(
   input: ReferenceAssetInsertT,
 ): Promise<ReferenceAsset> {
   const supabase = createServiceClient();
   const payload = ReferenceAssetInsert.parse(input);
-  // Re-sync: a same art_kit_id render replaces the previous one.
+
+  let version = 1;
   if (payload.art_kit_id) {
-    await supabase
+    const { data: latest } = await supabase
       .from("reference_assets")
-      .delete()
+      .select("version")
       .eq("project_id", payload.project_id)
-      .eq("art_kit_id", payload.art_kit_id);
+      .eq("art_kit_id", payload.art_kit_id)
+      .order("version", { ascending: false })
+      .limit(1);
+    const maxV = (latest?.[0] as { version?: number } | undefined)?.version ?? 0;
+    version = maxV + 1;
+    if (maxV > 0) {
+      // demote the previous current version(s) — the new row becomes current below
+      await supabase
+        .from("reference_assets")
+        .update({ is_current: false })
+        .eq("project_id", payload.project_id)
+        .eq("art_kit_id", payload.art_kit_id);
+    }
   }
+
   const { data, error } = await supabase
     .from("reference_assets")
-    .insert(payload)
+    .insert({ ...payload, version, is_current: true })
     .select()
     .single();
   if (error) throw new Error(`createReferenceAsset: ${error.message}`);
   return ReferenceAsset.parse(data);
+}
+
+/** All versions of a lineage (project + art_kit_id), newest version first — for the modal flipper. */
+export async function listAssetVersions(
+  projectId: string,
+  artKitId: string,
+): Promise<ReferenceAsset[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("reference_assets")
+    .select()
+    .eq("project_id", projectId)
+    .eq("art_kit_id", artKitId)
+    .order("version", { ascending: false });
+  if (error) throw new Error(`listAssetVersions: ${error.message}`);
+  return (data ?? []).map((r) => ReferenceAsset.parse(r));
+}
+
+/** Promote an older version back to current (rollback) — demotes the rest of its lineage. */
+export async function setCurrentVersion(id: string): Promise<void> {
+  const supabase = createServiceClient();
+  const asset = await getReferenceAsset(id);
+  if (!asset || !asset.art_kit_id) return;
+  await supabase
+    .from("reference_assets")
+    .update({ is_current: false })
+    .eq("project_id", asset.project_id)
+    .eq("art_kit_id", asset.art_kit_id);
+  const { error } = await supabase
+    .from("reference_assets")
+    .update({ is_current: true })
+    .eq("id", id);
+  if (error) throw new Error(`setCurrentVersion: ${error.message}`);
 }
 
 export async function getReferenceAsset(id: string): Promise<ReferenceAsset | null> {
@@ -59,6 +114,7 @@ export async function listReferenceAssetsByProject(
     .from("reference_assets")
     .select()
     .eq("project_id", projectId)
+    .eq("is_current", true) // default view = current version per lineage only
     .order("asset_type", { ascending: true })
     .order("label", { ascending: true });
   if (error) throw new Error(`listReferenceAssetsByProject: ${error.message}`);
@@ -78,6 +134,7 @@ export async function referenceCountsByProject(): Promise<Record<string, number>
     const { data, error } = await supabase
       .from("reference_assets")
       .select("project_id")
+      .eq("is_current", true) // count current versions only (matches the visible Library)
       .range(from, from + PAGE - 1);
     if (error) {
       console.warn("referenceCountsByProject failed:", error.message);
@@ -106,6 +163,7 @@ export async function listAllReferenceAssets(max = 20000): Promise<ReferenceAsse
     const { data, error } = await supabase
       .from("reference_assets")
       .select()
+      .eq("is_current", true) // global library shows current versions only
       .order("created_at", { ascending: false })
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`listAllReferenceAssets: ${error.message}`);
