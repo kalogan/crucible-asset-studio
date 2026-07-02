@@ -319,7 +319,9 @@ export function useGameCamera(props: GameCameraProps): GameCameraHandle {
   // DEFAULT UNCHANGED: `useCameraInput` (pointer-lock/keyboard) is the io source
   // unless the caller opts into `inputOverride` (e.g. TouchControls), in which
   // case the built-in rig is skipped entirely — no merging of the two sources.
-  const builtinIo = useCameraInput(mode === 'first');
+  // With an override, lockOnClick is ALSO suppressed: a canvas tap on a touch
+  // device must not request pointer lock.
+  const builtinIo = useCameraInput(mode === 'first' && !inputOverride);
   const io: GameCameraIO = inputOverride ?? builtinIo;
 
   // Keep the latest prop getters in refs so useFrame never restarts on rerender.
