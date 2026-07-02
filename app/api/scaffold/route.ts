@@ -20,6 +20,7 @@ export async function POST(req: Request): Promise<Response> {
     target?: unknown;
     template?: unknown;
     systemIds?: unknown;
+    identityToken?: unknown;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -33,8 +34,9 @@ export async function POST(req: Request): Promise<Response> {
     ? (body.template as ScaffoldTemplate)
     : "blank";
   const systemIds = Array.isArray(body.systemIds) ? body.systemIds.map(String) : [];
+  const identityToken = typeof body.identityToken === "string" ? body.identityToken : undefined;
 
-  const files = generateScaffold({ name, target, template, systemIds });
+  const files = generateScaffold({ name, target, template, systemIds, identityToken });
   const zip = new JSZip();
   for (const f of [...files, ...vendorKitFiles()]) zip.file(f.path, f.content);
   const bytes = await zip.generateAsync({ type: "uint8array" });

@@ -8,11 +8,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 
-function scaffoldHref(picks: { name: string; target: string; systemIds: string[] }): string {
+function scaffoldHref(picks: {
+  name: string;
+  target: string;
+  systemIds: string[];
+  identityToken: string;
+}): string {
   const params = new URLSearchParams({
     name: picks.name,
     target: picks.target,
     systems: picks.systemIds.join(","),
+    identity: picks.identityToken,
   });
   return `/kit/scaffold?${params.toString()}`;
 }

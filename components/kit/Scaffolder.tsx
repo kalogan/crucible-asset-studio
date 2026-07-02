@@ -77,12 +77,15 @@ export function Scaffolder({
   initialName,
   initialTarget,
   initialSystemIds,
+  initialIdentityToken,
 }: {
   systems: readonly ScaffoldSystem[];
   /** Prefill from the design brief (/brief → "Scaffold this"). */
   initialName?: string;
   initialTarget?: ScaffoldTarget;
   initialSystemIds?: readonly string[];
+  /** Prefill the identity seed/token (/brief derives one from the title/mood). */
+  initialIdentityToken?: string;
 }) {
   // Kit family. Game-kit drives the runnable Vite generator; app-kit drives the
   // Next.js/Supabase app-starter generator (auth/layout/deploy).
@@ -90,6 +93,9 @@ export function Scaffolder({
   const [name, setName] = useState(initialName || "My Game");
   const [target, setTarget] = useState<ScaffoldTarget>(initialTarget ?? "r3f");
   const [template, setTemplate] = useState<ScaffoldTemplate>("blank");
+  // The anti-sameness knob: blank derives a token from the project name at
+  // generate-time (see resolveIdentityToken) so it's still deterministic.
+  const [identityToken, setIdentityToken] = useState(initialIdentityToken ?? "");
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => {
     // Prefilled picks (intersected with known systems) win; otherwise select all
     // of the initial family (game-kit) — app-kit pieces are added on family switch.
@@ -164,9 +170,10 @@ export function Scaffolder({
         target,
         template,
         systemIds: [...selected],
+        identityToken,
       }),
     );
-  }, [kind, name, target, template, selected]);
+  }, [kind, name, target, template, selected, identityToken]);
 
   const onCopy = useCallback(async (file: ScaffoldFile) => {
     try {
@@ -188,7 +195,13 @@ export function Scaffolder({
       body: JSON.stringify(
         isApp
           ? { name: name.trim() || "My App", moduleIds: [...selected] }
-          : { name: name.trim() || "My Game", target, template, systemIds: [...selected] },
+          : {
+              name: name.trim() || "My Game",
+              target,
+              template,
+              systemIds: [...selected],
+              identityToken,
+            },
       ),
     });
     if (!res.ok) return;
@@ -206,7 +219,7 @@ export function Scaffolder({
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-  }, [files, kind, name, target, template, selected]);
+  }, [files, kind, name, target, template, selected, identityToken]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -254,6 +267,30 @@ export function Scaffolder({
               autoComplete="off"
             />
           </div>
+
+          {/* Identity seed/token — game-kit only (the anti-sameness knob). */}
+          {kind === "game" && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="scaffold-identity-token">
+                Identity seed/token (optional)
+              </Label>
+              <Input
+                id="scaffold-identity-token"
+                value={identityToken}
+                onChange={(e) => setIdentityToken(e.target.value)}
+                placeholder="blank = derived from project name"
+                autoComplete="off"
+              />
+              <p className="text-xs text-muted-foreground">
+                One seed/token → one coherent palette + lighting + postfx + audio
+                bundle, baked live into the generated{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                  src/identity.ts
+                </code>
+                . Leave blank to derive it from the project name.
+              </p>
+            </div>
+          )}
 
           {/* Template — game-kit only (the runnable Vite generator). */}
           {kind === "game" && (

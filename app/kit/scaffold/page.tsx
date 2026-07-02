@@ -62,6 +62,7 @@ export default async function ScaffoldPage({
   const initialSystemIds = systemsParam
     ? systemsParam.split(",").map((s) => s.trim()).filter(Boolean)
     : undefined;
+  const initialIdentityToken = firstParam(sp.identity);
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[110rem] flex-col gap-8 px-6 py-12">
@@ -96,6 +97,7 @@ export default async function ScaffoldPage({
         {...(initialName ? { initialName } : {})}
         {...(initialTarget ? { initialTarget } : {})}
         {...(initialSystemIds ? { initialSystemIds } : {})}
+        {...(initialIdentityToken ? { initialIdentityToken } : {})}
       />
     </main>
   );
