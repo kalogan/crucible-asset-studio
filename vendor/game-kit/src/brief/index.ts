@@ -154,12 +154,33 @@ export interface ScaffoldPicks {
   name: string;
   target: BriefTarget;
   systemIds: string[];
+  /**
+   * The identity seed/token derived from this brief's title + art-direction
+   * mood — carries the anti-sameness signal from brief into scaffold, so
+   * "Scaffold this" pre-fills a token instead of leaving the scaffolder to
+   * fall back to the (title-derived, but mood-blind) default. Never empty.
+   */
+  identityToken: string;
 }
 
 /**
- * Map a brief into scaffolder picks: the title, the recommended target, and the brief's
+ * Derive a stable identity token from a brief's title + art-direction mood.
+ * Pure + deterministic: the same brief always yields the same token. Combining
+ * title and mood (rather than title alone) means two brief titles that land on
+ * the same mood text still diverge, and vice versa. Falls back to the title
+ * alone when mood is blank, and to a constant when both are blank (never '').
+ */
+export function briefToIdentityToken(brief: DesignBrief): string {
+  const title = brief.title.trim();
+  const mood = brief.artDirection.mood.trim();
+  const token = [title, mood].filter((s) => s.length > 0).join(' — ');
+  return token.length > 0 ? token : 'untitled-game';
+}
+
+/**
+ * Map a brief into scaffolder picks: the title, the recommended target, the brief's
  * suggested systems INTERSECTED with the ids the host actually offers (so a hallucinated id
- * is dropped). Pure.
+ * is dropped), and an identity token derived from the title + mood. Pure.
  */
 export function briefToScaffoldPicks(
   brief: DesignBrief,
@@ -170,5 +191,6 @@ export function briefToScaffoldPicks(
     name: brief.title,
     target: brief.target,
     systemIds: brief.systems.filter((id) => available.has(id)),
+    identityToken: briefToIdentityToken(brief),
   };
 }

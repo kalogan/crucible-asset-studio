@@ -87,6 +87,9 @@ export const SYSTEMS: readonly KitSystem[] = [
   { id: "npc-reasoning", name: "NPC Reasoning", tier: "kit", status: "built", module: "npc" },
   { id: "nav", name: "Nav / Pathfinding", tier: "system", status: "built", module: "nav" },
   { id: "npc-behavior", name: "NPC Behavior", tier: "system", status: "built", module: "behavior" },
+  // The anti-sameness primitive: one seed/token -> a coherent palette/lighting/postfx/
+  // audio/geometry/motion bundle, so scaffolded games stop looking like reskins.
+  { id: "identity", name: "Identity", tier: "atom", status: "built", module: "identity" },
   // ★ GATED, default-OFF widening of the reasoning firewall (Track B5). Its own flag so it
   // is NEVER an accident of just selecting npc-reasoning — it lets the model REQUEST NPC
   // movement (a clamped goal the pathfinder still owns). See Scaffolder's MOVEMENT-GATED
@@ -121,6 +124,7 @@ export const SYSTEM_DESCRIPTIONS: Record<string, string> = {
   "npc-behavior": "Deterministic NPC behaviour (wander/patrol) + follow steering + utility-AI. Scaffolds a wandering NPC you tick(dt) over the nav grid.",
   "npc-reasoning-movement": "⚠ GATED, default-OFF firewall widening — lets the model drive NPC movement by REQUESTING a destination (goTo) or a bounded gesture (emote). The pathfinder still owns actual movement; goTo is clamped to walkable bounds. Review the firewall before shipping. Add on top of NPC Reasoning.",
   gltf: "Drop-in <GltfModel autoFit> loader (fit-to-height, per-material recolor, shadow flags, preload) + <Overlay>, a drei-Html wrapper that bridges DOM out of the Canvas. Distilled from GYRE.",
+  identity: "The anti-sameness primitive — createIdentity(seedOrToken) turns ONE seed into a coherent palette/lighting/postfx/audio/geometry/motion bundle (5 curated moods + per-seed jitter), so scaffolded games stop looking like reskins.",
 };
 
 // ── app-kit family (kind: "app") ─────────────────────────────────────────────
