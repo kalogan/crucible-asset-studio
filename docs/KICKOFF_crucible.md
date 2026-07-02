@@ -1,5 +1,10 @@
 # Crucible — kickoff prompt
 
+> **Historical (June 2026).** Kept for reference; superseded by STATUS.md (north star + strategy).
+> Known drift: the "LoRA workflow that worked" framing is corrected by KERNEL_LESSONS §0 (no LoRA
+> code existed in the reference); the phase plan has been overtaken (e.g. Phase-5 avatars shipped as
+> the character pipeline, 2026-07).
+
 *(Paste this as the opening message to the build agent. Adjust file paths to match the project.)*
 
 ---

@@ -1,5 +1,10 @@
 # PROJECT BRIEF & HANDOFF: Crucible
 
+> **Historical (June 2026).** Kept for reference; superseded by STATUS.md (north star + strategy).
+> Known drift: the "LoRA workflow that worked" framing is corrected by KERNEL_LESSONS §0 (no LoRA
+> code existed in the reference); the phase plan has been overtaken (e.g. Phase-5 avatars shipped as
+> the character pipeline, 2026-07).
+
 **Version:** v2 (adds explicit linkage to the canon-intake process)
 **Owner:** Kevin (single-user, forever)
 **Companion (required):** `CANON_INTAKE.md` — the per-game art-bible questionnaire + LoRA training spec. Crucible's canon engine and game-context intake (§3, Phase 2) are *operationalized* by that doc. Feed both into the project together.
