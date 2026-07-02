@@ -182,16 +182,26 @@ game-kit `<AnimatedCharacter>`), so GYRE and LD forge from the same factory in t
   `createFirstPersonCamera` `moveSpeed` now accepts a **live getter** (`() => number`) read per-frame, so a
   game can vary speed at runtime (sprint) WITHOUT recreating the controller (no look reset). This is what
   GYRE's Shift-run uses. gyre's vendored copy matches (re-vendor carries it forward).
-- ⏭ **Next:** (1) **asset VERSIONING** so re-rigs/regens keep history to flip through + A/B compare —
-  today's re-imports HARD-DELETE the prior version (delete-then-insert on `art_kit_id`) + overwrite the GLB,
-  so there's zero history. Recommended Phase 1 (do before more re-rigs pile up): add `version` + `is_current`
-  to `reference_assets`, version the storage path, version-not-delete on re-import; then a modal version
-  flipper + A/B compare (see [[project-studio-cockpit]]). (2) **riggability pre-check** (island count /
-  aspect / symmetry → "clean humanoid vs risky fused appendages" BEFORE spending the rig call) + an
-  **A-pose** rig-ready default. (3) Seed **GYRE canon** + generate a GYRE character through the pipeline.
-  (4) Optional: wire dodge/use to inputs (dodge key, use=interact); real sprint on other games via the new
-  kit getter. (5) Upstream the character clip-player into game-kit proper (GYRE uses an inline
-  `AnimatedPlayerBody` today since its vendored kit predates a character module).
+- ✅ **SHIPPED 2026-07-02 (4 parallel streams, all committed):**
+  1. **Asset VERSIONING (Phase 1 + flipper)** — re-syncs KEEP history now. Migration 0018 (version +
+     is_current, backfilled) applied; `createReferenceAsset` version-not-deletes (demote lineage → insert
+     at max+1); storage paths content-hashed (`contentHash`) so old GLBs survive; list views filter
+     is_current; `listAssetVersions`/`setCurrentVersion` DAL + `getAssetVersions`/`promoteAssetVersion`
+     actions; **AssetModal version flipper** (‹ v_n/total ›, "current", "Make current" rollback). DB-verified
+     (v1→v2 keeps both, is_current flips, default view = current only). Flipper appears once an asset has ≥2
+     versions (next re-rig/re-import).
+  2. **Riggability pre-check + A-pose default** — `lib/rig/riggability.ts` + `scripts/rig/check-riggability.mjs`
+     (islands via union-find / aspect / ±X symmetry; risky if islands>300 OR aspect<1.5 OR symmetry<0.5),
+     wired into `auto-rig.mjs --engine unirig` (warns, never blocks). Verified: boss=RISKY (556 islands),
+     player=CLEAN (134). **A-pose** `character-apose` framing now the recommended rig-ready default (T-pose kept).
+  3. **GYRE dodge/use wired** — dodge→Q, use→the E interact/talk gesture (additive, first-person unaffected).
+  4. **game-kit `moveSpeed` getter** upstreamed to Crucible master + tests 20/20 (was gyre-only).
+- ⏭ **Still next:** (1) Seed **GYRE canon** + generate a GYRE character through the pipeline (paid FLUX+TRELLIS
+  pass — hold for a deliberate run). (2) Upstream the character clip-player into game-kit proper (GYRE uses an
+  inline `AnimatedPlayerBody`; its vendored kit predates a character module). (3) Optional: real sprint speed on
+  other games via the new kit getter; versioning Phase 2 (A/B side-by-side compare board, ties to
+  [[project-studio-cockpit]]). (4) **Chore (chip):** a pre-existing `artBibleFromCanon` unit test fails on main
+  (canon-seed/test drift — unrelated to today's work).
 - 📎 **Learning — riggability is set upstream, not by a TRELLIS flag.** You can't make TRELLIS emit
   rig-ready topology; riggability is ~entirely the 2D input pose + our normalize step. The contract:
   clean humanoid silhouette, arms **separated** from the torso (T/A-pose), `mesh_simplify ≥ 0.9`,
