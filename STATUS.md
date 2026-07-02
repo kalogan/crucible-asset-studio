@@ -22,17 +22,22 @@ check back later) for infra/plumbing. **Gate:** CI running on both this repo and
 
 ## Arm sequencing
 
-- **NOW:** finish GYRE's demo; build the identity-token module (anti-sameness); start the 2D-mobile arm.
-- **NEXT — `cutscene` kit module (cinematic 3D storytelling; Director, 2026-07-02).** Nocturne-intro
-  energy: authored camera moves over the live 3D world while the environment *tells the story* (fog/light/
-  bloom ramps, the world falling into darkness). Environmental-ambience storytelling is core to GYRE's
-  identity, so this becomes a first-class kit module, not a GYRE one-off. Shape: a declarative, deterministic
-  **shot sequence player** — per shot: camera path (keyframes + easing), environment ramps (fog density,
-  light intensity/color, postfx), character clip triggers, caption/letterbox track, skippable; r3f
-  `<CutscenePlayer sequence onDone>`. Composes with existing kit pieces (camera, scene-state, audio, clip,
-  postfx) — mostly glue, not new tech. **First consumer is already on the slate:** GYRE's W3 endings (3
-  short montages) and optionally a title-card intro shot; build the minimal module when W3 starts, grow it
-  from real use (the GYRE-retro pattern: harvest glue from a real game, not speculate).
+- **NOW:** finish GYRE's demo (W1 Still Point ✅ · W2 shell ✅ · W3 endings in flight); identity-token
+  module ✅ WIRED into the scaffolder; start the 2D-mobile arm (build list now includes a **touch layer
+  for 3D games** — virtual stick + touch-look + tap-interact; GYRE is desktop-only today).
+- ✅ **`cutscene` kit module SHIPPED (2026-07-02):** deterministic shot-sequence player (camera keyframes +
+  easing, named ramp tracks, exactly-once events, skip-safe) + r3f `<CutscenePlayer>`. 28 tests. First
+  consumer: GYRE's W3 endings (in flight). Grow the vocabulary from consumer feedback.
+- ✅ **`layout` kit module v1 SHIPPED (2026-07-02; Director-locked design, see memory `project-layout-kit`):**
+  authored multi-floor interiors — **volumes + portals** descriptor (floors, rect/poly volumes, door/stair/
+  **atrium-void** portals, spawn + named exits as the "area" seam), `validateLayout` (full error list),
+  `buildLayoutGeometry` (slabs rect-decomposed around voids, walls with door gaps, stair runs),
+  `layoutBounds` (GameCamera-compatible collision), `<LayoutGreybox>`. 37 tests. Origin: the
+  deceive-me-daddy multi-floor/atrium experiments. **Data-first now → Crucible 2D-canvas-per-floor editor
+  later** (same format; editor needs: live validation UI, a pick/hit-test helper, real poly support —
+  polys are rect-hulled in v1). **Roadmap: full spatial runtime** (navgrid, spawns, door logic, room-enter
+  events) when a game needs it. **First application: GYRE post-demo** — an open-world map (the `world`
+  module, stitched via the area seam) contrasted with authored interior levels.
 - **NEXT (deliberate paid pass):** the reference-driven refine/upscale pipeline (procgen asset → render →
   reference-conditioned img2img/upscale → TRELLIS → derived asset via `source_asset_id`).
 - **AFTER THE SLATE (parked, not deleted):** LoRA training, Kiln finishing + CDN publish, Roblox
