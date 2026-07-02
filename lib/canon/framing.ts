@@ -18,6 +18,7 @@ export type AssetTypeKey =
   | "prop"
   | "tilesheet"
   | "character"
+  | "character-apose"
   | "character-tpose"
   | "sprite"
   | "icon"
@@ -54,6 +55,41 @@ export const ASSET_TYPE_FRAMINGS: Record<AssetTypeKey, Framing> = {
       "single centered character, front-facing, full figure or bust, clear readable silhouette",
     // Intentionally empty: characters need faces and must not inherit a "no faces" never.
     nevers: [],
+  },
+  "character-apose": {
+    key: "character-apose",
+    label: "Character — rig-ready (A-pose, recommended)",
+    // The RECOMMENDED rig-ready framing. Same contract as character-tpose (single
+    // full-body head-to-toe figure, symmetric, front orthographic, legs apart — so it
+    // promotes to a clean, separable, riggable 3D mesh) but with the arms held DOWN at
+    // ~40° below horizontal instead of straight out. An A-pose rigs AND rest-deforms
+    // slightly better than a strict T-pose (the shoulder isn't at a hard 90°, so weights
+    // relax more naturally) while keeping the limbs just as separable from the torso.
+    // POSE/COMPOSITION only — the canon supplies STYLE. Do NOT set a background here
+    // (the canon's background must win) and do NOT add anti-2D nevers (fighting the
+    // canon's style is what produced a photoreal creature on white).
+    formatCues:
+      "single full-body character head-to-toe, one figure centered, symmetric natural A-pose, " +
+      "arms relaxed at roughly 40 degrees below horizontal away from the body, elbows slightly " +
+      "bent, hands open and clear of the torso, legs shoulder-width apart, standing upright, " +
+      "facing forward, front orthographic view",
+    // Composition guards FIRST (buildFinalPrompt merges canon negatives BEFORE these and
+    // caps the list). "arms straight out" / "T-pose" are nevers here so the A-pose angle
+    // is not overridden; "arms crossed" keeps the arms clear of the torso for separability.
+    nevers: [
+      "sprite sheet",
+      "multiple figures",
+      "multiple views",
+      "grid of frames",
+      "T-pose",
+      "arms straight out",
+      "arms crossed",
+      "sitting",
+      "crouching",
+      "action pose",
+      "cropped",
+      "close-up",
+    ],
   },
   "character-tpose": {
     key: "character-tpose",
@@ -109,6 +145,8 @@ export const ASSET_TYPE_FRAMINGS: Record<AssetTypeKey, Framing> = {
 export const ASSET_TYPE_OPTIONS: { key: AssetTypeKey; label: string }[] = [
   "prop",
   "character",
+  // A-pose is the RECOMMENDED rig-ready default; it leads the T-pose in the dropdown.
+  "character-apose",
   "character-tpose",
   "sprite",
   "icon",

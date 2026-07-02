@@ -21,8 +21,14 @@ import { buildFinalPrompt } from "@/lib/canon/prompt";
 import { framingFor } from "@/lib/canon/framing";
 import { buildStoragePath, catalogKeyFor } from "./paths";
 
-/** The rig-ready T-pose character framing key — its own prompt + TRELLIS tuning. */
+/** The rig-ready character framing keys — their own prompt + TRELLIS tuning. */
 export const CHARACTER_TPOSE_KEY = "character-tpose";
+export const CHARACTER_APOSE_KEY = "character-apose";
+/**
+ * Both rig-ready framings (A-pose, the recommended default, and T-pose) get the same
+ * geometry-preserving TRELLIS budget so limbs stay separable for auto-rigging.
+ */
+export const RIG_READY_KEYS: readonly string[] = [CHARACTER_APOSE_KEY, CHARACTER_TPOSE_KEY];
 /**
  * Retain more geometry for rig-ready characters so joints survive auto-rigging
  * (vs. the 0.95 preset used for props/tiles). 0.9 is firtoz/trellis's FLOOR — it
@@ -31,9 +37,14 @@ export const CHARACTER_TPOSE_KEY = "character-tpose";
  */
 export const TPOSE_MESH_SIMPLIFY = 0.9;
 
-/** True when a recipe snapshot was generated as a rig-ready T-pose character. */
+/** True when a framing key is a rig-ready character (A-pose or T-pose). */
+export function isRigReadyKey(key: string | null | undefined): boolean {
+  return key != null && RIG_READY_KEYS.includes(key);
+}
+
+/** True when a recipe snapshot was generated as a rig-ready character (A- or T-pose). */
 function isTposeRecipe(recipe: Record<string, unknown>): boolean {
-  return recipe["asset_type_key"] === CHARACTER_TPOSE_KEY;
+  return isRigReadyKey(recipe["asset_type_key"] as string | undefined);
 }
 
 export type ImageProvider = "flux" | "nanobanana";
@@ -219,8 +230,8 @@ export async function runGenerationPipeline(input: PipelineInput): Promise<Asset
   });
   const job = await createJob({ spec_id: spec.id, status: "generating", executor: "replicate" });
   try {
-    const isTpose = input.assetType === CHARACTER_TPOSE_KEY;
-    const meshSimplify = isTpose ? TPOSE_MESH_SIMPLIFY : TRELLIS_DEFAULTS.mesh_simplify;
+    const rigReady = isRigReadyKey(input.assetType);
+    const meshSimplify = rigReady ? TPOSE_MESH_SIMPLIFY : TRELLIS_DEFAULTS.mesh_simplify;
     const img = await generate2D(job.id, input, canon, catalogKey);
     const { glbUrl, predictionId } = await generate3D(
       job.id,

@@ -257,17 +257,35 @@ export interface Pose {
   label: string;
   /** The verbatim `poseLabel` interpolated into the user message's "Sub-type:" line. */
   poseLabel: string;
-  /** When true, the recipe is marked character-tpose so promote-to-3D keeps 0.88. */
+  /**
+   * When true, the pose is RIG-READY (single separable full-body figure) → the recipe
+   * is marked with a `character-*pose` framing key so promote-to-3D keeps the geometry
+   * budget high. `rigReadyKey` says WHICH framing (A-pose is the recommended default).
+   */
   tpose: boolean;
+  /** The framing key a rig-ready pose maps to (character-apose | character-tpose). */
+  rigReadyKey?: "character-apose" | "character-tpose";
 }
 
 export const POSES: Pose[] = [
+  {
+    // RECOMMENDED default: an A-pose rigs AND rest-deforms slightly better than a
+    // strict T-pose (the shoulder sits at ~40° not a hard 90°, so skin weights relax
+    // more naturally) while keeping arms just as separable from the torso.
+    id: "apose",
+    label: "A-pose reference (rig-ready, recommended)",
+    poseLabel:
+      "Full-body character reference, SINGLE isolated figure (not a sprite sheet, not a grid), front-facing symmetric natural A-pose with arms relaxed at roughly 40 degrees below horizontal away from the body, elbows slightly bent, hands open and clear of the torso, legs apart, standing upright, full body head-to-toe, centered, for use as a 3D model reference",
+    tpose: true,
+    rigReadyKey: "character-apose",
+  },
   {
     id: "tpose",
     label: "T-pose reference (rig-ready)",
     poseLabel:
       "Full-body character reference, SINGLE isolated figure (not a sprite sheet, not a grid), front-facing symmetric T-pose with both arms extended out horizontally, legs apart, standing upright, full body head-to-toe, centered, for use as a 3D model reference",
     tpose: true,
+    rigReadyKey: "character-tpose",
   },
   {
     id: "idle",

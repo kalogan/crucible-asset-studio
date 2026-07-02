@@ -18,13 +18,14 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, createWriteStream, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, createWriteStream, statSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve, basename, extname } from "node:path";
 import { tmpdir } from "node:os";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { loadEnvLocal, ensureMeshUrl, rigWithUniRig, downloadTo } from "./rig/unirig.mjs";
+import { analyzeGlb, formatReport } from "./rig/check-riggability.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(__dirname, "..");
@@ -119,6 +120,23 @@ async function main() {
   let clipInput = inPath;
 
   if (args.engine === "unirig") {
+    // 0) RIGGABILITY PRE-CHECK — predict from the input mesh alone whether UniRig will
+    //    map it cleanly, BEFORE spending the call. Informational only: a "risky" mesh
+    //    (hundreds of islands / squat / asymmetric) still proceeds, but the operator is
+    //    warned so a bad 2D input pose can be caught early. Never blocks; never fatal.
+    try {
+      const report = analyzeGlb(readFileSync(inPath));
+      if (report.verdict === "risky") {
+        log("riggability: ⚠ RISKY — this mesh may rig ambiguously:");
+        for (const line of formatReport(report).split("\n")) log("  " + line);
+        log("  proceeding anyway (fix upstream: cleaner 2D pose / fewer floating parts).");
+      } else {
+        log("riggability: ✓ CLEAN —", formatReport(report).split("\n")[0]);
+      }
+    } catch (e) {
+      log("riggability: check skipped (could not analyze mesh):", e.message);
+    }
+
     // 1) get a fetchable .glb URL, 2) UniRig (skeleton + skin) on Replicate,
     // 3) download the rigged mesh — then unirig_clips.py authors the clips below.
     loadEnvLocal();

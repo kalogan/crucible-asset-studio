@@ -2,11 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { getActiveProject } from "@/lib/active-project";
-import {
-  runGenerationPipeline,
-  runImagePipeline,
-  CHARACTER_TPOSE_KEY,
-} from "@/lib/pipeline/generate";
+import { runGenerationPipeline, runImagePipeline } from "@/lib/pipeline/generate";
 import { enrichPrompt } from "@/lib/executor";
 import {
   artBibleFromCanon,
@@ -232,9 +228,10 @@ export async function runForgeGenerateAction(
 
   const mode = String(formData.get("mode") ?? "image") === "model" ? "model" : "image";
   const run = mode === "model" ? runGenerationPipeline : runImagePipeline;
-  // Only the rig-ready T-pose gets the character-tpose recipe key (→ 0.88 mesh_simplify).
-  const isTpose = poseById(String(formData.get("poseId") ?? "")).tpose;
-  const assetType = isTpose ? CHARACTER_TPOSE_KEY : "character";
+  // Rig-ready poses (A-pose = recommended default, or T-pose) map to their character-*pose
+  // framing key → promote-to-3D keeps the geometry budget high. Non-rig poses → "character".
+  const selectedPose = poseById(String(formData.get("poseId") ?? ""));
+  const assetType = selectedPose.rigReadyKey ?? "character";
   const provider =
     String(formData.get("provider") ?? "flux") === "nanobanana" ? "nanobanana" : "flux";
 

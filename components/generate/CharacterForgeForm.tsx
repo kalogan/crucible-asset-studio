@@ -200,7 +200,7 @@ export function CharacterForgeForm({
               ))}
             </select>
             <p className="text-xs text-muted-foreground">
-              T-pose reference promotes to a cleanly riggable 3D mesh.
+              A-pose (recommended) or T-pose reference promotes to a cleanly riggable 3D mesh.
             </p>
           </div>
         </div>
@@ -307,7 +307,7 @@ export function CharacterForgeForm({
                 <span className="font-medium text-foreground">Straight to 3D</span>
               </span>
               <span className="pl-6 text-xs text-muted-foreground">
-                FLUX → TRELLIS (T-pose auto-rigs cleanly).
+                FLUX → TRELLIS (A-pose / T-pose auto-rigs cleanly).
               </span>
             </label>
           </div>

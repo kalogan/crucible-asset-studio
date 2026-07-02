@@ -38,6 +38,37 @@ describe("framingFor", () => {
     expect(cues).not.toContain("background");
   });
 
+  it("character-apose carries A-pose cues (arms ~40° down) and stays canon-neutral", () => {
+    const f = framingFor("character-apose");
+    expect(f.key).toBe("character-apose");
+    const cues = f.formatCues.toLowerCase();
+    expect(cues).toContain("a-pose");
+    expect(cues).toContain("40 degrees below horizontal");
+    expect(cues).toContain("elbows slightly bent");
+    expect(cues).toContain("full-body");
+    expect(cues).toContain("front orthographic view");
+    // Rig-ready contract preserved: single figure, symmetric, legs apart.
+    expect(cues).toContain("symmetric");
+    expect(cues).toContain("shoulder-width apart");
+    // Must NOT be a T-pose, and must not set a background or fight the canon's style.
+    expect(f.nevers).toContain("T-pose");
+    expect(f.nevers).toContain("arms straight out");
+    expect(f.nevers).toContain("multiple figures");
+    expect(f.nevers).not.toContain("2D");
+    expect(f.nevers).not.toContain("pixel art");
+    expect(cues).not.toContain("background");
+  });
+
+  it("A-pose is the recommended rig-ready default (leads T-pose in the dropdown)", () => {
+    const keys = ASSET_TYPE_OPTIONS.map((o) => o.key);
+    const ai = keys.indexOf("character-apose");
+    const ti = keys.indexOf("character-tpose");
+    expect(ai).toBeGreaterThanOrEqual(0);
+    expect(ti).toBeGreaterThanOrEqual(0);
+    expect(ai).toBeLessThan(ti); // A-pose appears first
+    expect(ASSET_TYPE_FRAMINGS["character-apose"].label.toLowerCase()).toContain("recommended");
+  });
+
   it("falls back to the prop framing for an unknown key", () => {
     expect(framingFor("unknown-key")).toBe(ASSET_TYPE_FRAMINGS.prop);
     expect(framingFor("").key).toBe("prop");

@@ -258,8 +258,25 @@ describe("lookups fall back to the first entry for unknown ids", () => {
     expect(poseById("nope")).toBe(POSES[0]);
   });
 
-  it("the T-pose is flagged rig-ready and the idle is not", () => {
+  it("the A-pose and T-pose are flagged rig-ready and the idle is not", () => {
+    expect(poseById("apose").tpose).toBe(true);
     expect(poseById("tpose").tpose).toBe(true);
     expect(poseById("idle").tpose).toBe(false);
+  });
+
+  it("A-pose is the recommended DEFAULT (first entry) and maps to character-apose", () => {
+    expect(POSES[0]!.id).toBe("apose");
+    expect(poseById("apose").rigReadyKey).toBe("character-apose");
+    expect(poseById("tpose").rigReadyKey).toBe("character-tpose");
+    // A non-rig pose has no rigReadyKey → the action falls back to "character".
+    expect(poseById("idle").rigReadyKey).toBeUndefined();
+  });
+
+  it("A-pose cues describe arms ~40° below horizontal (not a T-pose)", () => {
+    const label = poseById("apose").poseLabel.toLowerCase();
+    expect(label).toContain("a-pose");
+    expect(label).toContain("40 degrees below horizontal");
+    expect(label).toContain("elbows slightly bent");
+    expect(label).not.toContain("arms extended out horizontally");
   });
 });
