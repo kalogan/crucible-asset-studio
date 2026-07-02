@@ -59,9 +59,11 @@ describe("artBibleFromCanon", () => {
       "NO metal, NO stone, NO sci-fi tech, NO human faces, NO text, NO outlines, " +
         "NO 3d render, NO photorealistic, NO smooth gradients",
     );
-    // no character_theme on LD → falls back to north_star + native-humanoid tail
-    expect(b.playerTheme).toContain(String(LD_CANON.style_guide.north_star));
-    expect(b.playerTheme).toContain("a humanoid character native to this world");
+    // LD's seed carries character_theme verbatim (forge parity with ART_BIBLE.playerTheme)
+    // → it wins outright, no north_star/native-humanoid fallback tail.
+    expect(b.playerTheme).toBe(LD_CANON.style_guide.character_theme);
+    expect(b.playerTheme).toBe(ART_BIBLE.playerTheme);
+    expect(b.playerTheme).not.toContain("a humanoid character native to this world");
   });
 
   it("maps the GYRE canon → GYRE's theme / palette / forbidden / character theme", () => {

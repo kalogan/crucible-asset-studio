@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    # No secrets required — the test suite runs env-free (409 tests) and every
+    # page in the app is `export const dynamic = "force-dynamic"`, so `next build`
+    # never touches env-gated code at build time (env access is lazy, see lib/env.ts).
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        # Version comes from package.json's "packageManager" field.
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        timeout-minutes: 5
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        timeout-minutes: 3
+        run: pnpm typecheck
+
+      - name: Lint
+        timeout-minutes: 3
+        run: pnpm lint
+
+      - name: Test
+        timeout-minutes: 5
+        run: pnpm test
+
+      - name: Build
+        timeout-minutes: 8
+        run: pnpm build
