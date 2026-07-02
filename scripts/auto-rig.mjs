@@ -24,10 +24,12 @@ import { dirname, join, resolve, basename, extname } from "node:path";
 import { tmpdir } from "node:os";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
+import { loadEnvLocal, ensureMeshUrl, rigWithUniRig, downloadTo } from "./rig/unirig.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(__dirname, "..");
-const RIG_PY = join(__dirname, "rig", "humanoid_rig.py");
+const RIG_PY = join(__dirname, "rig", "humanoid_rig.py"); // legacy geometric skinner
+const UNIRIG_CLIPS_PY = join(__dirname, "rig", "unirig_clips.py"); // clip-author on a UniRig rig
 
 function log(...a) {
   console.log("[auto-rig]", ...a);
@@ -68,14 +70,17 @@ async function download(url) {
 }
 
 function parseArgs(argv) {
-  const args = { in: null, out: null, renderDir: null, pose: "adown", targetTris: 0 };
+  // engine: "unirig" (default — ML skeleton+skin on Replicate, then world-space clips)
+  //         | "geometric" (legacy in-Blender nearest-bone skinner)
+  const args = { in: null, out: null, renderDir: null, pose: "adown", targetTris: 0, engine: "unirig" };
   const rest = argv.slice(2);
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === "--out") args.out = rest[++i];
     else if (a === "--render-dir") args.renderDir = rest[++i];
-    else if (a === "--pose") args.pose = rest[++i]; // adown (arms-down) | tpose
+    else if (a === "--pose") args.pose = rest[++i]; // adown (arms-down) | tpose (geometric only)
     else if (a === "--target-tris") args.targetTris = rest[++i]; // decimate budget (0 = off)
+    else if (a === "--engine") args.engine = rest[++i]; // unirig | geometric
     else if (!a.startsWith("--") && !args.in) args.in = a;
   }
   return args;
@@ -107,17 +112,41 @@ async function main() {
     ? resolve(args.out)
     : join(dirname(inPath), basename(inPath, extname(inPath)) + ".rigged.glb");
   log("output:", outPath);
+  log("engine:", args.engine);
 
-  const pyArgs = ["--in", inPath, "--out", outPath, "--pose", args.pose];
-  if (Number(args.targetTris) > 0) {
-    pyArgs.push("--target-tris", String(args.targetTris));
-  }
-  if (args.renderDir) {
-    pyArgs.push("--render-dir", resolve(args.renderDir));
+  // Which Blender script + input mesh the clip-authoring step runs on:
+  let clipPy = RIG_PY;
+  let clipInput = inPath;
+
+  if (args.engine === "unirig") {
+    // 1) get a fetchable .glb URL, 2) UniRig (skeleton + skin) on Replicate,
+    // 3) download the rigged mesh — then unirig_clips.py authors the clips below.
+    loadEnvLocal();
+    const meshUrl = isUrl ? await ensureMeshUrl(args.in, inPath) : await ensureMeshUrl(inPath, inPath);
+    log("UniRig input mesh:", meshUrl);
+    const riggedUrl = await rigWithUniRig(meshUrl, {
+      onStatus: (s) => process.stdout.write(`\r[auto-rig] UniRig ${s}    `),
+    });
+    process.stdout.write("\n");
+    const tmpRigged = join(tmpdir(), "crucible-autorig", basename(inPath, extname(inPath)) + ".unirig.glb");
+    mkdirSync(dirname(tmpRigged), { recursive: true });
+    await downloadTo(riggedUrl, tmpRigged);
+    log("UniRig rigged mesh:", tmpRigged, `(${(statSync(tmpRigged).size / 1e6).toFixed(2)} MB)`);
+    clipPy = UNIRIG_CLIPS_PY;
+    clipInput = tmpRigged;
+  } else if (args.engine !== "geometric") {
+    die(`unknown --engine "${args.engine}" (use "unirig" or "geometric")`);
   }
 
-  const blenderArgs = ["-b", "-P", RIG_PY, "--", ...pyArgs];
-  log("running:", basename(blender), blenderArgs.join(" "));
+  // Blender clip-authoring pass (both engines share the export step; only the input +
+  // script differ). unirig_clips.py has no --pose (UniRig defines the rest pose).
+  const pyArgs = ["--in", clipInput, "--out", outPath];
+  if (args.engine === "geometric") pyArgs.push("--pose", args.pose);
+  if (Number(args.targetTris) > 0) pyArgs.push("--target-tris", String(args.targetTris));
+  if (args.renderDir) pyArgs.push("--render-dir", resolve(args.renderDir));
+
+  const blenderArgs = ["-b", "-P", clipPy, "--", ...pyArgs];
+  log("running:", basename(blender), basename(clipPy), pyArgs.join(" "));
 
   const res = spawnSync(blender, blenderArgs, {
     stdio: "inherit",
@@ -128,7 +157,7 @@ async function main() {
 
   if (!existsSync(outPath)) die(`expected output not written: ${outPath}`);
   log("done ->", outPath, `(${(statSync(outPath).size / 1e6).toFixed(2)} MB)`);
-  log("glTF clips: idle, cast, guard, strike, hit");
+  log("glTF clips: idle, walk, cast, guard, strike, hit");
 }
 
 main().catch((e) => die(e.stack || String(e)));

@@ -30,6 +30,16 @@ export const MODEL_REGISTRY: Record<string, ModelDef> = {
     kind: "versioned",
     hash: "4876f2a8da1c544772dffa32e8889da4a1bab3a1f5c1937bfcfccb99ae347251",
   },
+  // UniRig (SIGGRAPH'25) — ML auto-rigger: predicts skeleton + skin weights from an
+  // arbitrary mesh. Replaces our geometric nearest-bone skinning (which tore limbs into
+  // "taffy" on generated meshes). Input: { input_mesh: <.glb url> }; output: a rigged .glb
+  // (no animation clips — those are authored afterward by scripts/rig/unirig_clips.py).
+  // NOTE: the input URL's PATH must end in .glb — the Replicate files-API URL fails
+  // file-type sniffing; a stored Supabase .glb URL works.
+  "aaronjmars/unirig-ai": {
+    kind: "versioned",
+    hash: "9ee496eafcc6ab9789a110a6357e43e5ee8b93cee9ab653bdc6f06a29341ee86",
+  },
 };
 
 export interface ResolvedRequest {

@@ -10,7 +10,7 @@
 
 import { revalidatePath } from "next/cache";
 import { existsSync, readdirSync } from "node:fs";
-import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { getReferenceAsset, createReferenceAsset } from "@/lib/db/reference-assets";
@@ -74,26 +74,24 @@ export async function rigAssetAction(input: RigInput): Promise<RigResult> {
 
   const meta = deriveRiggedMeta({ label: asset.label, artKitId: asset.art_kit_id });
 
-  // Scratch dir for the download + rigged output; always cleaned up.
+  // Scratch dir for the rigged output; always cleaned up.
   const work = await mkdtemp(path.join(tmpdir(), "crucible-rig-"));
-  const inPath = path.join(work, "in.glb");
   const outPath = path.join(work, "out.glb");
   try {
-    // 1) Download the source GLB to a temp file.
-    const res = await fetch(asset.image_path);
-    if (!res.ok) return { ok: false, error: `Failed to fetch source GLB (HTTP ${res.status}).` };
-    await writeFile(inPath, Buffer.from(await res.arrayBuffer()));
-
-    // 2) Run the auto-rig CLI (Blender). Long — ~30-60s. Dynamic import keeps
-    //    node:child_process out of any serverless bundle.
+    // Run the auto-rig CLI (Blender). The default engine is UniRig (ML skeleton+skin on
+    // Replicate, then world-space clips), so this now takes MINUTES (UniRig ~2-4m + clips
+    // + up/download), not seconds. We pass the asset's stored .glb URL straight through:
+    // UniRig fetches it directly (its path already ends in .glb), so no re-upload. `--pose`
+    // only affects the legacy geometric engine; UniRig defines its own rest pose. Dynamic
+    // import keeps node:child_process out of any serverless bundle.
     const { execFile } = await import("node:child_process");
     const { promisify } = await import("node:util");
     const run = promisify(execFile);
     try {
       await run(
         process.execPath,
-        [path.join(REPO, "scripts", "auto-rig.mjs"), inPath, "--out", outPath, "--pose", pose],
-        { cwd: REPO, timeout: 5 * 60_000, maxBuffer: 32 * 1024 * 1024 },
+        [path.join(REPO, "scripts", "auto-rig.mjs"), asset.image_path, "--out", outPath, "--pose", pose],
+        { cwd: REPO, timeout: 12 * 60_000, maxBuffer: 32 * 1024 * 1024 },
       );
     } catch (err) {
       // execFile rejects with { stderr } on non-zero exit — surface the rig's own message.

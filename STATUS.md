@@ -134,6 +134,71 @@ goals: make scaffolded games feel DIFFERENT, and be able to make 2D mobile games
   portrait-mobile done) and `Skateboard-hero` (pure createWorld/step sim, endless weighted spawner + ramp, 2D
   platformer physics, gesture→trick table, 2D AABB/swept collision, leaderboard, Canvas2D renderer).
 
+**★ Character pipeline — 2D art-bible → 3D → auto-rig (2026-07-01; ACTIVE).** The whole character
+workflow now lives IN Crucible (memory `[[project-crucible-character-3d-rig]]`): LD-forge-parity 2D
+generation (canon-driven, sent to FLUX verbatim via `finalPromptOverride`) → TRELLIS img→3D promote
+(`mesh_simplify ≥ 0.9`) → auto-rig → runtime clip-player. Reusable across games (canon-driven forge +
+game-kit `<AnimatedCharacter>`), so GYRE and LD forge from the same factory in their own art bibles.
+- ✅ **Built:** forge-parity 2D (`lib/generate/living-dungeon-forge.ts`, `character-tpose` framing),
+  TRELLIS promote, game-kit clip-player, LOCAL "Rig this" action, `--target-tris` decimate for mobile budgets.
+- 🔑 **THE PIVOT (this session):** the hand-rolled Blender skinner (geometric nearest-bone + Laplacian
+  smoothing) hit a hard quality ceiling — limbs tore into stretched **"taffy"** sheets on generated meshes,
+  through 3 rounds of tuning. **Switched to UniRig** (SIGGRAPH'25 ML auto-rigger, `aaronjmars/unirig-ai`
+  on Replicate). **PROVEN:** on the exact boss that broke my rig, UniRig's skin deforms as a coherent
+  volume (no taffy); on a full humanoid it produced spine+neck+head, both arms **with fingers**, both legs
+  **with toes** — richer than my fixed 19-bone armature. UniRig gives skeleton+skin but **no clips**.
+- ✅ **Built (UniRig wiring, tsc-clean):** registered `aaronjmars/unirig-ai` in the model registry
+  (pinned hash) + reusable `rigWithUniRig(meshUrl)` in `lib/rig/unirig.ts` (the "kit" piece). Gotchas
+  baked into comments: input URL's path must end in `.glb` (Replicate files-API URL fails file-type
+  sniff; a Supabase `.glb` URL works); output has no animations.
+- ✅ **DONE + verified:** `scripts/rig/unirig_clips.py` — classifies UniRig's generic `bone_N` names into
+  humanoid roles (geometric/hierarchical, not hard-coded) → authors idle/cast/guard/strike/hit as
+  **world-space** clips (roll-independent, since UniRig bone rolls are arbitrary), keeping UniRig's weights
+  byte-identical. Render-verified against a full humanoid (ld-player-49): the taffy-prone **cast** and the
+  **guard** crouch both deform as coherent volumes, **zero taffy** — confirmed by reading the renders, not
+  just the agent's word. Output GLB: skins:1, 37 joints, 5 clips named exactly idle/cast/guard/strike/hit.
+  Accepts `--in --out [--render-dir] [--target-tris N] [--no-export]`. **The full pipeline is now proven
+  end-to-end** (2D → TRELLIS → UniRig → clips → animated GLB).
+- ✅ **Pipeline wired end-to-end (2026-07-01 cont.):** `auto-rig.mjs` now DEFAULTS to the UniRig engine
+  (upload→UniRig→`unirig_clips.py`; `--engine geometric` kept as fallback), via CLI helper `scripts/rig/
+  unirig.mjs`; the LOCAL "Rig this" action uses it. **Full clip set = 11:** idle · walk · **run · jump ·
+  dodge · use · death** · cast · guard(one-knee kneel) · strike(hip-chambered). Both a player (ld-player-49)
+  and the boss (Threshold Host) rigged + imported to the Library (stable art-kit ids → replace, no dupes).
+- 🐞 **Two bugs found + fixed (durable, in the pipeline source):** (a) **backward limbs** — a world-X sign
+  was inverted for the hanging-limb bones, so arms/legs swung to the model's back; negated the limb signs
+  (torso/head were already right). (b) **contaminated frame-1** — clips were stashed as OVERLAPPING NLA
+  tracks left *unmuted*, so authoring the next clip captured the others' poses into its keyframes (`use`
+  frame-1 legs came out mid-stride); fix = mute stashed tracks during authoring, unmute for export
+  (`export_nla_strips=False`, `export_optimize_animation_size=False`). Verified by decoding the GLB
+  quaternions + renders. (c) **death floor-penetration** — eased the hip-sink so the collapse rests ON the
+  floor (min-Z −0.478 vs −0.49 floor).
+- ✅ **In GYRE, playable now** (`web-projects/gyre`): a `?anim` **animation lab** (all 11 clips + model
+  toggle + orbit) and a **live tuning panel** (per-clip speed sliders, 1–5×, persisted). **Gameplay wiring:**
+  descent avatar plays idle↔walk from movement, **Shift = run (2× move speed + run clip)**, **Space = jump**;
+  battle avatar plays strike/guard/cast per action and **death on defeat**. Reusable `AnimatedPlayerBody`
+  (drei `useGLTF`/`useAnimations` + `SkeletonUtils.clone`, autoFit). Tuned defaults baked in
+  (walk 2× · run 1.6× · cast/guard 3× · strike 2× · jump 1.2× · …).
+- ✅ **game-kit enhancement (updated the master `vendor/game-kit` + tests 20/20):** `GameCamera` /
+  `createFirstPersonCamera` `moveSpeed` now accepts a **live getter** (`() => number`) read per-frame, so a
+  game can vary speed at runtime (sprint) WITHOUT recreating the controller (no look reset). This is what
+  GYRE's Shift-run uses. gyre's vendored copy matches (re-vendor carries it forward).
+- ⏭ **Next:** (1) **asset VERSIONING** so re-rigs/regens keep history to flip through + A/B compare —
+  today's re-imports HARD-DELETE the prior version (delete-then-insert on `art_kit_id`) + overwrite the GLB,
+  so there's zero history. Recommended Phase 1 (do before more re-rigs pile up): add `version` + `is_current`
+  to `reference_assets`, version the storage path, version-not-delete on re-import; then a modal version
+  flipper + A/B compare (see [[project-studio-cockpit]]). (2) **riggability pre-check** (island count /
+  aspect / symmetry → "clean humanoid vs risky fused appendages" BEFORE spending the rig call) + an
+  **A-pose** rig-ready default. (3) Seed **GYRE canon** + generate a GYRE character through the pipeline.
+  (4) Optional: wire dodge/use to inputs (dodge key, use=interact); real sprint on other games via the new
+  kit getter. (5) Upstream the character clip-player into game-kit proper (GYRE uses an inline
+  `AnimatedPlayerBody` today since its vendored kit predates a character module).
+- 📎 **Learning — riggability is set upstream, not by a TRELLIS flag.** You can't make TRELLIS emit
+  rig-ready topology; riggability is ~entirely the 2D input pose + our normalize step. The contract:
+  clean humanoid silhouette, arms **separated** from the torso (T/A-pose), `mesh_simplify ≥ 0.9`,
+  normalized upright/centered. A genuinely **non-humanoid** design (the tendril boss) never rigs
+  perfectly to a humanoid skeleton — a design choice, not a pipeline bug. This retires the old **Phase 5
+  — avatars (deferred)** line: the character pipeline is now the active build, not a future phase.
+
 - **Reference-driven refine/upscale pipeline** (the north-star asset-gen arc): procgen/reference asset →
   render → reference-conditioned img2img/upscale → TRELLIS → **derived** asset via `source_asset_id` (schema
   already supports it). Turns the ~480-asset library into source material. Needs one deliberate paid pass.
