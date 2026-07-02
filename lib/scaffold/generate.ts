@@ -36,7 +36,26 @@ export type ScaffoldOptions = {
   /** Starter template. Defaults to "blank" (pure system picker, v1 behaviour). */
   template?: ScaffoldTemplate;
   systemIds: readonly string[];
+  /**
+   * Identity seed/token — the anti-sameness knob. Blank/omitted derives a token
+   * deterministically from the project name (via `slugify`), so every scaffold
+   * still gets SOME identity, and re-generating the same name reproduces it.
+   * The resolved token is baked into the generated `src/identity.ts` as the
+   * literal argument to `createIdentity(...)`, so the identity is LIVE in the
+   * output (re-computed from the token at runtime), not frozen numbers.
+   */
+  identityToken?: string;
 };
+
+/**
+ * Resolve the identity token: an explicit non-blank token wins; otherwise fall
+ * back to the project's slug so the token is still deterministic per-name. Pure.
+ */
+export function resolveIdentityToken(name: string, identityToken?: string): string {
+  const explicit = identityToken?.trim();
+  if (explicit) return explicit;
+  return slugify(name) || "game";
+}
 
 /** UI-facing template metadata (label + which systems it implies/pre-checks). */
 export type TemplateMeta = {
@@ -379,6 +398,28 @@ export const WIRING: Record<string, WiringEntry> = {
     r3f: {
       imports: [`import { clamp, lerp, damp } from "game-kit";`],
       setup: [`// math utils (clamp, lerp, damp) available from game-kit`],
+    },
+  },
+  identity: {
+    label: "Identity",
+    // `src/identity.ts` (always emitted — see buildIdentityTs) already computes
+    // `identity` from the resolved token; this system just references it so
+    // main wires it in explicitly instead of leaving it unused.
+    vanilla: {
+      imports: [`import { identity } from "./identity";`],
+      setup: [
+        `// The anti-sameness bundle for this seed/token — read identity.palette /`,
+        `// .lighting / .postfx / .audio / .geometry / .motion. See src/identity.ts.`,
+        `console.log("identity mood:", identity.mood);`,
+      ],
+    },
+    r3f: {
+      imports: [`import { identity } from "./identity";`],
+      setup: [
+        `// The anti-sameness bundle for this seed/token — read identity.palette /`,
+        `// .lighting / .postfx / .audio / .geometry / .motion. See src/identity.ts.`,
+        `console.log("identity mood:", identity.mood);`,
+      ],
     },
   },
   netcode: {
@@ -972,6 +1013,12 @@ export interface MoodyRoomOptions {
   size?: number;
   /** Wall + ceiling height. Default 5. */
   height?: number;
+  /**
+   * Room colours (floor/wall/ceiling/stone), \`#rrggbb\`. Defaults to the
+   * original dark neutral set; the scene builders pass the seed's
+   * \`identity.palette\` here so the room matches the rest of the identity.
+   */
+  colors?: { floor?: string; wall?: string; ceiling?: string; stone?: string };
 }
 
 /**
@@ -985,11 +1032,12 @@ export function buildMoodyRoom(opts: MoodyRoomOptions = {}): THREE.Group {
   const height = opts.height ?? 5;
   const rng = createRng(seed);
 
+  const colors = opts.colors ?? {};
   const palette = createPalette({
-    floor: "#1b1e26",
-    wall: "#23262f",
-    ceiling: "#15171d",
-    stone: "#2c2f38",
+    floor: colors.floor ?? "#1b1e26",
+    wall: colors.wall ?? "#23262f",
+    ceiling: colors.ceiling ?? "#15171d",
+    stone: colors.stone ?? "#2c2f38",
   });
 
   const room = new THREE.Group();
@@ -1071,8 +1119,9 @@ const MOODY_SCENE_TSX = `import { useEffect, useMemo, useRef } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { LightingRig, PostFx, useFirstPersonCamera } from "game-kit/r3f";
-import { BLOOM_MOODY, createInputMap, createParticles, createRng } from "game-kit";
+import { createInputMap, createParticles, createRng } from "game-kit";
 import { buildMoodyRoom } from "./moodyRoom";
+import { identity } from "./identity";
 
 /**
  * WASD (held-key) + pointer-lock mouse-look, built on game-kit's createInputMap.
@@ -1145,7 +1194,13 @@ function useExplorerInput(): () => { lookDelta: [number, number]; move: [number,
 /** A slow drifting dust field — game-kit's pooled particle system as bloom fodder. */
 function Dust() {
   const system = useMemo(
-    () => createParticles({ max: 200, size: 0.06, color: 0x6f7d99, rng: createRng(3).next }),
+    () =>
+      createParticles({
+        max: 200,
+        size: 0.06,
+        color: new THREE.Color(identity.palette.colors.glow).getHex(),
+        rng: createRng(3).next,
+      }),
     [],
   );
   useEffect(() => {
@@ -1172,10 +1227,13 @@ function Dust() {
   return <primitive object={system.object} />;
 }
 
-/** The faceted room + everything that makes it moody. */
+/** The faceted room + everything that makes it moody — all driven by \`identity\`. */
 export function MoodyScene() {
   const scene = useThree((s) => s.scene);
-  const room = useMemo(() => buildMoodyRoom({ seed: 7 }), []);
+  const room = useMemo(
+    () => buildMoodyRoom({ seed: 7, colors: identity.palette.colors }),
+    [],
+  );
   const getInput = useExplorerInput();
 
   // First-person camera at eye height; WASD + mouse-look drive it each frame.
@@ -1184,10 +1242,11 @@ export function MoodyScene() {
     fp.setPosition([0, 1.7, 6]);
   }, [fp]);
 
-  // Cold fog so the room fades into dark — the signature moody depth cue.
+  // Fog tinted from the identity's bg colour so the room fades into ITS dark,
+  // not a hard-coded one — the signature moody depth cue, still per-seed.
   useEffect(() => {
     const prev = scene.fog;
-    scene.fog = new THREE.FogExp2(0x0a0c12, 0.055);
+    scene.fog = new THREE.FogExp2(identity.palette.colors.bg, 0.055);
     return () => {
       scene.fog = prev;
     };
@@ -1197,12 +1256,18 @@ export function MoodyScene() {
     <>
       <primitive object={room} />
       <LightingRig
-        preset="moody"
-        sun={{ color: "#6f8dff", intensity: 1.4, position: [3, 6, 2], castShadow: true }}
+        preset={identity.lighting.preset}
+        ambient={{ intensity: identity.lighting.ambient.intensity }}
+        sun={{
+          color: identity.palette.colors.accent,
+          intensity: identity.lighting.sun.intensity,
+          position: [3, 6, 2],
+          castShadow: true,
+        }}
       />
       <Dust />
-      {/* The r3f <PostFx> takes bloom values directly; feed it the "moody" profile. */}
-      <PostFx bloom={BLOOM_MOODY} />
+      {/* The r3f <PostFx> takes bloom values directly; feed it the identity's bloom. */}
+      <PostFx bloom={identity.postfx.bloom} />
     </>
   );
 }
@@ -1225,14 +1290,18 @@ import {
   createRng,
 } from "game-kit";
 import { buildMoodyRoom } from "./moodyRoom";
+import { identity } from "./identity";
 
-/** Boot the moody first-person explorer into \`app\`. Returns a teardown fn. */
+/** Boot the moody first-person explorer into \`app\`. Driven by \`identity\` (see
+ * src/identity.ts) — palette/lighting/postfx all come from the seed/token, so
+ * this starter looks distinct from another scaffold's. Returns a teardown fn. */
 export function startMoodyExplorer(app: HTMLElement): () => void {
-  const { renderer, scene } = createRenderer({ clearColor: 0x0a0c12 });
+  const bgHex = new THREE.Color(identity.palette.colors.bg).getHex();
+  const { renderer, scene } = createRenderer({ clearColor: bgHex });
   app.appendChild(renderer.domElement);
 
-  // Cold exponential fog — the room fades into the dark.
-  scene.fog = new THREE.FogExp2(0x0a0c12, 0.055);
+  // Fog tinted from the identity's bg colour — the room fades into ITS dark.
+  scene.fog = new THREE.FogExp2(bgHex, 0.055);
 
   const camera = new THREE.PerspectiveCamera(
     70,
@@ -1242,20 +1311,35 @@ export function startMoodyExplorer(app: HTMLElement): () => void {
   );
   camera.position.set(0, 1.7, 6);
 
-  // The faceted room (prng + geo + palette).
-  scene.add(buildMoodyRoom({ seed: 7 }));
+  // The faceted room (prng + geo + palette), coloured from the identity.
+  scene.add(buildMoodyRoom({ seed: 7, colors: identity.palette.colors }));
 
-  // A single cold light + ambient floor via the "moody" preset.
+  // A single light + ambient floor via the identity's lighting preset/intensity.
   createLightingRig(scene, {
-    preset: "moody",
-    sun: { color: "#6f8dff", intensity: 1.4, position: [3, 6, 2], castShadow: true },
+    preset: identity.lighting.preset,
+    ambient: { intensity: identity.lighting.ambient.intensity },
+    sun: {
+      color: identity.palette.colors.accent,
+      intensity: identity.lighting.sun.intensity,
+      position: [3, 6, 2],
+      castShadow: true,
+    },
   });
 
-  // Bloom (moody preset) — rendered instead of renderer.render().
-  const postfx = createPostFx(renderer, scene, camera, { preset: "moody" });
+  // Bloom driven by the identity's postfx profile — rendered instead of
+  // renderer.render().
+  const postfx = createPostFx(renderer, scene, camera, {
+    preset: identity.postfx.preset,
+    bloom: identity.postfx.bloom,
+  });
 
-  // Drifting dust as bloom fodder.
-  const dust = createParticles({ max: 200, size: 0.06, color: 0x6f7d99, rng: createRng(3).next });
+  // Drifting dust as bloom fodder, tinted from the identity's glow colour.
+  const dust = createParticles({
+    max: 200,
+    size: 0.06,
+    color: new THREE.Color(identity.palette.colors.glow).getHex(),
+    rng: createRng(3).next,
+  });
   scene.add(dust.object);
   for (let i = 0; i < 60; i++) {
     dust.emit(
@@ -1866,6 +1950,40 @@ function buildMoodyVanillaMain(slug: string): string {
   ].join("\n");
 }
 
+/**
+ * Escape a string for embedding inside a double-quoted TS string literal.
+ * Only backslash + double-quote need escaping — tokens are plain slugs/titles.
+ */
+function escapeTsString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+/**
+ * The generated `src/identity.ts` — the anti-sameness wiring made LIVE in the
+ * output. Bakes the resolved token in as the literal `createIdentity(...)` arg
+ * (not frozen numbers), so the starter recomputes the full identity bundle at
+ * runtime and every consumer (palette/lighting/postfx/audio/geometry/motion)
+ * reads from ONE shared source. Emitted for every scaffold regardless of which
+ * systems are picked, so templates (moody-explorer) and the `identity` system
+ * wiring both resolve `./identity` the same way.
+ */
+function buildIdentityTs(token: string): string {
+  return [
+    `// The anti-sameness primitive: derives a COHERENT, DISTINCT palette +`,
+    `// lighting + postfx + audio + geometry + motion bundle from ONE token, so`,
+    `// this starter doesn't look like every other scaffold. Same token always`,
+    `// reproduces the same identity — change it below (or re-scaffold with a`,
+    `// different seed) to get a different, still-coherent look.`,
+    `import { createIdentity } from "game-kit";`,
+    ``,
+    `export const IDENTITY_TOKEN = "${escapeTsString(token)}";`,
+    ``,
+    `/** identity.palette / .lighting / .postfx / .audio / .geometry / .motion */`,
+    `export const identity = createIdentity(IDENTITY_TOKEN);`,
+    ``,
+  ].join("\n");
+}
+
 /** A starter `.gitignore` so the first commit never drags in node_modules/dist. */
 function buildGitignore(): string {
   return [
@@ -2041,6 +2159,7 @@ export function generateScaffold(opts: ScaffoldOptions): ScaffoldFile[] {
   const requestedIds = [...new Set([...opts.systemIds, ...templateSystems])];
   const resolved = resolveSystems(requestedIds);
   const contrib = templateContribution(template, opts.target, slug);
+  const identityToken = resolveIdentityToken(opts.name, opts.identityToken);
 
   const mainPath = opts.target === "r3f" ? "src/main.tsx" : "src/main.ts";
   let mainContent: string;
@@ -2064,6 +2183,9 @@ export function generateScaffold(opts: ScaffoldOptions): ScaffoldFile[] {
     { path: "vite.config.ts", content: buildViteConfig(opts.target) },
     { path: "index.html", content: buildIndexHtml(opts.name, opts.target) },
     { path: "tsconfig.json", content: buildTsconfig(opts.target) },
+    // Always emitted: the anti-sameness bundle every consumer (the identity
+    // system's wiring, the moody-explorer template) resolves `./identity` against.
+    { path: "src/identity.ts", content: buildIdentityTs(identityToken) },
     { path: mainPath, content: mainContent },
     {
       path: "README.md",

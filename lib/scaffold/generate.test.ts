@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { generateScaffold, TEMPLATES, type ScaffoldFile } from "./generate";
+import { generateScaffold, resolveIdentityToken, TEMPLATES, type ScaffoldFile } from "./generate";
+import { createIdentity } from "@/vendor/game-kit/src/identity/index";
 
 function fileMap(files: ScaffoldFile[]): Map<string, string> {
   return new Map(files.map((f) => [f.path, f.content]));
@@ -20,6 +21,7 @@ describe("generateScaffold — file tree", () => {
         "create-repo.sh",
         "index.html",
         "package.json",
+        "src/identity.ts",
         "src/main.ts",
         "tsconfig.json",
         "vite.config.ts",
@@ -550,10 +552,14 @@ describe("generateScaffold — moody-explorer template", () => {
     );
     expect(scene).toContain("createInputMap");
     expect(scene).toContain("useFirstPersonCamera(");
-    expect(scene).toContain('preset="moody"');
+    // Lighting/postfx/palette are driven by the generated identity, not a
+    // hard-coded "moody" literal — the anti-sameness wiring.
+    expect(scene).toContain('import { identity } from "./identity"');
+    expect(scene).toContain("preset={identity.lighting.preset}");
+    expect(scene).toContain("<PostFx bloom={identity.postfx.bloom} />");
     expect(scene).toContain("FogExp2");
     expect(scene).toContain("createParticles({");
-    expect(scene).toContain("buildMoodyRoom({ seed: 7 })");
+    expect(scene).toContain("buildMoodyRoom({ seed: 7, colors: identity.palette.colors })");
 
     const main = map.get("src/main.tsx") as string;
     expect(main).toContain('import { MoodyScene } from "./MoodyScene"');
@@ -584,7 +590,10 @@ describe("generateScaffold — moody-explorer template", () => {
     expect(scene).toContain("createFirstPersonCamera");
     expect(scene).toContain("createInputMap");
     expect(scene).toContain("createPostFx");
-    expect(scene).toContain('preset: "moody"');
+    // Driven by the generated identity, not a hard-coded "moody" literal.
+    expect(scene).toContain('import { identity } from "./identity"');
+    expect(scene).toContain("preset: identity.lighting.preset");
+    expect(scene).toContain("bloom: identity.postfx.bloom");
     expect(scene).toContain("postfx.render()");
 
     const main = map.get("src/main.ts") as string;
@@ -702,5 +711,197 @@ describe("generateScaffold — procgen-world template", () => {
     const main = map.get("src/main.tsx") as string;
     expect(main).toContain('import { World } from "./World"');
     expect(main).toContain("<World seed={1} />");
+  });
+});
+
+describe("resolveIdentityToken", () => {
+  it("returns the trimmed explicit token when non-blank", () => {
+    expect(resolveIdentityToken("My Game", "  cold-moon  ")).toBe("cold-moon");
+  });
+
+  it("derives a slug from the name when the token is blank/omitted", () => {
+    expect(resolveIdentityToken("My Cool Game!", "")).toBe("my-cool-game");
+    expect(resolveIdentityToken("My Cool Game!")).toBe("my-cool-game");
+    expect(resolveIdentityToken("My Cool Game!", "   ")).toBe("my-cool-game");
+  });
+
+  it("falls back to 'game' when both name and token are unusable", () => {
+    expect(resolveIdentityToken("!!!", "")).toBe("game");
+  });
+});
+
+describe("generateScaffold — src/identity.ts (anti-sameness wiring)", () => {
+  it("is always emitted, regardless of picked systems/template", () => {
+    const files = generateScaffold({ name: "G", target: "vanilla", systemIds: [] });
+    expect(fileMap(files).has("src/identity.ts")).toBe(true);
+  });
+
+  it("bakes the resolved token as a literal createIdentity(...) call", () => {
+    const content = fileMap(
+      generateScaffold({
+        name: "G",
+        target: "vanilla",
+        systemIds: [],
+        identityToken: "cold-moon",
+      }),
+    ).get("src/identity.ts") as string;
+    expect(content).toContain('import { createIdentity } from "game-kit";');
+    expect(content).toContain('export const IDENTITY_TOKEN = "cold-moon";');
+    expect(content).toContain("export const identity = createIdentity(IDENTITY_TOKEN);");
+  });
+
+  it("derives the token from the project name when identityToken is blank/omitted", () => {
+    const blank = fileMap(
+      generateScaffold({ name: "Frost Peaks", target: "vanilla", systemIds: [] }),
+    ).get("src/identity.ts") as string;
+    const omitted = fileMap(
+      generateScaffold({ name: "Frost Peaks", target: "vanilla", systemIds: [] }),
+    ).get("src/identity.ts") as string;
+    expect(blank).toContain('export const IDENTITY_TOKEN = "frost-peaks";');
+    expect(blank).toBe(omitted);
+  });
+
+  it("escapes double quotes / backslashes in the token", () => {
+    const content = fileMap(
+      generateScaffold({
+        name: "G",
+        target: "vanilla",
+        systemIds: [],
+        identityToken: 'weird "token" \\ name',
+      }),
+    ).get("src/identity.ts") as string;
+    expect(content).toContain(
+      'export const IDENTITY_TOKEN = "weird \\"token\\" \\\\ name";',
+    );
+  });
+
+  it("same token -> byte-identical src/identity.ts across separate generate calls", () => {
+    const a = fileMap(
+      generateScaffold({ name: "A", target: "vanilla", systemIds: [], identityToken: "ember-1" }),
+    ).get("src/identity.ts");
+    const b = fileMap(
+      generateScaffold({ name: "B", target: "r3f", systemIds: ["lighting"], identityToken: "ember-1" }),
+    ).get("src/identity.ts");
+    expect(a).toBe(b);
+  });
+
+  it("different tokens -> different baked identity files", () => {
+    const a = fileMap(
+      generateScaffold({ name: "G", target: "vanilla", systemIds: [], identityToken: "ember-1" }),
+    ).get("src/identity.ts");
+    const b = fileMap(
+      generateScaffold({ name: "G", target: "vanilla", systemIds: [], identityToken: "abyssal-9" }),
+    ).get("src/identity.ts");
+    expect(a).not.toBe(b);
+  });
+
+  it("full generate output is deterministic for the same options (including identity)", () => {
+    const opts = {
+      name: "Determinism Check",
+      target: "vanilla" as const,
+      systemIds: ["render-bootstrap", "lighting"],
+      identityToken: "steady-seed",
+    };
+    expect(generateScaffold(opts)).toEqual(generateScaffold(opts));
+  });
+});
+
+describe("generateScaffold — 'identity' system wiring", () => {
+  it("references the generated identity module when picked (vanilla)", () => {
+    const main = fileMap(
+      generateScaffold({
+        name: "G",
+        target: "vanilla",
+        systemIds: ["render-bootstrap", "identity"],
+      }),
+    ).get("src/main.ts") as string;
+    expect(main).toContain('import { identity } from "./identity";');
+    expect(main).toContain("identity.mood");
+  });
+
+  it("references the generated identity module when picked (r3f)", () => {
+    const main = fileMap(
+      generateScaffold({
+        name: "G",
+        target: "r3f",
+        systemIds: ["identity"],
+      }),
+    ).get("src/main.tsx") as string;
+    expect(main).toContain('import { identity } from "./identity";');
+    expect(main).toContain("identity.mood");
+  });
+});
+
+describe("generateScaffold — moody-explorer consumes the generated identity", () => {
+  it("r3f scene's palette/lighting/postfx match createIdentity(token) for the resolved token", () => {
+    const identityToken = "verdant-test-seed";
+    const map = fileMap(
+      generateScaffold({
+        name: "Gloom",
+        target: "r3f",
+        template: "moody-explorer",
+        systemIds: [],
+        identityToken,
+      }),
+    );
+    const identityFile = map.get("src/identity.ts") as string;
+    expect(identityFile).toContain(`export const IDENTITY_TOKEN = "${identityToken}";`);
+
+    // Cross-check against the real primitive: the SAME token must resolve to
+    // the SAME mood/palette the scene will read at runtime via `identity`.
+    const expected = createIdentity(identityToken);
+    const scene = map.get("src/MoodyScene.tsx") as string;
+    expect(scene).toContain("identity.lighting.preset");
+    expect(scene).toContain("identity.postfx.bloom");
+    expect(scene).toContain("identity.palette.colors");
+    // Sanity: the mood the token resolves to is one of the curated archetypes.
+    expect(["ember", "abyssal", "verdant", "frostbite", "arcane"]).toContain(expected.mood);
+  });
+
+  it("different tokens -> different generated identity files for the same template/target", () => {
+    const a = fileMap(
+      generateScaffold({
+        name: "Gloom",
+        target: "r3f",
+        template: "moody-explorer",
+        systemIds: [],
+        identityToken: "ember-a",
+      }),
+    ).get("src/identity.ts");
+    const b = fileMap(
+      generateScaffold({
+        name: "Gloom",
+        target: "r3f",
+        template: "moody-explorer",
+        systemIds: [],
+        identityToken: "abyssal-b",
+      }),
+    ).get("src/identity.ts");
+    expect(a).not.toBe(b);
+  });
+
+  it("no leftover hard-coded 'moody' preset/bloom literals in the generated scenes", () => {
+    const map = fileMap(
+      generateScaffold({
+        name: "Gloom",
+        target: "r3f",
+        template: "moody-explorer",
+        systemIds: [],
+      }),
+    );
+    const r3fScene = map.get("src/MoodyScene.tsx") as string;
+    expect(r3fScene).not.toContain('preset="moody"');
+    expect(r3fScene).not.toContain("BLOOM_MOODY");
+
+    const vanillaMap = fileMap(
+      generateScaffold({
+        name: "Gloom",
+        target: "vanilla",
+        template: "moody-explorer",
+        systemIds: [],
+      }),
+    );
+    const vanillaScene = vanillaMap.get("src/moodyScene.ts") as string;
+    expect(vanillaScene).not.toContain('preset: "moody"');
   });
 });
