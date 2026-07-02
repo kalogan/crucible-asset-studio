@@ -31,7 +31,10 @@ Many **Builder** agents do focused, disjoint slices of work in parallel. Nothing
 a builder claims is trusted until the Architect re-runs the full gate with real
 exit codes. Work is checkpointed constantly so nothing is ever lost. The human
 is consulted only for the things only a human can decide — design forks, feel,
-and risky/irreversible actions — which is what makes being AFK safe.
+and risky/irreversible actions — which is what makes being AFK safe. The same
+discipline runs in two cadences (§9): **AFK** for work the gate can judge, and a
+**Sync** taste loop for work only the Director's eye can judge — verification binds
+in both.
 
 The result: **massive parallel progress at a high, enforced quality bar, with the
 human in the loop only where their judgment is irreplaceable.**
@@ -292,6 +295,41 @@ standing risk (you can build beautifully-verified things nobody wants) and decid
 *deliberately* whether to seek real-user signal or keep building on conviction.
 Never let the green gate masquerade as product validation.
 
+### 5b-ii. Domain verification checklists — verify the property the user cares about
+
+The runtime smoke (§5b) is only as good as *what it checks for*. The failure mode is
+subtle: you verify the property that's **easy to render**, and it passes, while the
+property that actually **matters** is broken. A rig verification that checked "deforms
+smoothly" went green — while the limbs swung **backward**. Smoothness was the
+easy-to-see property; direction was the one that mattered. The smoke booted, drove,
+screenshotted, and *still* shipped a broken artifact, because nobody had written down
+"limbs must move in the correct direction" as a thing to look at.
+
+> **Rule:** for each recurring artifact domain, keep an **explicit checklist** of the
+> properties that must hold — and verify **each one by observation, not inference.**
+> "It rendered without error" is not "it's correct." Look at the thing and check the
+> box, or don't check it.
+
+The checklist is the domain's contribution to the four-dimensions gap (§5b): the
+*Functional/Contextual* properties no linter names, made concrete so the smoke can't
+skip them. Two worked examples of the shape:
+
+- **RIGS.** Deforms smoothly **AND** limbs move in the correct direction relative to
+  facing **AND** feet contact the floor (no float, no sink) **AND** every expected clip
+  is present *and* starts from a neutral pose. Any one false → red, no matter how good
+  the others look.
+- **UI CHANGES.** The Architect **boots the app and drives the changed surface** —
+  *clicks* it, not just *compiles* it — at the **real viewport**, before the Director
+  ever sees it. Compiling proves the code parses; it says nothing about whether the new
+  control works, or whether it broke a neighbor. Two bugs shipped to the Director this
+  week precisely because this was skipped: an overlay that **covered** an adjacent HP
+  bar, and a control that **wedged** after its first use. A boot-and-click smoke catches
+  both in seconds; a compile catches neither.
+
+Instantiate a checklist per domain the moment it recurs (template in
+[Part II](#i-domain-verification-checklist-template)); it becomes part of that domain's
+gate, verified in the smoke, never taken on a builder's say-so.
+
 ### 5c. Accessibility and mobile are constraints, not polish
 
 For any product with a UI, two standing constraints belong on **every UI builder's
@@ -360,6 +398,58 @@ Director — and never cross them while AFK:
 
 Everything else is fair game unattended. When in doubt, **checkpoint and ask**
 rather than act.
+
+### 9. Two operating modes
+
+The pipeline runs in two legitimate modes. They are not a compromise on quality —
+they're the same discipline shaped to two different kinds of "done." Pick the mode
+from the **work type**, not from mood or convenience.
+
+- **AFK mode (the original).** The Director is away. Work flows through a **review
+  queue**; supervision runs in long loops; builders have full autonomy inside the
+  safety boundaries (§8). This is the right mode when **"done" is objective** — the
+  gate can decide it. Infra, pipeline, backend, data, refactors: the definition of
+  done is a green gate, so the human doesn't need to be in the room.
+- **Sync mode (the taste loop).** The Director is **present and playtesting**, giving
+  feedback at a minutes cadence — *"the walk is too slow," "the guard should kneel"* —
+  and the Architect **fixes, verifies, and redelivers** in tight cycles. This is the
+  right mode when **"done" is the Director's eye** — game-feel, visual, and audio work
+  where no gate can judge the result. The loop is a conversation, not a queue.
+
+**What still binds in sync mode.** Sync is a *cadence* change, not a discipline change.
+Every load-bearing rule survives:
+- **Independent verification before every handoff (§5).** Never show the Director
+  unverified work — not even in a fast loop. A redeliver that hasn't cleared its gate
+  (and its domain checklist, §5b-ii) is exactly the "green-but-broken" the pipeline
+  exists to stop. Speed is not an excuse to skip the re-run.
+- **Checkpoint commits (§4-prevention, §6).** Commit per increment. A live taste loop
+  is *more* churn, not less — losing the last ten fixes to a crash is worse mid-conversation.
+- **Safety boundaries (§8).** Present ≠ blanket approval. The stop-and-ask list still
+  holds; the Director being nearby doesn't authorize a force-push or a deploy.
+- **Fan-out for the parallelizable parts (§6).** A taste session can *still* run
+  background builders on **disjoint infra** while the Director and Architect iterate on
+  feel. Sync mode doesn't mean single-threaded — it means the *feel* work is
+  interactive while the disjoint plumbing keeps fanning out.
+
+**What relaxes.** Only the cadence machinery:
+- The **review queue collapses into live feedback** — items that would be *queued* for
+  a distant Director are answered in the moment instead.
+- **Supervision cadence follows the conversation** — you're not running long fallback
+  heartbeats against an absent human; you pace to the loop.
+
+| Work type | "Done" is decided by | Mode |
+|---|---|---|
+| Infra / pipeline / backend / data | the gate (objective) | **AFK** |
+| Refactor / migration / test coverage | the gate (objective) | **AFK** |
+| Game-feel / animation / movement tuning | the Director's eye | **Sync** |
+| Visual / layout / art direction | the Director's eye | **Sync** |
+| Audio / music / SFX feel | the Director's ear | **Sync** |
+| Mixed slice (infra + feel) | split it | **AFK** the infra, **Sync** the feel |
+
+The modes compose: a session is often **Sync in the foreground** (the Director iterating
+on feel) **over AFK builders in the background** (disjoint infra). What never changes,
+in either mode, is the authority rule (§1): nothing a builder claims is trusted until
+the Architect re-runs the gate.
 
 ---
 
@@ -529,6 +619,39 @@ synthesize the answers into the plan and dispatch — don't re-ask what's settle
   of blocking. The Director drains it on their schedule.
 - **Roadmap:** mark slices done; keep the next-up ordering explicit.
 
+### H. Mode selection (AFK vs Sync)
+
+Pick the mode from the work type before dispatching (§9). The discipline is identical;
+only the cadence and the review-queue-vs-live-feedback differ.
+
+| Signal | → Mode | Cadence | Review path | Fan-out |
+|---|---|---|---|---|
+| "done" = green gate (infra/pipeline/backend/data/refactor) | **AFK** | long supervision loops (§F) | **queue** taste items | full background fan-out |
+| "done" = Director's eye/ear (feel/visual/audio) | **Sync** | follow the conversation | **live feedback** in the loop | disjoint infra still fans out in the background |
+| mixed slice | **split** | Sync the feel, AFK the infra | live for feel, queue for infra | infra fans out under the taste loop |
+
+Invariant across both modes: **verify before every handoff (§5), commit per increment
+(§4-prevention), honor safety boundaries (§8).** Sync relaxes *only* the cadence and the
+queue — never the verification.
+
+### I. Domain verification checklist (template)
+
+For each recurring artifact domain (§5b-ii), instantiate this block and run it in the
+runtime smoke. Verify **each** property by observation; a green build is not a checked box.
+
+```
+DOMAIN: <e.g. rig | UI change | audio clip | generated mesh>
+VERIFY (each by observation, in the smoke — not inferred from "it built"):
+- [ ] <property 1 the user actually cares about>   e.g. limbs move in the CORRECT direction
+- [ ] <property 2>                                  e.g. deforms smoothly (no shattering)
+- [ ] <property 3>                                  e.g. feet contact the floor (no float/sink)
+- [ ] <property 4: completeness>                    e.g. every expected clip present + neutral start
+- [ ] <the neighbor check>                          e.g. the change didn't cover/wedge an adjacent control
+BOOT + DRIVE: <boot the app/preview, DRIVE the changed surface at the real viewport —
+              click it, don't just compile it — before the Director sees it>
+ANY box false → RED. Report which property failed; do NOT hand off.
+```
+
 ---
 
 ## When to use this (and when not)
@@ -582,6 +705,18 @@ inherently serial and tiny (no fan-out to gain); or every step needs human judgm
 - **Stop-before** — a safety boundary the Architect won't cross unattended.
 - **Review queue** — a list of taste/feel/wording items surfaced to the Director
   instead of blocking.
+- **AFK mode (§9)** — Director away; work flows through a review queue on long
+  supervision loops with full autonomy inside the safety boundaries. For work where
+  "done" is objective (the gate) — infra/pipeline/backend/data.
+- **Sync mode (§9)** — the taste loop: Director present and playtesting, giving
+  minutes-cadence feedback while the Architect fixes-verifies-redelivers in tight
+  cycles. For work where "done" is the Director's eye — game-feel/visual/audio. Only
+  the cadence and the review queue relax; verification, checkpoints, safety boundaries,
+  and background fan-out still bind.
+- **Domain verification checklist (§5b-ii)** — a per-domain list of the properties an
+  artifact must actually have (e.g. for a rig: correct limb direction, floor contact,
+  all clips present), each verified **by observation** in the runtime smoke — so the
+  smoke can't pass on the easy-to-render property while the one that matters is broken.
 
 ---
 
@@ -640,6 +775,19 @@ moments that shaped the rules above:
 - **Cozy design rules as constraints.** Director taste ("exposure should slow, not
   kill"; "PvP opt-in only") became standing constraints handed to every relevant
   builder — taste encoded as rules, not re-litigated per slice.
+- **Backward limbs passed a "smooth" check → domain checklists.** A character-rig
+  verification asked only "does it deform smoothly?" — it did, and went green, while the
+  limbs swung *backward* relative to facing. Smoothness was the easy-to-render property;
+  direction was the one that mattered, and nothing had told the smoke to look at it.
+  Hence §5b-ii: each recurring domain gets an explicit checklist (rig = smooth **and**
+  correct direction **and** feet on the floor **and** all clips present from neutral),
+  each box verified by *observation*, not inferred from a clean build.
+- **Two UI bugs shipped past a compile → boot-and-drive the surface.** Two changes
+  reached the Director broken because verification stopped at "it compiles": a tuning
+  panel that **covered the enemy HP bar**, and a slider that **wedged after first use**.
+  Both are invisible to a typecheck and obvious to a five-second boot-and-click. Hence
+  the UI half of §5b-ii: the Architect boots the app and *drives the changed surface* at
+  the real viewport — clicks it, checks the neighbors — before the Director ever sees it.
 
 The throughput this enabled: while the Director was AFK or away on a usage reset,
 disjoint builders delivered a gear loop, procedural audio + music, telegraphs,
