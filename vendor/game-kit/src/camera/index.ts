@@ -277,8 +277,11 @@ export interface FirstPersonCameraOptions {
   invertY?: boolean;
   /** Pitch clamp magnitude, radians. Default ~85°. */
   pitchLimit?: number;
-  /** Movement speed in units per second. Default 2.2. */
-  moveSpeed?: number;
+  /**
+   * Movement speed in units per second. Default 2.2. Pass a GETTER (`() => number`)
+   * to vary speed at runtime (e.g. a sprint toggle) without recreating the controller.
+   */
+  moveSpeed?: number | (() => number);
 }
 
 /** First-person camera. See {@link createFirstPersonCamera}. */
@@ -307,7 +310,10 @@ export function createFirstPersonCamera(
   const lookSensitivity = opts.lookSensitivity ?? 0.0025;
   const invertY = opts.invertY ?? false;
   const pitchLimit = opts.pitchLimit ?? 85 * DEG2RAD;
-  const moveSpeed = opts.moveSpeed ?? 2.2;
+  // moveSpeed may be a live getter (sprint) — resolve it PER FRAME below.
+  const staticSpeed = typeof opts.moveSpeed === "number" ? opts.moveSpeed : 2.2;
+  const getMoveSpeed: () => number =
+    typeof opts.moveSpeed === "function" ? opts.moveSpeed : () => staticSpeed;
 
   let yaw = opts.yaw ?? 0;
   let pitch = clamp(opts.pitch ?? 0, -pitchLimit, pitchLimit);
@@ -342,7 +348,7 @@ export function createFirstPersonCamera(
         // Right = forward × +Y projected to XZ → (-fz, 0, fx).
         _right.set(-_forward.z, 0, _forward.x);
 
-        const dist = moveSpeed * dt;
+        const dist = getMoveSpeed() * dt;
         camera.position.x += (_forward.x * forward + _right.x * strafe) * dist;
         camera.position.z += (_forward.z * forward + _right.z * strafe) * dist;
       }

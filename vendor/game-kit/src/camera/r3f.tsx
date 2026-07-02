@@ -283,6 +283,11 @@ export function useGameCamera(props: GameCameraProps): GameCameraHandle {
   const { mode, options, bounds } = props;
   const camera = useThree((s) => s.camera);
   const resolved = useMemo(() => resolveGameCameraOptions(options), [options]);
+  // Keep the live moveSpeed in a ref so the FP controller (created once) can read the
+  // CURRENT value each frame — lets a game vary speed at runtime (sprint) without
+  // recreating the controller (which would reset look).
+  const moveSpeedRef = useRef(resolved.moveSpeed);
+  moveSpeedRef.current = resolved.moveSpeed;
   const io = useCameraInput(mode === 'first');
 
   // Keep the latest prop getters in refs so useFrame never restarts on rerender.
@@ -298,7 +303,7 @@ export function useGameCamera(props: GameCameraProps): GameCameraHandle {
       lookSensitivity: resolved.lookSensitivity,
       invertY: resolved.invertY,
       pitchLimit: resolved.pitchLimit,
-      moveSpeed: resolved.moveSpeed,
+      moveSpeed: () => moveSpeedRef.current, // live (sprint) — read per frame
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, mode]);
