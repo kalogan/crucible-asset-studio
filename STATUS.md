@@ -23,6 +23,16 @@ check back later) for infra/plumbing. **Gate:** CI running on both this repo and
 ## Arm sequencing
 
 - **NOW:** finish GYRE's demo; build the identity-token module (anti-sameness); start the 2D-mobile arm.
+- **NEXT — `cutscene` kit module (cinematic 3D storytelling; Director, 2026-07-02).** Nocturne-intro
+  energy: authored camera moves over the live 3D world while the environment *tells the story* (fog/light/
+  bloom ramps, the world falling into darkness). Environmental-ambience storytelling is core to GYRE's
+  identity, so this becomes a first-class kit module, not a GYRE one-off. Shape: a declarative, deterministic
+  **shot sequence player** — per shot: camera path (keyframes + easing), environment ramps (fog density,
+  light intensity/color, postfx), character clip triggers, caption/letterbox track, skippable; r3f
+  `<CutscenePlayer sequence onDone>`. Composes with existing kit pieces (camera, scene-state, audio, clip,
+  postfx) — mostly glue, not new tech. **First consumer is already on the slate:** GYRE's W3 endings (3
+  short montages) and optionally a title-card intro shot; build the minimal module when W3 starts, grow it
+  from real use (the GYRE-retro pattern: harvest glue from a real game, not speculate).
 - **NEXT (deliberate paid pass):** the reference-driven refine/upscale pipeline (procgen asset → render →
   reference-conditioned img2img/upscale → TRELLIS → derived asset via `source_asset_id`).
 - **AFTER THE SLATE (parked, not deleted):** LoRA training, Kiln finishing + CDN publish, Roblox
