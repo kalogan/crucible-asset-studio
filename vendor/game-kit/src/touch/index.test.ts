@@ -18,6 +18,15 @@ function up(id: number, x: number, y: number): TouchPointerEvent {
 }
 
 describe('createTouchState — stick', () => {
+  it('push UP walks FORWARD (screen-y negated for the camera; regression: backwards-on-mobile)', () => {
+    const t = createTouchState({ screenWidth: SCREEN_WIDTH });
+    t.handleEvent(down(1, 100, 300), 0);
+    t.handleEvent(move(1, 100, 200), 16); // drag UP 100px (screen y decreases)
+    const [strafe, forward] = t.moveAxes();
+    expect(strafe).toBeCloseTo(0);
+    expect(forward).toBeGreaterThan(0.5); // UP on screen = POSITIVE forward
+  });
+
   it('is inactive with zero axes before any touch', () => {
     const t = createTouchState({ screenWidth: SCREEN_WIDTH });
     expect(t.stick()).toEqual({ active: false, x: 0, y: 0 });

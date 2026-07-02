@@ -309,7 +309,11 @@ export function createTouchState(opts: TouchStateOptions): TouchState {
 
     moveAxes(): [number, number] {
       const s = stickTrack ? this.stick() : { x: 0, y: 0 };
-      return [s.x, s.y];
+      // Screen-space Y grows DOWNWARD, but CameraInput.move's forward axis is
+      // positive-forward (keyboard W = +1). Negate here — the camera-facing
+      // adapter — so pushing the stick UP walks forward. `stick()` stays raw
+      // screen-space for nub rendering. (`|| 0` normalizes -0 → 0.)
+      return [s.x, -s.y || 0];
     },
 
     drainLook(): [number, number] {
