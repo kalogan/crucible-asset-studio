@@ -124,6 +124,23 @@ export function useFirstPersonCamera(
 // look/orbit/zoom accumulation) is HARVESTED from GYRE's hand-built player.tsx
 // and shared across all three modes so no game hand-wires it again.
 
+/**
+ * The per-frame input shape `useCameraInput` (below) produces and every mode's
+ * `useFrame` drains. Any object matching this shape can stand in for the
+ * built-in pointer-lock/keyboard rig — see {@link GameCameraProps.inputOverride}.
+ * `touch/r3f.tsx`'s `TouchControls` `onReady` callback hands back exactly this.
+ */
+export interface GameCameraIO {
+  /** Accumulated look delta since the last drain, `[dx, dy]`, then reset. */
+  drainLook(): [number, number];
+  /** Current move axes `[strafe, forward]`, each typically in [-1, 1]. */
+  moveAxes(): [number, number];
+  /** Accumulated zoom/dolly delta since the last drain, then reset. */
+  drainZoom(): number;
+  /** True while the user is actively dragging to orbit (third/topdown). */
+  isDragging(): boolean;
+}
+
 /** Props/args for {@link useGameCamera} / {@link GameCamera}. */
 export interface GameCameraProps {
   /** Which built-in mode to run. */
@@ -148,6 +165,17 @@ export interface GameCameraProps {
    * first-person games that need the eye position (e.g. audio listeners).
    */
   onReady?: (getPos: () => THREE.Vector3) => void;
+  /**
+   * OPT-IN: an alternate {@link GameCameraIO} used INSTEAD of the built-in
+   * `useCameraInput` pointer-lock/keyboard rig — e.g. `TouchControls`' `onReady`
+   * io (`touch/r3f.tsx`), for mobile. When omitted (the default), behavior is
+   * EXACTLY the existing pointer-lock/keyboard/drag/wheel rig, unchanged. When
+   * provided, its io fully REPLACES the built-in rig's output for this
+   * instance (the two sources are mutually exclusive per `GameCamera`, no
+   * merging) — `useCameraInput` still mounts (Rules of Hooks) but its DOM
+   * listeners simply go unread.
+   */
+  inputOverride?: GameCameraIO;
 }
 
 /** Handle returned by {@link useGameCamera} for imperative teleports. */
@@ -280,7 +308,7 @@ function useCameraInput(lockOnClick: boolean) {
  *   the XZ plane; no pitch. `bounds` constrains the target.
  */
 export function useGameCamera(props: GameCameraProps): GameCameraHandle {
-  const { mode, options, bounds } = props;
+  const { mode, options, bounds, inputOverride } = props;
   const camera = useThree((s) => s.camera);
   const resolved = useMemo(() => resolveGameCameraOptions(options), [options]);
   // Keep the live moveSpeed in a ref so the FP controller (created once) can read the
@@ -288,7 +316,11 @@ export function useGameCamera(props: GameCameraProps): GameCameraHandle {
   // recreating the controller (which would reset look).
   const moveSpeedRef = useRef(resolved.moveSpeed);
   moveSpeedRef.current = resolved.moveSpeed;
-  const io = useCameraInput(mode === 'first');
+  // DEFAULT UNCHANGED: `useCameraInput` (pointer-lock/keyboard) is the io source
+  // unless the caller opts into `inputOverride` (e.g. TouchControls), in which
+  // case the built-in rig is skipped entirely — no merging of the two sources.
+  const builtinIo = useCameraInput(mode === 'first');
+  const io: GameCameraIO = inputOverride ?? builtinIo;
 
   // Keep the latest prop getters in refs so useFrame never restarts on rerender.
   const targetRef = useRef(props.target);

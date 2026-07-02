@@ -16,3 +16,4 @@ export * from './character/r3f.js';
 export * from './scene-state/r3f.js';
 export * from './cutscene/r3f.js';
 export * from './layout/r3f.js';
+export * from './touch/r3f.js';

@@ -16,6 +16,7 @@ export * from './math/index.js';
 export * from './net/index.js';
 export * from './presets/index.js';
 export * from './identity/index.js';
+export * from './touch/index.js';
 
 // three-dependent modules.
 export * from './lighting/index.js';
