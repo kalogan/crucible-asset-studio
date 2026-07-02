@@ -30,3 +30,4 @@ export * from './fx/index.js';
 export * from './clip/index.js';
 export * from './world/index.js';
 export * from './gltf/index.js';
+export * from './cutscene/index.js';
